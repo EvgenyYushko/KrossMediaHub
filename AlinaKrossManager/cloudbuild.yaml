@@ -1,13 +1,10 @@
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: [
-      'build',
-      '-t', 'gcr.io/$PROJECT_ID/alina-kross-manager',
-      '-f', 'AlinaKrossManager/Dockerfile',
-      '.'
-    ]
+  # Шаг 0: Переход в директорию и сборка Docker-образа
+  - name: 'gcr.io/cloud-builders/gcloud' # Используем gcloud builder, который поддерживает bash
+    args: ['bash', '-c', 'cd AlinaKrossManager && docker build -t gcr.io/$PROJECT_ID/alina-kross-manager .']
     id: Build
 
+  # Шаг 1: Пуш Docker-образа
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/alina-kross-manager']
     id: Push
