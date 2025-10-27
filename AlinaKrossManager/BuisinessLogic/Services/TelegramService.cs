@@ -12,7 +12,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			var response = text.ToLower() switch
 			{
-				"/start" => "Привет! Я Alina Kross Manager.",
+				"/start" => "Привет! Я Alina Kross Manager .",
 				_ => $"Вы сказали: {text}"
 			};
 
