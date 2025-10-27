@@ -16,6 +16,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				_ => $"Вы сказали: {text}"
 			};
 
+			var test = Environment.GetEnvironmentVariable("TelegramBotToken");
+			Console.WriteLine(test);
+
 			await botClient.SendRequest<Message>(
 				new SendMessageRequest(update.Message.Chat.Id, response),
 				ct
