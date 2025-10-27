@@ -1,18 +1,18 @@
 steps:
-# Шаг 0: Сборка Docker-образа с явным указанием рабочей директории
-- name: 'gcr.io/cloud-builders/docker'
-  args: [
-    'build', 
-    '-t', 'gcr.io/$PROJECT_ID/alina-kross-manager', 
-    '.' # Контекст сборки - текущая директория (которая будет 'AlinaKrossManager')
-  ]
-  dir: 'AlinaKrossManager' # <-- Ключевой параметр: устанавливает рабочую директорию
-  id: Build
+  # Шаг 0: Сборка Docker-образа
+  # Контекст сборки '.' (корень) ищет Dockerfile в корне.
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/alina-kross-manager',
+      '.'  # Контекст сборки: корень репозитория (/workspace)
+    ]
+    id: Build
 
-# Шаг 1: Пуш Docker-образа
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/$PROJECT_ID/alina-kross-manager']
-  id: Push
+  # Шаг 1: Пуш Docker-образа
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/alina-kross-manager']
+    id: Push
 
 images:
-- 'gcr.io/$PROJECT_ID/alina-kross-manager'
+  - 'gcr.io/$PROJECT_ID/alina-kross-manager'
