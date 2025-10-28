@@ -28,7 +28,8 @@ if (app.Environment.IsDevelopment())
 	app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// ВНИМАНИЕ: Закомментировать или удалить в Cloud Run/Kubernetes
+// app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
