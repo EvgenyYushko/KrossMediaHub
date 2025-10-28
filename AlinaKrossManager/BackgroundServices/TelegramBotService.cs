@@ -59,15 +59,15 @@ namespace AlinaKrossManager.BackgroundServices
 			//}
 		}
 
-		private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
-		{
-			await _telegramService.HandleUpdateAsync(botClient, update, ct);
-		}
+		//private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
+		//{
+		//	await _telegramService.HandleUpdateAsync(botClient, update, ct);
+		//}
 
-		private Task HandleErrorAsync(ITelegramBotClient botClient, Exception error, CancellationToken ct)
-		{
-			_logger.LogError(error, "Ошибка Telegram бота");
-			return Task.CompletedTask;
-		}
+		//private Task HandleErrorAsync(ITelegramBotClient botClient, Exception error, CancellationToken ct)
+		//{
+		//	_logger.LogError(error, "Ошибка Telegram бота");
+		//	return Task.CompletedTask;
+		//}
 	}
 }

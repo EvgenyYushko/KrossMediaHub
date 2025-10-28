@@ -2,6 +2,7 @@ using AlinaKrossManager.BuisinessLogic.Services;
 using Microsoft.AspNetCore.Mvc;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using static AlinaKrossManager.Helpers.Logger;
 
 namespace AlinaKrossManager.Controllers
 {
@@ -22,7 +23,16 @@ namespace AlinaKrossManager.Controllers
 		[HttpPost]
 		public async Task<IActionResult> Post([FromBody] Update update)
 		{
-			await _telegramService.HandleUpdateAsync(_telegramBotClient, update, CancellationToken.None); // Передайте update вашему обработчику
+			try
+			{
+				Log($"{update.Message?.Text}");
+				await _telegramService.HandleUpdateAsync(_telegramBotClient, update, CancellationToken.None); // Передайте update вашему обработчику
+			}
+			catch (Exception ex)
+			{
+				Log(ex.ToString());
+			}
+
 			return Ok(); // Важно: всегда возвращайте 200 OK быстро
 		}
 	}
