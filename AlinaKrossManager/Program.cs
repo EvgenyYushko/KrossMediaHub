@@ -18,7 +18,7 @@ builder.Services.AddSingleton<ITelegramBotClient>(provider =>
 	return new TelegramBotClient(token);
 });
 
-builder.Services.AddHostedService<TelegramBotService>();
+//builder.Services.AddHostedService<TelegramBotService>();
 builder.Services.AddSingleton<TelegramService>();
 
 var app = builder.Build();

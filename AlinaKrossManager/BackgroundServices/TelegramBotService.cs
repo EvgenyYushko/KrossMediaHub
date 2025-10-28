@@ -25,38 +25,38 @@ namespace AlinaKrossManager.BackgroundServices
 
 		protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 		{
-			try
-			{
-				// Получаем информацию о боте
-				var me = await _botClient.SendRequest<User>(new GetMeRequest(), stoppingToken);
-				_logger.LogInformation($"Бот @{me.Username} запущен!");
+			//try
+			//{
+			//	// Получаем информацию о боте
+			//	var me = await _botClient.SendRequest<User>(new GetMeRequest(), stoppingToken);
+			//	_logger.LogInformation($"Бот @{me.Username} запущен!");
 
-				// Минимальная настройка ReceiverOptions
-				var receiverOptions = new ReceiverOptions
-				{
-					AllowedUpdates = []
-				};
+			//	// Минимальная настройка ReceiverOptions
+			//	var receiverOptions = new ReceiverOptions
+			//	{
+			//		AllowedUpdates = []
+			//	};
 
-				// Базовая версия StartReceiving
-				_botClient.StartReceiving(
-					HandleUpdateAsync,
-					HandleErrorAsync,
-					receiverOptions,
-					stoppingToken
-				);
+			//	// Базовая версия StartReceiving
+			//	_botClient.StartReceiving(
+			//		HandleUpdateAsync,
+			//		HandleErrorAsync,
+			//		receiverOptions,
+			//		stoppingToken
+			//	);
 
-				_logger.LogInformation("Бот начал работу");
+			//	_logger.LogInformation("Бот начал работу");
 
-				// Бесконечное ожидание
-				while (!stoppingToken.IsCancellationRequested)
-				{
-					await Task.Delay(1000, stoppingToken);
-				}
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(ex, "Ошибка в боте");
-			}
+			//	// Бесконечное ожидание
+			//	while (!stoppingToken.IsCancellationRequested)
+			//	{
+			//		await Task.Delay(1000, stoppingToken);
+			//	}
+			//}
+			//catch (Exception ex)
+			//{
+			//	_logger.LogError(ex, "Ошибка в боте");
+			//}
 		}
 
 		private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
