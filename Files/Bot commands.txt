@@ -1,0 +1,3 @@
+start - Начать
+generate_image - Сгенерировать изображение
+post_to_insta - Пост в инсту
