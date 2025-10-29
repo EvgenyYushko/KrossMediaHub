@@ -6,31 +6,31 @@ using Telegram.Bot.Types;
 namespace AlinaKrossManager.Models
 {
 	// Класс для отправки сообщения
-	public class SendMessageRequest : IRequest<Message>
-	{
-		public long ChatId { get; }
-		public string Text { get; }
+	//public class SendMessageRequest : IRequest<Message>
+	//{
+	//	public long ChatId { get; }
+	//	public string Text { get; }
 
-		public HttpMethod HttpMethod => HttpMethod.Post;
-		public string MethodName => "sendMessage";
-		public bool IsWebhookResponse { get; set; }
+	//	public HttpMethod HttpMethod => HttpMethod.Post;
+	//	public string MethodName => "sendMessage";
+	//	public bool IsWebhookResponse { get; set; }
 
-		public SendMessageRequest(long chatId, string text)
-		{
-			ChatId = chatId;
-			Text = text;
-		}
+	//	public SendMessageRequest(long chatId, string text)
+	//	{
+	//		ChatId = chatId;
+	//		Text = text;
+	//	}
 
-		public HttpContent? ToHttpContent()
-		{
-			var payload = new
-			{
-				chat_id = ChatId,
-				text = Text
-			};
+	//	public HttpContent? ToHttpContent()
+	//	{
+	//		var payload = new
+	//		{
+	//			chat_id = ChatId,
+	//			text = Text
+	//		};
 
-			var json = JsonSerializer.Serialize(payload);
-			return new StringContent(json, Encoding.UTF8, "application/json");
-		}
-	}
+	//		var json = JsonSerializer.Serialize(payload);
+	//		return new StringContent(json, Encoding.UTF8, "application/json");
+	//	}
+	//}
 }

@@ -1,0 +1,95 @@
+using AlinaKrossManager.Services;
+using Protos.GoogleGeminiService;
+
+namespace AlinaKrossManager.BuisinessLogic.Services
+{
+	public class GoogleGenerativeLanguageModel : IGenerativeLanguageModel
+	{
+		private readonly GeminiService.GeminiServiceClient _geminiServiceClient;
+		
+		private string[] modelsToTry =
+		{
+			"imagen-4.0-ultra-generate-001",
+			"imagen-4.0-generate-001",
+			"imagen-4.0-fast-generate-001",
+			"imagen-3.0-generate-002"
+		};
+
+		public GoogleGenerativeLanguageModel(GeminiService.GeminiServiceClient geminiServiceClient)
+		{
+			_geminiServiceClient = geminiServiceClient;
+		}
+
+		public async Task<string> GeminiRequest(string prompt)
+		{
+			var response = await _geminiServiceClient.RequestAsync(new Prompt { Text = prompt });
+			return response.GeneratedText;
+		}
+
+		public async Task<string> GeminiRequest(string prompt, string base64Image)
+		{
+			var response = await _geminiServiceClient.RequestWithImageAsync(new()
+			{
+				Prompt = { new Prompt { Text = prompt } },
+				Base64Idata = base64Image
+			});
+			return response.GeneratedText;
+		}
+
+		public async Task<List<string>> GeminiRequestGenerateImage(string prompt/*, int maxAttemptsPerModel = 2, int delayBetweenAttempts = 1000*/)
+		{
+			var maxAttemptsPerModel = 2;
+			var delayBetweenAttempts = 1000;
+
+			foreach (var model in modelsToTry)
+			{
+				for (int attempt = 1; attempt <= maxAttemptsPerModel; attempt++)
+				{
+					try
+					{
+						Console.WriteLine($"🔄 Попытка {attempt}/{maxAttemptsPerModel} с моделью: {model}");
+
+						var response = await _geminiServiceClient.RequestGenerateImageAsync(new()
+						{
+							Prompt = { new Prompt { Text = prompt } },
+							MimeType = "image/jpeg",
+							AspectRatio = "3:4",
+							SampleCount = 1,
+							SelectedModel = model
+						});
+
+						var images = response.GeneratedImagesBase64.ToList();
+
+						if (images.Count > 0)
+						{
+							Console.WriteLine($"✅ Успех! Модель {model} сгенерировала {images.Count} изображений");
+							return images;
+						}
+
+						Console.WriteLine($"⚠️ Модель {model} вернула 0 изображений");
+
+						// Задержка перед следующей попыткой (кроме последней)
+						if (attempt < maxAttemptsPerModel)
+						{
+							await Task.Delay(delayBetweenAttempts);
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"❌ Ошибка (модель: {model}, попытка: {attempt}): {ex.Message}");
+
+						if (attempt < maxAttemptsPerModel)
+						{
+							await Task.Delay(delayBetweenAttempts);
+						}
+					}
+				}
+
+				Console.WriteLine($"🔁 Переход к следующей модели...");
+			}
+
+			Console.WriteLine($"💥 Все модели исчерпаны. Не удалось сгенерировать изображения.");
+			return new List<string>();
+		}
+	}
+}

@@ -1,18 +1,10 @@
 using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.Models;
 using Microsoft.AspNetCore.Mvc;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
 using static AlinaKrossManager.Helpers.Logger;
-using System.Text;
-using System.Text.Json;
-using AlinaKrossManager.BuisinessLogic.Services;
-using AlinaKrossManager.Models;
-using Telegram.Bot;
-using Telegram.Bot.Polling;
-using Telegram.Bot.Requests.Abstractions;
-using Telegram.Bot.Types;
 
 namespace AlinaKrossManager.Controllers
 {

@@ -1,5 +1,10 @@
+using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Controllers;
+using AlinaKrossManager.Services;
+using Grpc.Net.Client;
+using Grpc.Net.Client.Web;
+using Protos.GoogleGeminiService;
 using Telegram.Bot;
 using static AlinaKrossManager.Constants.AppConstants;
 
@@ -15,7 +20,28 @@ builder.Services.AddSingleton<ITelegramBotClient>(provider =>
 	return new TelegramBotClient(token);
 });
 
+builder.Services.AddSingleton<IGenerativeLanguageModel>(provider =>
+{
+	var client = provider.GetService<GeminiService.GeminiServiceClient>();
+	return new GoogleGenerativeLanguageModel(client);
+});
+
+builder.Services.AddSingleton(provider =>
+{
+	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
+	var conversationService = provider.GetService<ConversationService>();
+	//var PageAccessToken = "IGAALt2MgjsilBZAFNKQ040cWM4TTl1Mkt5dFF5WXloekRJbGdwU1hqTmNBVFkzQU9mV29NWVk0X2hPdXZALZA3Q2ZA09VYXFyUnhrY3QweElHNVBnaExaS0c5TDJxS2RjN3lydlFYS0JzRUhkaGVyaTJyOTJFaHpYMVh0S2p1ZAy1xMAZDZD";
+	var accessToken = "IGAAQEMxhZAfcFBZAFM0NHhuZAjRRcnpkWEZANNGtiZAkZA2ZA1NUME8yYXFHMndXU29GUEVpUDh0bmVSeV9WSEs3M3Q4Sk93TWUzb0RWcXNYOGktekhFQ2x3YVE1Y0ZAOWm9fTEpDTXRiQlBkNXpzc0Y5dndfcS0tcm1veHNNTUUzSmRydwZDZD";
+	return new InstagramService(accessToken, geminiModel, conversationService);
+});
+
 builder.Services.AddSingleton<TelegramService>();
+var channel = GrpcChannel.ForAddress("https://google-services-kdg8.onrender.com", new GrpcChannelOptions
+{
+	HttpHandler = new GrpcWebHandler(GrpcWebMode.GrpcWeb, new HttpClientHandler())
+});
+
+builder.Services.AddSingleton(new GeminiService.GeminiServiceClient(channel));
 
 var app = builder.Build();
 
