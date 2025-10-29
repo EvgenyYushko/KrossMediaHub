@@ -15,12 +15,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 # Этот этап используется для сборки проекта сервиса
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
+
+# ДОБАВЛЯЕМ ARG ДЛЯ NUGET АУТЕНТИФИКАЦИИ
+ARG GITHUB_USER
+ARG GITHUB_TOKEN
+
 WORKDIR /src
 
-# КЛЮЧЕВОЕ ИЗМЕНЕНИЕ 1: Копируем файл .csproj из его реального местоположения
-# Контекст сборки теперь - корень, поэтому путь: AlinaKrossManager/AlinaKrossManager.csproj
-COPY [".nuget/NuGet.config", "."]
+# Копируем файл .csproj
 COPY ["AlinaKrossManager/AlinaKrossManager.csproj", "AlinaKrossManager/"]
+RUN dotnet nuget add source "https://nuget.pkg.github.com/EvgenyYushko/index.json" --name "github" --username "${GITHUB_USER}" --password "${GITHUB_TOKEN}" --store-password-in-clear-text
 
 # Восстанавливаем зависимости
 RUN dotnet restore "./AlinaKrossManager/AlinaKrossManager.csproj"
@@ -28,10 +32,10 @@ RUN dotnet restore "./AlinaKrossManager/AlinaKrossManager.csproj"
 # Копируем остальную часть проекта (из корня репозитория)
 COPY . .
 
-# КЛЮЧЕВОЕ ИЗМЕНЕНИЕ 2: Переходим в директорию проекта для сборки
+# Переходим в директорию проекта для сборки
 WORKDIR "/src/AlinaKrossManager"
 
-# Собираем проект, находясь в его директории
+# Собираем проект
 RUN dotnet build "./AlinaKrossManager.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # Этот этап используется для публикации проекта сервиса
