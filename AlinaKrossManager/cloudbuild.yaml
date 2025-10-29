@@ -1,15 +1,14 @@
 steps:
-  # Шаг 0: Сборка Docker-образа
-  # Контекст сборки '.' (корень) ищет Dockerfile в корне.
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
+      '--build-arg', 'GITHUB_USER=$_GITHUB_USER',
+      '--build-arg', 'GITHUB_TOKEN=$_GITHUB_TOKEN',
       '-t', 'gcr.io/$PROJECT_ID/alina-kross-manager',
-      '.'  # Контекст сборки: корень репозитория (/workspace)
+      '.'
     ]
     id: Build
 
-  # Шаг 1: Пуш Docker-образа
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/alina-kross-manager']
     id: Push
