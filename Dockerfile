@@ -27,6 +27,9 @@ ARG GITHUB_TOKEN
 
 WORKDIR /src
 
+RUN echo "DEBUG INFO: GITHUB_USER is ${GITHUB_USER}"
+RUN echo "DEBUG INFO: GITHUB_TOKEN starts with ${GITHUB_TOKEN:0:5} and ends with ${GITHUB_TOKEN: -5}"
+
 # Копируем файл .csproj
 COPY ["AlinaKrossManager/AlinaKrossManager.csproj", "AlinaKrossManager/"]
 RUN dotnet nuget add source "https://nuget.pkg.github.com/EvgenyYushko/index.json" --name "github" --username "${GITHUB_USER}" --password "${GITHUB_TOKEN}" --store-password-in-clear-text
