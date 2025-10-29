@@ -19,6 +19,7 @@ WORKDIR /src
 
 # КЛЮЧЕВОЕ ИЗМЕНЕНИЕ 1: Копируем файл .csproj из его реального местоположения
 # Контекст сборки теперь - корень, поэтому путь: AlinaKrossManager/AlinaKrossManager.csproj
+COPY ["NuGet.Config", "."]
 COPY ["AlinaKrossManager/AlinaKrossManager.csproj", "AlinaKrossManager/"]
 
 # Восстанавливаем зависимости
