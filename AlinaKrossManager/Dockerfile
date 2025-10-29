@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 
-# ДОБАВЛЯЕМ ARG ДЛЯ NUGET АУТЕНТИФИКАЦИИ
+# ДОБАВЛЯЕМ ARG ДЛЯ NUGET АУТЕНТИФИКАЦИИ 
 ARG GITHUB_USER
 ARG GITHUB_TOKEN
 
