@@ -27,6 +27,9 @@ ARG GITHUB_TOKEN
 
 WORKDIR /src
 
+ENV GITHUB_USER="EvgenyYushko"
+ENV GITHUB_TOKEN="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"
+
 # --- ШАГ ДЛЯ ОТЛАДКИ: ВЫВОД ПЕРЕМЕННЫХ В ЛОГИ ---
 RUN echo "DEBUG INFO: GITHUB_USER is ${GITHUB_USER}"
 RUN echo "DEBUG INFO: GITHUB_TOKEN is ${GITHUB_TOKEN}"
