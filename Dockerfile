@@ -1,79 +1,55 @@
+# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+
+# Этот этап используется при запуске из VS в быстром режиме (по умолчанию для конфигурации Debug)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+# Пользователь APP_UID, скорее всего, определен в другом месте, оставляем как есть.
 USER $APP_UID 
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-RUN echo "=== START: Installing CA certificates ===" && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
-    rm -rf /var/lib/apt/lists/* && \
-    echo "=== COMPLETE: CA certificates installed ==="
+# НОВЫЙ ШАГ ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ SSL/TLS
+# Это обновит список доверенных корневых сертификатов в контейнере.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
+# Этот этап используется для сборки проекта сервиса
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
-ARG GITHUB_USER=EvgenyYushko
-ARG GITHUB_TOKEN=ghp_rtGWU6196kTD5ifykvYj9KvMrZBfku3rZ8jl
+
+# ДОБАВЛЯЕМ ARG ДЛЯ NUGET АУТЕНТИФИКАЦИИ
+ARG GITHUB_USER
+ARG GITHUB_TOKEN
 
 WORKDIR /src
 
-RUN echo "=== START: Build stage - Setting up environment ==="
-
-# �������� ������ .csproj �������
-RUN echo "=== STEP 1: Copying project file ==="
+# Копируем файл .csproj
 COPY ["AlinaKrossManager/AlinaKrossManager.csproj", "AlinaKrossManager/"]
-RUN echo "Project file copied successfully"
+RUN dotnet nuget add source "https://nuget.pkg.github.com/EvgenyYushko/index.json" --name "github" --username "${GITHUB_USER}" --password "${GITHUB_TOKEN}" --store-password-in-clear-text
 
-# ��������� GITHUB NUGET SOURCE ����� restore
-RUN echo "=== STEP 2: Adding GitHub NuGet source ===" && \
-    echo "Adding GitHub NuGet source for user: ${GITHUB_USER}" && \
-    dotnet nuget add source "https://nuget.pkg.github.com/EvgenyYushko/index.json" \
-    --name "github" \
-    --username "${GITHUB_USER}" \
-    --password "${GITHUB_TOKEN}" \
-    --store-password-in-clear-text && \
-    echo "GitHub NuGet source added successfully"
-
-# ��������� ��� source ���������
-RUN echo "=== STEP 3: Listing available NuGet sources ==="
-RUN dotnet nuget list source
-RUN echo "NuGet sources listed"
-
-# ������ ��������������� �����������
-RUN echo "=== STEP 4: Restoring dependencies ==="
-RUN echo "Starting dotnet restore for AlinaKrossManager.csproj..."
+# Восстанавливаем зависимости
 RUN dotnet restore "./AlinaKrossManager/AlinaKrossManager.csproj"
-RUN echo "=== SUCCESS: Dependencies restored ==="
 
-# �������� ��������� �����
-RUN echo "=== STEP 5: Copying remaining source files ==="
+# Копируем остальную часть проекта (из корня репозитория)
 COPY . .
-RUN echo "Source files copied successfully"
 
+# Переходим в директорию проекта для сборки
 WORKDIR "/src/AlinaKrossManager"
 
-RUN echo "=== STEP 6: Building project ==="
-RUN echo "Building with configuration: $BUILD_CONFIGURATION"
+# Собираем проект
 RUN dotnet build "./AlinaKrossManager.csproj" -c $BUILD_CONFIGURATION -o /app/build
-RUN echo "=== SUCCESS: Build completed ==="
 
-RUN echo "=== COMPLETE: Build stage finished ==="
-
+# Этот этап используется для публикации проекта сервиса
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-
-RUN echo "=== START: Publish stage ==="
-RUN echo "Publishing with configuration: $BUILD_CONFIGURATION"
+# Публикуем проект
 RUN dotnet publish "./AlinaKrossManager.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-RUN echo "=== SUCCESS: Publish completed ==="
 
+# Этот этап используется в продакшене или при запуске из VS в обычном режиме
 FROM base AS final
 WORKDIR /app
 
-RUN echo "=== START: Final stage - Preparing runtime ==="
-RUN echo "Copying published files..."
+# Копируем опубликованные файлы
 COPY --from=publish /app/publish .
-RUN echo "Published files copied successfully"
-RUN echo "=== COMPLETE: Application ready ==="
 
+# Точка входа
 ENTRYPOINT ["dotnet", "AlinaKrossManager.dll"]
