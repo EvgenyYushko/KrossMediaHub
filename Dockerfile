@@ -8,9 +8,14 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
+# --- ИСПРАВЛЕНИЕ НАЧИНАЕТСЯ ЗДЕСЬ ---
+# Временно переключаемся на root, чтобы установить пакеты
+USER root
 # НОВЫЙ ШАГ ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ SSL/TLS
-# Это обновит список доверенных корневых сертификатов в контейнере.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# Снова переключаемся на не-рутового пользователя для последующих шагов и запуска
+USER $APP_UID
+# --- ИСПРАВЛЕНИЕ ЗАКАНЧИВАЕТСЯ ЗДЕСЬ ---
 
 # Этот этап используется для сборки проекта сервиса
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build

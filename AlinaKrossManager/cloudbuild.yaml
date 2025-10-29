@@ -3,7 +3,9 @@ steps:
     args: [
       'build',
       '-t', 'gcr.io/$PROJECT_ID/alina-kross-manager',
-      '.'
+      '.',
+      '--build-arg', 'GITHUB_USER=${_GITHUB_USER}',  # Передача аргумента 1
+      '--build-arg', 'GITHUB_TOKEN=${_GITHUB_TOKEN}' # Передача аргумента 2
     ]
     id: Build
 
