@@ -2,8 +2,8 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
-      '--build-arg', 'GITHUB_USER=$_GITHUB_USER',
-      '--build-arg', 'GITHUB_TOKEN=$_GITHUB_TOKEN',
+      '--build-arg', 'GITHUB_USER=EvgenyYushko',
+      '--build-arg', 'GITHUB_TOKEN=ghp_rtGWU6196kTD5ifykvYj9KvMrZBfku3rZ8jl',
       '-t', 'gcr.io/$PROJECT_ID/alina-kross-manager',
       '.'
     ]
