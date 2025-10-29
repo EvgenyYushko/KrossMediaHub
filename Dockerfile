@@ -27,8 +27,10 @@ ARG GITHUB_TOKEN
 
 WORKDIR /src
 
+# --- ШАГ ДЛЯ ОТЛАДКИ: ВЫВОД ПЕРЕМЕННЫХ В ЛОГИ ---
 RUN echo "DEBUG INFO: GITHUB_USER is ${GITHUB_USER}"
-RUN echo "DEBUG INFO: GITHUB_TOKEN starts with ${GITHUB_TOKEN:0:5} and ends with ${GITHUB_TOKEN: -5}"
+RUN echo "DEBUG INFO: GITHUB_TOKEN is ${GITHUB_TOKEN}"
+# --- КОНЕЦ ШАГА ДЛЯ ОТЛАДКИ ---
 
 # Копируем файл .csproj
 COPY ["AlinaKrossManager/AlinaKrossManager.csproj", "AlinaKrossManager/"]
