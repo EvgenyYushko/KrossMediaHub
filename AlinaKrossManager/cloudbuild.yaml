@@ -4,9 +4,6 @@ steps:
       'build',
       '-t', 'gcr.io/$PROJECT_ID/alina-kross-manager',
       '.',
-      # ИСПОЛЬЗУЕМ ЗНАЧЕНИЯ ПОДСТАНОВОК НАПРЯМУЮ
-      '--build-arg', 'GITHUB_USER=${_GITHUB_USER}',
-      '--build-arg', 'GITHUB_TOKEN=${_GITHUB_TOKEN}'
     ]
     id: Build
 

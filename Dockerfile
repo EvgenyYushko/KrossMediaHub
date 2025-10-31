@@ -30,13 +30,6 @@ WORKDIR /src
 ENV GITHUB_USER="EvgenyYushko"
 ENV GITHUB_TOKEN="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"
 
-# --- ШАГ ДЛЯ ОТЛАДКИ: ВЫВОД ПЕРЕМЕННЫХ В ЛОГИ ---
-RUN echo "DEBUG INFO: GITHUB_USER is ${GITHUB_USER}"
-RUN echo "DEBUG INFO: GITHUB_TOKEN is ${GITHUB_TOKEN}"
-RUN echo "DEBUG INFO: GITHUB_USER is ${_GITHUB_USER}"
-RUN echo "DEBUG INFO: GITHUB_TOKEN is ${_GITHUB_TOKEN}"
-# --- КОНЕЦ ШАГА ДЛЯ ОТЛАДКИ --- 
-
 # Копируем файл .csproj
 COPY ["AlinaKrossManager/AlinaKrossManager.csproj", "AlinaKrossManager/"]
 RUN dotnet nuget add source "https://nuget.pkg.github.com/EvgenyYushko/index.json" --name "github" --username "${GITHUB_USER}" --password "${GITHUB_TOKEN}" --store-password-in-clear-text

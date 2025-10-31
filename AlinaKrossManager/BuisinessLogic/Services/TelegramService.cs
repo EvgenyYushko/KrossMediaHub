@@ -1,6 +1,5 @@
 using AlinaKrossManager.Services;
 using Telegram.Bot;
-using Telegram.Bot.Requests;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using static AlinaKrossManager.Helpers.TelegramUserHelper;
@@ -22,7 +21,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
 		{
-			if (update.Message?.Text is not { } text) return;
+			if (update.Message?.Text is not { } text)
+			{
+				HandleMediaGroup(update.Message);
+				return;
+			}
 
 			var msgText = update.Message.GetMsgText() ?? "";
 
@@ -50,12 +53,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 								{
 									await _telegramBotClient.DeleteMessage(update.Message.Chat.Id, update.Message.MessageId, ct);
 									await _telegramBotClient.DeleteMessage(update.Message.Chat.Id, msgStart.MessageId, ct);
-
-									await _telegramBotClient.SendRequest(new DeleteMessageRequest
-									{
-										ChatId = update.Message.Chat.Id,
-										MessageId = msgStart.MessageId
-									}, ct);
 								}
 								catch { }
 							}
@@ -64,21 +61,78 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_insta") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						var base64Image = await TryGetImage(rmsg.Photo);
-						var images = new List<string>(){base64Image};
-						await _instagramService.CreateMediaAsync(images, "ds");;
+						List<string> images = new();
+
+						// Проверяем, это фотоальбом или одиночное фото
+						if (rmsg.MediaGroupId != null)
+						{
+							// Это фотоальбом - нужно получить все фото из группы
+							images = await TryGetAllImagesFromMediaGroup(rmsg.MediaGroupId);
+						}
+						else if (rmsg.Photo != null && rmsg.Photo.Length > 0)
+						{
+							// Одиночное фото - берем самый большой размер
+							var base64Image = await TryGetImage(rmsg.Photo);
+							images = new List<string>() { base64Image };
+						}						
+
+						if (images.Count == 0)
+						{
+							await botClient.SendMessage(update.Message.Chat.Id, "❌ Не найдено фото для публикации");
+							return;
+						}
+
+						string description = "";
+						var startMsg = await botClient.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации...");
+						try
+						{
+
+							var promptForeDescriptionPost = "Придумай красивое, краткое описание на английском языке, возможно добавь эмодзи, к посту в инстаграм под постом с фотографией. " +
+								$"А так же придумай не более 15 хештогов, они должны соответствовать " +
+								$"теме изображения, а так же всегда включать пару обязательных хештегов для указания что это AI контент, например #aigirls. " +
+								$"Вот само изображение: {images.FirstOrDefault()}" +
+								$"\n\n Формат ответа: Ответь строго только готовое описание с хештегами, " +
+								$"без всякого рода ковычек и экранирования. " +
+								$"Пример ответа: Golden hour glow ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence #neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
+
+							description = await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost);
+							try
+							{
+								await _telegramBotClient.SendMessage(update.Message.Chat.Id, $"{description}", replyParameters: new ReplyParameters { MessageId = rmsg.MessageId });
+							}
+							catch { }
+						}
+						catch (Exception e)
+						{
+							Console.WriteLine(e.Message);
+						}
+
+						try
+						{
+							var result = await _instagramService.CreateMediaAsync(images, description);
+							if (result.Success)
+							{
+								var msgRes = $"✅ Пост успешно создан! ID: {result.Id}";
+								Console.WriteLine(msgRes);
+								try
+								{
+									await _telegramBotClient.SendMessage(update.Message.Chat.Id, msgRes);
+								}
+								catch { }
+							}
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"❌ Ошибка: {ex.Message}");
+						}
+						finally
+						{
+							try{await _telegramBotClient.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct);}catch {}
+						}
 					}
 
 					break;
 			}
-
-			//var response = text.ToLower() switch
-			//{
-			//	"/start" => "Привет! Я Alina Kross.", вывы
-			//	_ => $"Вы сказали: {text}"
-			//};
-
-			//await botClient.SendRequest(new SendMessageRequest { ChatId = update.Message.Chat.Id, Text = response }, ct);
 		}
 
 		public async Task SendMsgBotOnly(Update update, CancellationToken ct)
@@ -193,6 +247,54 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 
 			return base64Image;
+		}
+
+		// Добавьте этот словарь в ваш класс бота
+		private readonly Dictionary<string, List<Message>> _activeMediaGroups = new();
+
+		// Метод для получения всех фото из медиагруппы
+		private async Task<List<string>> TryGetAllImagesFromMediaGroup(string mediaGroupId)
+		{
+			var base64Images = new List<string>();
+
+			// Проверяем, есть ли у нас все сообщения из этой группы
+			if (_activeMediaGroups.ContainsKey(mediaGroupId))
+			{
+				foreach (var message in _activeMediaGroups[mediaGroupId])
+				{
+					if (message.Photo != null && message.Photo.Length > 0)
+					{
+						var base64Image = await TryGetImage(message.Photo);
+						if (base64Image != null)
+						{
+							base64Images.Add(base64Image);
+						}
+					}
+				}
+
+				// Удаляем обработанную группу
+				_activeMediaGroups.Remove(mediaGroupId);
+			}
+
+			return base64Images;
+		}
+
+		// И где-то в обработке сообщений нужно собирать медиагруппы:
+		public void HandleMediaGroup(Message message)
+		{
+			if (message.MediaGroupId != null && message.Photo != null)
+			{
+				var mediaGroupId = message.MediaGroupId;
+
+				if (!_activeMediaGroups.ContainsKey(mediaGroupId))
+				{
+					_activeMediaGroups[mediaGroupId] = new List<Message>();
+				}
+
+				_activeMediaGroups[mediaGroupId].Add(message);
+
+				// Можно добавить таймер для автоматической очистки старых групп
+			}
 		}
 	}
 }
