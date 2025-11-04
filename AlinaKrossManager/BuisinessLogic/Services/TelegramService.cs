@@ -59,6 +59,79 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						}
 					}
 					break;
+				case UpdateType.Message when msgText.IsCommand("post_to_threads") && update.Message.ReplyToMessage is Message rmsg:
+					{
+						// Ваши данные (должны быть уже настроены в Instagram Graph API)
+						var httpClient = new HttpClient();
+						try
+						{
+							
+							var threadsClient = new ThreadsGraphApiClient("TH|1582164256111927|klvrRaZ9XpW0O8DUymSpfXSxESM", "1582164256111927");
+
+							var threadsResult = await threadsClient.CreateThreadAsync("Только Threads пост! 📱");
+							if (threadsResult.Success)
+							{
+								Console.WriteLine($"Threads пост создан: {threadsResult.Id}");
+							}
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"Ошибка: {ex.Message}");
+						}
+					}
+					break;
+				case UpdateType.Message when msgText.IsCommand("post_to_facebook") && update.Message.ReplyToMessage is Message rmsg:
+					{					
+						List<string> images = new();
+
+						// Проверяем, это фотоальбом или одиночное фото
+						if (rmsg.MediaGroupId != null)
+						{
+							// Это фотоальбом - нужно получить все фото из группы
+							images = await TryGetAllImagesFromMediaGroup(rmsg.MediaGroupId);
+						}
+						else if (rmsg.Photo != null && rmsg.Photo.Length > 0)
+						{
+							// Одиночное фото - берем самый большой размер
+							var base64Image = await TryGetImage(rmsg.Photo);
+							images = new List<string>() { base64Image };
+						}
+
+						if (images.Count == 0)
+						{
+							await botClient.SendMessage(update.Message.Chat.Id, "❌ Не найдено фото для публикации");
+							return;
+						}
+
+						var startMsg = await botClient.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации...");
+						try
+						{
+							var longLiveToken = "EAAY5A6MrJHgBPZBQrANTL62IRrEdPNAFCTMBBRg1PraciiqfarhG98YZCdGO9wxEhza3uk7BE56KEDGtWHagB8hgaUsQUFiQ3x3uhPZBbZBDZC6BtGsmoQURUAO7aVSEktmGeer6TtQZC9PWA6ZAM0EEgInZAFtWmjkz7ow4IDsCl7B55O80n2VW9wsNil3Nh8F5lkRfbIpj";
+							var faceBookService = new FaceBook(longLiveToken);
+
+							var res = await faceBookService.PublishToPageAsync("Hello from API", images);
+							if (res)
+							{
+								var msgRes = $"✅ Пост успешно создан!";
+								Console.WriteLine(msgRes);
+								try
+								{
+									await _telegramBotClient.SendMessage(update.Message.Chat.Id, msgRes);
+								}
+								catch { }
+							}
+							
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"Ошибка: {ex.Message}");
+						}
+						finally
+						{
+							try { await _telegramBotClient.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
+						}
+					}
+					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_insta") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						List<string> images = new();
@@ -74,7 +147,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 							// Одиночное фото - берем самый большой размер
 							var base64Image = await TryGetImage(rmsg.Photo);
 							images = new List<string>() { base64Image };
-						}						
+						}
 
 						if (images.Count == 0)
 						{
@@ -127,7 +200,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						}
 						finally
 						{
-							try{await _telegramBotClient.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct);}catch {}
+							try { await _telegramBotClient.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
 						}
 					}
 

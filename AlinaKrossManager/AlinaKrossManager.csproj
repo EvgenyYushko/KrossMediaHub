@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <Folder Include="BackgroundServices\" />
+    <Folder Include="BuisinessLogic\Services\Base\" />
   </ItemGroup>
 
 </Project>
