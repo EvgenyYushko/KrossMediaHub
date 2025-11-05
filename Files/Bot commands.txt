@@ -3,3 +3,4 @@ generate_image - Сгенерировать изображение
 post_to_insta - Пост в инсту
 post_to_threads - Пост в Threads
 post_to_facebook - пост в FaceBook
+post_to_bluesky - пост в BlueSky

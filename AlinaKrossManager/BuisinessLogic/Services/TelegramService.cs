@@ -11,12 +11,18 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly InstagramService _instagramService;
 		private readonly ITelegramBotClient _telegramBotClient;
 		private readonly IGenerativeLanguageModel _generativeLanguageModel;
+		private readonly BlueSkyService _blueSkyService;
 
-		public TelegramService(InstagramService instagramService, ITelegramBotClient telegramBotClient, IGenerativeLanguageModel generativeLanguageModel)
+		public TelegramService(InstagramService instagramService
+			, ITelegramBotClient telegramBotClient
+			, IGenerativeLanguageModel generativeLanguageModel
+			, BlueSkyService blueSkyService
+		)
 		{
 			_instagramService = instagramService;
 			_telegramBotClient = telegramBotClient;
 			_generativeLanguageModel = generativeLanguageModel;
+			_blueSkyService = blueSkyService;
 		}
 
 		public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
@@ -65,7 +71,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						var httpClient = new HttpClient();
 						try
 						{
-							
+
 							var threadsClient = new ThreadsGraphApiClient("TH|1582164256111927|klvrRaZ9XpW0O8DUymSpfXSxESM", "1582164256111927");
 
 							var threadsResult = await threadsClient.CreateThreadAsync("Только Threads пост! 📱");
@@ -80,26 +86,111 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						}
 					}
 					break;
+				case UpdateType.Message when msgText.IsCommand("post_to_bluesky") && update.Message.ReplyToMessage is Message rmsg:
+					{
+						var startMsg = await botClient.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации...");
+
+						try
+						{
+							List<string> images = await TryGetIMagesPromTelegram(botClient, update, rmsg);
+							var resVideos = await TryGetVideoBase64FromTelegram(botClient, rmsg);
+							var replayText = rmsg.GetMsgText() ?? "";
+							if (images.Count == 0 && string.IsNullOrWhiteSpace(replayText) && resVideos.base64Video is null)
+							{
+								return;
+							}
+
+							// 1. Первичный вход при запуске
+							if (!_blueSkyService.BlueSkyLogin)
+							{
+								if (!await _blueSkyService.LoginAsync())
+								{
+									Console.WriteLine("Критическая ошибка: не удалось войти в аккаунт.");
+									return;
+								}
+
+								Console.WriteLine("Успешно удалось войти в аккаунт. ✅");
+								_blueSkyService.BlueSkyLogin = true;
+							}
+
+							if (await _blueSkyService.UpdateSessionAsync())
+							{
+								// 3. Публикуем с новым токеном, который теперь хранится внутри service.AccessJwt
+
+								List<ImageAttachment> attachments = null;
+								if (images.Count > 0)
+								{
+									attachments = new();
+									foreach (var image in images)
+									{
+										attachments.Add(new ImageAttachment
+										{
+											Image = await _blueSkyService.UploadImageFromBase64Async(image, "image/png")
+										});
+									}
+								}
+
+								bool success = false;
+
+								if (resVideos.base64Video is not null)
+								{
+									var videoBlob = await _blueSkyService.UploadVideoFromBase64Async(resVideos.base64Video, resVideos.mimeType);
+									if (videoBlob == null)
+									{
+										Console.WriteLine("Ошибка: не удалось загрузить видео.");
+										return;
+									}
+									var ratio = new AspectRatio { Width = 9, Height = 16 };
+
+									// 3. Постинг
+									success = await _blueSkyService.CreatePostWithVideoAsync(replayText, videoBlob, ratio);
+								}
+								else if (attachments is not null)
+								{
+									success = await _blueSkyService.CreatePostWithImagesAsync(replayText, attachments);
+								}
+								else
+								{
+									success = await _blueSkyService.CreatePostAsync(replayText);
+								}
+
+								if (success)
+								{
+									var msgRes = $"✅ Пост успешно создан!";
+									Console.WriteLine(msgRes);
+									try
+									{
+										await _telegramBotClient.SendMessage(update.Message.Chat.Id, msgRes, replyParameters: new ReplyParameters { MessageId = rmsg.MessageId });
+									}
+									catch { }
+								}
+							}
+							else
+							{
+								Console.WriteLine("Не удалось обновить токен. Попытка повторного входа...");
+								// Можно попробовать LoginAsync еще раз, если Refresh Token истек.
+								if (!await _blueSkyService.LoginAsync())
+								{
+									Console.WriteLine("Не удалось выполнить повторный вход. Завершение работы.");
+									break;
+								}
+							}
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"Ошибка: {ex.Message}");
+						}
+						finally
+						{
+							try { await _telegramBotClient.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
+						}
+					}
+					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_facebook") && update.Message.ReplyToMessage is Message rmsg:
-					{					
-						List<string> images = new();
-
-						// Проверяем, это фотоальбом или одиночное фото
-						if (rmsg.MediaGroupId != null)
-						{
-							// Это фотоальбом - нужно получить все фото из группы
-							images = await TryGetAllImagesFromMediaGroup(rmsg.MediaGroupId);
-						}
-						else if (rmsg.Photo != null && rmsg.Photo.Length > 0)
-						{
-							// Одиночное фото - берем самый большой размер
-							var base64Image = await TryGetImage(rmsg.Photo);
-							images = new List<string>() { base64Image };
-						}
-
+					{
+						List<string> images = await TryGetIMagesPromTelegram(botClient, update, rmsg);
 						if (images.Count == 0)
 						{
-							await botClient.SendMessage(update.Message.Chat.Id, "❌ Не найдено фото для публикации");
 							return;
 						}
 
@@ -116,11 +207,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 								Console.WriteLine(msgRes);
 								try
 								{
-									await _telegramBotClient.SendMessage(update.Message.Chat.Id, msgRes);
+									await _telegramBotClient.SendMessage(update.Message.Chat.Id, msgRes, replyParameters: new ReplyParameters { MessageId = rmsg.MessageId });
 								}
 								catch { }
 							}
-							
+
 						}
 						catch (Exception ex)
 						{
@@ -134,24 +225,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_insta") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						List<string> images = new();
-
-						// Проверяем, это фотоальбом или одиночное фото
-						if (rmsg.MediaGroupId != null)
-						{
-							// Это фотоальбом - нужно получить все фото из группы
-							images = await TryGetAllImagesFromMediaGroup(rmsg.MediaGroupId);
-						}
-						else if (rmsg.Photo != null && rmsg.Photo.Length > 0)
-						{
-							// Одиночное фото - берем самый большой размер
-							var base64Image = await TryGetImage(rmsg.Photo);
-							images = new List<string>() { base64Image };
-						}
-
+						List<string> images = await TryGetIMagesPromTelegram(botClient, update, rmsg);
 						if (images.Count == 0)
 						{
-							await botClient.SendMessage(update.Message.Chat.Id, "❌ Не найдено фото для публикации");
 							return;
 						}
 
@@ -189,7 +265,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 								Console.WriteLine(msgRes);
 								try
 								{
-									await _telegramBotClient.SendMessage(update.Message.Chat.Id, msgRes);
+									await _telegramBotClient.SendMessage(update.Message.Chat.Id, msgRes, replyParameters: new ReplyParameters { MessageId = rmsg.MessageId });
 								}
 								catch { }
 							}
@@ -207,6 +283,74 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					break;
 			}
 		}
+
+		private async Task<List<string>> TryGetIMagesPromTelegram(ITelegramBotClient botClient, Update update, Message rmsg)
+		{
+			List<string> images = new();
+
+			// Проверяем, это фотоальбом или одиночное фото
+			if (rmsg.MediaGroupId != null)
+			{
+				// Это фотоальбом - нужно получить все фото из группы
+				images = await TryGetAllImagesFromMediaGroup(rmsg.MediaGroupId);
+			}
+			else if (rmsg.Photo != null && rmsg.Photo.Length > 0)
+			{
+				// Одиночное фото - берем самый большой размер
+				var base64Image = await TryGetImage(rmsg.Photo);
+				images = new List<string>() { base64Image };
+			}
+
+			if (images.Count == 0)
+			{
+				await botClient.SendMessage(update.Message.Chat.Id, "❌ Не найдено фото для публикации");
+				return images;
+			}
+
+			return images;
+		}
+
+		public async Task<(string? base64Video, string? mimeType)> TryGetVideoBase64FromTelegram(ITelegramBotClient botClient, Message rmsg)
+		{
+			// 1. Проверяем, есть ли видео в сообщении
+			if (rmsg.Video == null)
+			{
+				await botClient.SendMessage(rmsg.Chat.Id, "❌ В сообщении не найдено видео для публикации.");
+				return (null, null);
+			}
+
+			// 2. Получаем информацию о видео
+			var video = rmsg.Video;
+
+			// 3. Проверяем наличие FileId и MIME-типа
+			if (string.IsNullOrEmpty(video.FileId) || string.IsNullOrEmpty(video.MimeType))
+			{
+				await botClient.SendMessage(rmsg.Chat.Id, "❌ Видео найдено, но отсутствует FileId или MIME-тип.");
+				return (null, null);
+			}
+
+			// 4. Загружаем файл и конвертируем его в Base64
+			try
+			{
+				// Используем вспомогательный метод для загрузки по FileId
+				var base64Video = await TryGetFileBase64(rmsg.Video);
+
+				if (!string.IsNullOrEmpty(base64Video))
+				{
+					Console.WriteLine($"✅ Видео успешно загружено. Размер байт: {video.FileSize}. MIME: {video.MimeType}");
+					return (base64Video, video.MimeType);
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка при загрузке видео из Telegram: {ex.Message}");
+				await botClient.SendMessage(rmsg.Chat.Id, $"❌ Критическая ошибка при загрузке видео: {ex.Message}");
+			}
+
+			return (null, null);
+		}
+
+
 
 		public async Task SendMsgBotOnly(Update update, CancellationToken ct)
 		{
@@ -286,6 +430,50 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					stream.Dispose();
 				}
 			}
+		}
+
+		private async Task<string> TryGetFileBase64(Video? video)
+		{
+			// Проверка наличия объекта Video и FileId
+			if (video is null || string.IsNullOrEmpty(video.FileId))
+			{
+				return null;
+			}
+
+			// 1. Получаем информацию о файле (включая FilePath)
+			// Аналогично вашему примеру: _telegramBotClient.GetFile
+			// !!! УБЕДИТЕСЬ, ЧТО ЭТОТ МЕТОД ПРИНИМАЕТ ТОЛЬКО fileId ИЛИ ОБЪЕКТ Video
+			// Если ваш _telegramBotClient.GetFile принимает только string fileId:
+			var file = await _telegramBotClient.GetFile(video.FileId);
+
+			if (file.FilePath is null)
+			{
+				// Если FilePath не получен, значит, файл недоступен
+				return null;
+			}
+
+			// 2. Скачиваем видеофайл
+			string base64Video;
+			using (var ms = new MemoryStream())
+			{
+				try
+				{
+					// Вызываем DownloadFile, который есть на интерфейсе ITelegramBotClient
+					// (Используем FilePath, полученный на Шаге 1)
+					await _telegramBotClient.DownloadFile(file.FilePath, ms);
+
+					// 3. Конвертируем байты в Base64
+					byte[] videoBytes = ms.ToArray();
+					base64Video = Convert.ToBase64String(videoBytes);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Ошибка при скачивании видео {video.FileId}: {ex.Message}");
+					return null;
+				}
+			}
+
+			return base64Video;
 		}
 
 		private async Task<string> TryGetImage(PhotoSize[] photo)

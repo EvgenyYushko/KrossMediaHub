@@ -35,6 +35,13 @@ builder.Services.AddSingleton(provider =>
 	return new InstagramService(accessToken, geminiModel, conversationService);
 });
 
+builder.Services.AddSingleton(provider =>
+{
+	const string IDENTIFIER_CLUE_SKY = "alinakross.bsky.social";
+	const string APP_PASSWORD_BLUE_SKY = "d4an-bvic-ssrd-r663";
+	return new BlueSkyService(IDENTIFIER_CLUE_SKY, APP_PASSWORD_BLUE_SKY);
+});
+
 builder.Services.AddSingleton<TelegramService>();
 var channel = GrpcChannel.ForAddress("https://google-services-kdg8.onrender.com", new GrpcChannelOptions
 {
