@@ -42,6 +42,12 @@ builder.Services.AddSingleton(provider =>
 	return new BlueSkyService(IDENTIFIER_CLUE_SKY, APP_PASSWORD_BLUE_SKY);
 });
 
+builder.Services.AddSingleton(provider =>
+{
+	var longLiveToken = "EAAY5A6MrJHgBPZBQrANTL62IRrEdPNAFCTMBBRg1PraciiqfarhG98YZCdGO9wxEhza3uk7BE56KEDGtWHagB8hgaUsQUFiQ3x3uhPZBbZBDZC6BtGsmoQURUAO7aVSEktmGeer6TtQZC9PWA6ZAM0EEgInZAFtWmjkz7ow4IDsCl7B55O80n2VW9wsNil3Nh8F5lkRfbIpj";
+	return new FaceBookService(longLiveToken);
+});
+
 builder.Services.AddSingleton<TelegramService>();
 var channel = GrpcChannel.ForAddress("https://google-services-kdg8.onrender.com", new GrpcChannelOptions
 {

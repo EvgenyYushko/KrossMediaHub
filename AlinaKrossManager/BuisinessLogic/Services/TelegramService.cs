@@ -12,17 +12,20 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly ITelegramBotClient _telegramBotClient;
 		private readonly IGenerativeLanguageModel _generativeLanguageModel;
 		private readonly BlueSkyService _blueSkyService;
+		private readonly FaceBookService _faceBookService;
 
 		public TelegramService(InstagramService instagramService
 			, ITelegramBotClient telegramBotClient
 			, IGenerativeLanguageModel generativeLanguageModel
 			, BlueSkyService blueSkyService
+			, FaceBookService faceBookService
 		)
 		{
 			_instagramService = instagramService;
 			_telegramBotClient = telegramBotClient;
 			_generativeLanguageModel = generativeLanguageModel;
 			_blueSkyService = blueSkyService;
+			_faceBookService = faceBookService;
 		}
 
 		public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
@@ -116,7 +119,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 							if (await _blueSkyService.UpdateSessionAsync())
 							{
 								// 3. Публикуем с новым токеном, который теперь хранится внутри service.AccessJwt
-
 								List<ImageAttachment> attachments = null;
 								if (images.Count > 0)
 								{
@@ -188,8 +190,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_facebook") && update.Message.ReplyToMessage is Message rmsg:
 					{
+						var replayText = rmsg.GetMsgText() ?? "";
+						var resVideos = await TryGetVideoBase64FromTelegram(botClient, rmsg);
 						List<string> images = await TryGetIMagesPromTelegram(botClient, update, rmsg);
-						if (images.Count == 0)
+						if (images.Count == 0 && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
 						{
 							return;
 						}
@@ -197,11 +201,17 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						var startMsg = await botClient.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации...");
 						try
 						{
-							var longLiveToken = "EAAY5A6MrJHgBPZBQrANTL62IRrEdPNAFCTMBBRg1PraciiqfarhG98YZCdGO9wxEhza3uk7BE56KEDGtWHagB8hgaUsQUFiQ3x3uhPZBbZBDZC6BtGsmoQURUAO7aVSEktmGeer6TtQZC9PWA6ZAM0EEgInZAFtWmjkz7ow4IDsCl7B55O80n2VW9wsNil3Nh8F5lkRfbIpj";
-							var faceBookService = new FaceBook(longLiveToken);
+							bool success = false;
+							if (images.Count > 0)
+							{
+								success = await _faceBookService.PublishToPageAsync(replayText, images);
+							}
+							else if (resVideos.base64Video is not null)
+							{
+								success = await _faceBookService.PublishReelAsync(replayText, resVideos.base64Video);
+							}
 
-							var res = await faceBookService.PublishToPageAsync("Hello from API", images);
-							if (res)
+							if (success)
 							{
 								var msgRes = $"✅ Пост успешно создан!";
 								Console.WriteLine(msgRes);
@@ -225,6 +235,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_insta") && update.Message.ReplyToMessage is Message rmsg:
 					{
+						var replayText = rmsg.GetMsgText();
 						List<string> images = await TryGetIMagesPromTelegram(botClient, update, rmsg);
 						if (images.Count == 0)
 						{
@@ -235,7 +246,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						var startMsg = await botClient.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации...");
 						try
 						{
-
 							var promptForeDescriptionPost = "Придумай красивое, краткое описание на английском языке, возможно добавь эмодзи, к посту в инстаграм под постом с фотографией. " +
 								$"А так же придумай не более 15 хештогов, они должны соответствовать " +
 								$"теме изображения, а так же всегда включать пару обязательных хештегов для указания что это AI контент, например #aigirls. " +
@@ -244,7 +254,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 								$"без всякого рода ковычек и экранирования. " +
 								$"Пример ответа: Golden hour glow ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence #neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
 
-							description = await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost);
+							description = replayText ?? await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost);
 							try
 							{
 								await _telegramBotClient.SendMessage(update.Message.Chat.Id, $"{description}", replyParameters: new ReplyParameters { MessageId = rmsg.MessageId });
