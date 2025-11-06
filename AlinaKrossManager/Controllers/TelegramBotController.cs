@@ -1,4 +1,4 @@
-using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.Models;
 using Microsoft.AspNetCore.Mvc;
 using Telegram.Bot;
@@ -14,12 +14,12 @@ namespace AlinaKrossManager.Controllers
 	public class TelegramBotController : ControllerBase
 	{
 		private readonly ITelegramBotClient _telegramBotClient;
-		private readonly TelegramService _telegramService;
+		private readonly TelegramManager _telegramManager;
 
-		public TelegramBotController(ITelegramBotClient telegramBotClient, TelegramService telegramService)
+		public TelegramBotController(ITelegramBotClient telegramBotClient, TelegramManager telegramService)
 		{
 			_telegramBotClient = telegramBotClient;
-			_telegramService = telegramService;
+			_telegramManager = telegramService;
 		}
 
 		[HttpPost]
@@ -28,7 +28,7 @@ namespace AlinaKrossManager.Controllers
 			try
 			{
 				Log($"{update.Message?.Text}");
-				await _telegramService.HandleUpdateAsync(_telegramBotClient, update, CancellationToken.None); // Передайте update вашему обработчику
+				await _telegramManager.HandleUpdateAsync(update, CancellationToken.None); // Передайте update вашему обработчику
 			}
 			catch (Exception ex)
 			{
@@ -77,7 +77,7 @@ namespace AlinaKrossManager.Controllers
 
 		private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
 		{
-			await _telegramService.HandleUpdateAsync(botClient, update, ct);
+			await _telegramManager.HandleUpdateAsync(update, ct);
 		}
 
 		private Task HandleErrorAsync(ITelegramBotClient botClient, Exception error, CancellationToken ct)

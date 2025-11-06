@@ -1,4 +1,5 @@
 using AlinaKrossManager.BuisinessLogic.Instagram;
+using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Controllers;
 using AlinaKrossManager.Services;
@@ -49,6 +50,8 @@ builder.Services.AddSingleton(provider =>
 });
 
 builder.Services.AddSingleton<TelegramService>();
+builder.Services.AddSingleton<TelegramManager>();
+
 var channel = GrpcChannel.ForAddress("https://google-services-kdg8.onrender.com", new GrpcChannelOptions
 {
 	HttpHandler = new GrpcWebHandler(GrpcWebMode.GrpcWeb, new HttpClientHandler())
@@ -71,7 +74,7 @@ using (var scope = app.Services.CreateScope())
 
 	if (app.Environment.IsDevelopment())
 	{
-		var telegramService = serviceProvider.GetRequiredService<TelegramService>();
+		var telegramService = serviceProvider.GetRequiredService<TelegramManager>();
 		var bot = new TelegramBotController(telegramClient, telegramService);
 		await bot.RunLocalTest();
 	}
