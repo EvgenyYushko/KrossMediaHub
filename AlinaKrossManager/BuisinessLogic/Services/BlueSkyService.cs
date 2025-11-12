@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 
 namespace AlinaKrossManager.BuisinessLogic.Services
@@ -146,6 +147,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			var postEndpoint = $"{PdsUrl}/xrpc/com.atproto.repo.createRecord";
 
+			List<Facet> facets = TryGetFacets(postText);
+
 			// 1. Устанавливаем токен AccessJwt
 			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
 
@@ -153,6 +156,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var record = new
 			{
 				text = postText,
+				facets = facets.Any() ? facets : null,
 				createdAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 			};
 
@@ -190,6 +194,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				return false;
 			}
 
+			List<Facet> facets = TryGetFacets(postText);
+
 			var postEndpoint = $"{PdsUrl}/xrpc/com.atproto.repo.createRecord";
 			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
 
@@ -204,6 +210,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var record = new PostRecord
 			{
 				Text = postText,
+				Facets = facets.Any() ? facets : null,
 				CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
 				Embed = embedPayload
 			};
@@ -359,6 +366,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				return false;
 			}
 
+			List<Facet> facets = TryGetFacets(postText);
+
 			var postEndpoint = $"{PdsUrl}/xrpc/com.atproto.repo.createRecord";
 			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
 
@@ -372,6 +381,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var record = new PostRecord
 			{
 				Text = postText,
+				Facets = facets.Any() ? facets : null,
 				CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
 				Embed = embedPayload // Embed принимает наш объект ImageEmbedPayload
 			};
@@ -403,6 +413,76 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				return false;
 			}
 		}
+
+		private static List<Facet> TryGetFacets(string postText)
+		{
+			var facets = new List<Facet>();
+			// Паттерн для поиска хештегов: #слово (должно быть пробел или конец строки после слова)
+			var hashtagRegex = new Regex(@"#(\w+)");
+
+			foreach (Match match in hashtagRegex.Matches(postText))
+			{
+				var hashtagText = match.Groups[1].Value; // Слово без #
+				var matchIndex = match.Index;           // Индекс начала совпадения (включая #)
+
+				// Вычисление смещений в БАЙТАХ
+				// Bluesky требует байтовые смещения.
+				var byteStart = Encoding.UTF8.GetByteCount(postText.Substring(0, matchIndex));
+				var byteEnd = Encoding.UTF8.GetByteCount(postText.Substring(0, matchIndex + match.Length));
+
+				var facet = new Facet
+				{
+					Index = new ByteSlice
+					{
+						ByteStart = byteStart,
+						ByteEnd = byteEnd
+					},
+					Features = new List<object>
+					{
+						new TagFeature { Tag = hashtagText }
+					}
+				};
+				facets.Add(facet);
+			}
+
+			return facets;
+		}
+	}
+
+	// Структура для определения диапазона символов
+	public class ByteSlice
+	{
+		// Индекс начала (в байтах)
+		[JsonPropertyName("byteStart")]
+		public int ByteStart { get; set; }
+
+		// Индекс конца (в байтах)
+		[JsonPropertyName("byteEnd")]
+		public int ByteEnd { get; set; }
+	}
+
+	// Структура для определения типа ссылки (Хештег)
+	public class TagFeature
+	{
+		// Обязательный для хештегов
+		[JsonPropertyName("$type")]
+		public string Type { get; set; } = "app.bsky.richtext.facet#tag";
+
+		// Само значение хештега (БЕЗ символа #)
+		[JsonPropertyName("tag")]
+		public string Tag { get; set; }
+	}
+
+	// Главная структура фасета
+	public class Facet
+	{
+		// Диапазон символов в тексте
+		[JsonPropertyName("index")]
+		public ByteSlice Index { get; set; }
+
+		// Определение ссылки (может быть TagFeature, LinkFeature, MentionFeature)
+		[JsonPropertyName("features")]
+		public List<object> Features { get; set; }
 	}
 
 	public class PostRecord
@@ -420,6 +500,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		// Вложение (изображения, ссылки и т.д.)
 		[JsonPropertyName("embed")]
 		public object? Embed { get; set; }
+
+		[JsonPropertyName("facets")]
+		public List<Facet> Facets { get; set; }
 
 		// (Необязательные поля, такие как reply, facets, langs, здесь опущены)
 	}
