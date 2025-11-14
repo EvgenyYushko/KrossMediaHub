@@ -7,7 +7,7 @@ namespace AlinaKrossManager.Jobs
 {
 	public class InstagramDailyPostJob : SchedulerJob
 	{
-		public const string Time = "0 20 * * * ?";
+		public const string Time = "0 28 * * * ?";
 
 		private readonly InstagramService _instagramService;
 
@@ -21,9 +21,17 @@ namespace AlinaKrossManager.Jobs
 
 		public override async Task Execute(IJobExecutionContext context)
 		{
-			Console.WriteLine("Start Job");
-			await _instagramService.SendInstagramAdminMessage($"Hello form google cloude console, now {TimeZoneHelper.DateTimeNow}");
-			Console.WriteLine("End Job");
+			try
+			{
+				Console.WriteLine("Start Job");
+				await _instagramService.SendInstagramAdminMessage($"Hello form google cloude console, now ");
+				Console.WriteLine("End Job");
+
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(ex.ToString());
+			}
 		}
 	}
 }

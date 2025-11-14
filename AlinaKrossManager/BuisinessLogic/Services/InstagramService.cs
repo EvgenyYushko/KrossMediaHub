@@ -735,6 +735,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public Task SendInstagramAdminMessage(string text)
 		{
+			Console.WriteLine(_evgenyYushkoId);
+			Console.WriteLine(_accessToken);
 			return SendInstagramMessage(_evgenyYushkoId, text, _accessToken);
 		}
 
