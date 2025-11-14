@@ -1,3 +1,4 @@
+using System.Globalization;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Services;
 using Telegram.Bot.Types;
@@ -130,6 +131,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 								}
 
 								bool success = false;
+
+								replayText = await TruncateTextToMaxLength(replayText);
 
 								if (resVideos.base64Video is not null)
 								{
@@ -293,6 +296,24 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 					break;
 			}
+		}
+
+		private const int MAX_GRAPHEME_LENGTH = 300;
+
+		public async Task<string> TruncateTextToMaxLength(string text)
+		{
+			if (string.IsNullOrEmpty(text)) return text;
+
+			var stringInfo = new StringInfo(text);
+			if (stringInfo.LengthInTextElements <= MAX_GRAPHEME_LENGTH)
+				return text;
+
+			var prompt = "Данный текст для вставки в описание публикации в bluesky, must not be longer than 300 graphemes. " +
+				"Сократи его до 300, таким образом что бы по возможности сохранить смысл и хотя бы часть хештегов. " +
+				"Верни только готовый результат, без пояснений, дополнительных скобок и форматирования." +
+				$"Вот само описание: {text}";
+
+			return await _generativeLanguageModel.GeminiRequest(prompt);
 		}
 
 		public async Task GenerateImageByText(Update update, CancellationToken ct)

@@ -2,12 +2,16 @@ using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Controllers;
+using AlinaKrossManager.Helpers;
+using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Web;
 using Protos.GoogleGeminiService;
+using Quartz;
 using Telegram.Bot;
 using static AlinaKrossManager.Constants.AppConstants;
+using static AlinaKrossManager.Jobs.Helpers.JobHelper;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +63,46 @@ var channel = GrpcChannel.ForAddress("https://google-services-kdg8.onrender.com"
 
 builder.Services.AddSingleton(new GeminiService.GeminiServiceClient(channel));
 
+builder.Services.AddQuartz(q =>
+{
+	q.SchedulerId = "MainScheduler";
+	q.UseMicrosoftDependencyInjectionJobFactory();
+
+	// Настройка пула потоков (ограничиваем количество одновременно выполняемых задач)
+	q.UseDefaultThreadPool(tp =>
+	{
+		tp.MaxConcurrency = 1; // Ограничиваем до 1 одновременно выполняемой задачи
+	});
+
+	var timeZone = TimeZoneHelper.GetTimeZoneInfo();
+
+	foreach (var job in JobSettings)
+	{
+		var jobKey = new JobKey($"{job.Key}Job");
+		q.AddJob(job.Type, jobKey, j => j.StoreDurably());
+
+		if (!job.Castum)
+		{
+			q.AddTrigger(t => t
+				.WithIdentity($"{job.Key}Trigger")
+				.ForJob(jobKey)
+				.WithCronSchedule($"{job.Time}", x => x.InTimeZone(timeZone))
+			);
+		}
+	}
+});
+
+// Запуск Quartz как фоновой службы
+builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
+
+// Получаем IScheduler для проверки расписаний
+builder.Services.AddTransient(provider =>
+{
+	var schedulerFactory = provider.GetRequiredService<ISchedulerFactory>();
+	return schedulerFactory.GetScheduler().GetAwaiter().GetResult();
+});
+builder.Services.AddTransient<ScheduleInspectorService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -69,6 +113,21 @@ if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
 	var serviceProvider = scope.ServiceProvider;
+	var scheduler = serviceProvider.GetRequiredService<IScheduler>();
+
+	if (!scheduler.IsStarted)
+	{
+		await scheduler.Start();
+		Console.WriteLine("Критическое предупреждение: Планировщик был запущен вручную!");
+	}
+	else
+	{
+		Console.WriteLine($"Планировщик запущен: {scheduler.IsStarted}, Режим ожидания: {scheduler.InStandbyMode}");
+	}
+
+	var inspector = scope.ServiceProvider.GetRequiredService<ScheduleInspectorService>();
+	Task.Run(async () => await inspector.PrintScheduleInfo()).Wait();
+
 	var config = serviceProvider.GetRequiredService<IConfiguration>();
 	var telegramClient = serviceProvider.GetRequiredService<ITelegramBotClient>();
 

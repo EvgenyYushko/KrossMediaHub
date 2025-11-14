@@ -16,6 +16,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public string _imgbbApiKey = "807392339c89019fcbe08fcdd068a19c";
 		private const string _alinaKrossId = "17841477563266256";
 		private const string _alinaKrossName = "alina.kross.ai";
+		private const string _evgenyYushkoId = "1307933750574022";
 
 		public InstagramService(string accessToken, IGenerativeLanguageModel generativeLanguage, ConversationService conversationService)
 		{
@@ -730,6 +731,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				await SendResponse(senderId, "I wanted to send a photo, but something went wrong.");
 			}
+		}
+
+		public Task SendInstagramAdminMessage(string text)
+		{
+			return SendInstagramMessage(_evgenyYushkoId, text, _accessToken);
 		}
 
 		private async Task SendInstagramMessage(string recipientId, string text, string accessToken)
