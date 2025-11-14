@@ -756,7 +756,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var content = new StringContent(json, Encoding.UTF8, "application/json");
 
 			httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-
+			httpClient.Timeout = TimeSpan.FromSeconds(900);
 			var response = await httpClient.PostAsync(url, content);
 
 			if (response.IsSuccessStatusCode)
