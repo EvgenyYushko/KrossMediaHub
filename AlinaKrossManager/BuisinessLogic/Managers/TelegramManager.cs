@@ -37,7 +37,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				return;
 			}
 
-			await _instagramService.SendInstagramAdminMessage($"Hello form google cloude console, now ");
+			//await _instagramService.SendInstagramAdminMessage($"Hello form google cloude console, now ");
 
 
 			var msgText = update.Message.GetMsgText() ?? "";
