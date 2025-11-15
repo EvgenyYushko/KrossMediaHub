@@ -24,7 +24,7 @@ namespace AlinaKrossManager.Jobs
 			try
 			{
 				Console.WriteLine("Start Job");
-				await _instagramService.SendInstagramAdminMessage($"Hello form google cloude console, now ");
+				await _instagramService.SendInstagramAdminMessage($"Hello form google cloude console, now {TimeZoneHelper.DateTimeNow}");
 				Console.WriteLine("End Job");
 
 			}
