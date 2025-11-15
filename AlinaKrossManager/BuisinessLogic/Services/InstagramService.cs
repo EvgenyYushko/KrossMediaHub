@@ -749,13 +749,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var payload = new
 			{
 				recipient = new { id = recipientId },
-				message = new { text = text }
+				message = new { text = text },
+				access_token = accessToken
 			};
 
 			var json = JsonSerializer.Serialize(payload);
 			var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-			_http.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+			//_http.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
 			
 			var response = await _http.PostAsync(url, content);
 
