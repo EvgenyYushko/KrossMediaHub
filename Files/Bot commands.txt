@@ -1,6 +1,7 @@
 start - Начать
-generate_image - Сгенерировать изображение
-post_to_insta - Пост в инсту
+generate_image - создать изображение
+post_to_insta - пост в инсту
 post_to_threads - Пост в Threads
 post_to_facebook - пост в FaceBook
 post_to_bluesky - пост в BlueSky
+post_to_all - пост везде
