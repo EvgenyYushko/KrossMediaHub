@@ -742,9 +742,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		private async Task SendInstagramMessage(string recipientId, string text, string accessToken)
 		{
-			using var httpClient = new HttpClient();
+			//using var httpClient = new HttpClient();
 
-			var url = $"https://graph.instagram.com/v19.0/me/messages";
+			var url = $"v19.0/me/messages";
 
 			var payload = new
 			{
@@ -755,9 +755,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var json = JsonSerializer.Serialize(payload);
 			var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-			httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-			httpClient.Timeout = TimeSpan.FromSeconds(900);
-			var response = await httpClient.PostAsync(url, content);
+			_http.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+			
+			var response = await _http.PostAsync(url, content);
 
 			if (response.IsSuccessStatusCode)
 			{
