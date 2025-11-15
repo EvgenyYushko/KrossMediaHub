@@ -7,7 +7,7 @@ namespace AlinaKrossManager.Jobs
 {
 	public class InstagramDailyPostJob : SchedulerJob
 	{
-		public const string Time = "0 */5 * * * ?";
+		public const string Time = "0 */10 * * * ?";
 
 		private readonly InstagramService _instagramService;
 

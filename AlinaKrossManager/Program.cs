@@ -1,3 +1,4 @@
+using AlinaKrossManager.BackgroundServices;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
@@ -55,6 +56,8 @@ builder.Services.AddSingleton(provider =>
 
 builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<TelegramManager>();
+
+builder.Services.AddHostedService<HealthCheckBackgroundService>();
 
 var channel = GrpcChannel.ForAddress("https://google-services-kdg8.onrender.com", new GrpcChannelOptions
 {
