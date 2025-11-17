@@ -27,8 +27,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public string PdsUrl { get; private set; } = "https://auriporia.us-west.host.bsky.network";//string.Empty;
 		protected override string ServiceName => "BlueSky";
 
-		public BlueSkyService(string identifire, string appPassword, IGenerativeLanguageModel generativeLanguageModel, TelegramService telegramService)
-			: base(generativeLanguageModel, telegramService)
+		public BlueSkyService(string identifire, string appPassword, IGenerativeLanguageModel generativeLanguageModel)
+			: base(generativeLanguageModel)
 		{
 			_identifire = identifire;
 			_appPassword = appPassword;

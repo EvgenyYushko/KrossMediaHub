@@ -100,22 +100,29 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return true;
 		}
 
-		public async Task SendSinglePhotoAsync(long chatId, string base64Image, int msgId, string caption = "")
+		public async Task SendSinglePhotoAsync(long chatId, string base64Image, int? msgId, string caption = "")
 		{
 			var imageBytes = Convert.FromBase64String(base64Image);
 			using var stream = new MemoryStream(imageBytes);
 
-			var sentMessage = await _telegramBotClient.SendPhoto(chatId,
-				InputFile.FromStream(stream, "image.jpg"),
-				caption,
-				replyParameters:
-					new ReplyParameters
-					{
-						MessageId = msgId
-					});
+			if (msgId is not null)
+			{
+				var sentMessage = await _telegramBotClient.SendPhoto(chatId,
+					InputFile.FromStream(stream, "image.jpg"),
+					caption,
+					replyParameters:
+						new ReplyParameters
+						{
+							MessageId = msgId.Value
+						});
+			}
+			else
+			{
+				var sentMessage = await _telegramBotClient.SendPhoto(chatId, InputFile.FromStream(stream, "image.jpg"), caption);
+			}
 		}
 
-		public async Task SendPhotoAlbumAsync(long chatId, List<string> base64Images, int msgId, string caption = "")
+		public async Task SendPhotoAlbumAsync(long chatId, List<string> base64Images, int? msgId, string caption = "")
 		{
 			var media = new List<IAlbumInputMedia>();
 			var streams = new List<MemoryStream>(); // храним ссылки на стримы
@@ -139,7 +146,15 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					media.Add(inputMedia);
 				}
 
-				var sentMessages = await _telegramBotClient.SendMediaGroup(chatId, media, new ReplyParameters { MessageId = msgId });
+				if (msgId is not null)
+				{
+					var sentMessages = await _telegramBotClient.SendMediaGroup(chatId, media, new ReplyParameters { MessageId = msgId.Value });
+				}
+				else
+				{
+					var sentMessages = await _telegramBotClient.SendMediaGroup(chatId, media);
+				}
+
 			}
 			catch (Exception ex)
 			{
@@ -197,6 +212,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 
 			return base64Video;
+		}
+
+		public Task DeleteMessage(ChatId chatId, int messageId)
+		{
+			var ct = new CancellationToken();
+			return _telegramBotClient.DeleteMessage(chatId, messageId, ct);
 		}
 
 		public Task DeleteMessage(ChatId chatId, int messageId, CancellationToken ct)

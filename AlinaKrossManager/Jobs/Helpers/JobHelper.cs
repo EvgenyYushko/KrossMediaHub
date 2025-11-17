@@ -14,7 +14,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 			//JobSettings.Add(new() { Type = typeof(AllNewsJob), Key = AllNewsKey, Time = "", Castum = true });
 			//JobSettings.Add(new() { Type = typeof(WeatherJob), Key = WeatherKey, Time = "", Castum = true });
 
-			JobSettings.Add(new() { Type = typeof(InstagramDailyPostJob), Key = INSTAGRAM_DAILY_POST_JOB, Time = InstagramDailyPostJob.Time, Castum = false });
+			JobSettings.Add(new() { Type = typeof(DilyPostJob), Key = INSTAGRAM_DAILY_POST_JOB, Time = DilyPostJob.Time, Castum = false });
 		}
 	}
 

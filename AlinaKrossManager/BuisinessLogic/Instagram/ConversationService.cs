@@ -3,12 +3,17 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 	public class ConversationService
 	{
 		private readonly Dictionary<string, UserConversation> _conversations = new();
-		private readonly int _maxHistoryLength = 50; // Максимальное количество сообщений в истории
+		private readonly int _maxHistoryLength = 40; // Максимальное количество сообщений в истории
 		private readonly ILogger<ConversationService> _logger;
 
 		public ConversationService(ILogger<ConversationService> logger)
 		{
 			_logger = logger;
+		}
+
+		public List<string> GetAllUserConversations()
+		{
+			return _conversations.Keys.ToList();
 		}
 
 		// Добавляем сообщение пользователя
@@ -21,7 +26,7 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 
 			_conversations[userId].Messages.Add(new ChatMessage
 			{
-				Sender = "user",
+				Sender = "User",
 				Text = messageText,
 				Timestamp = DateTime.UtcNow
 			});
@@ -40,7 +45,7 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 
 			_conversations[userId].Messages.Add(new ChatMessage
 			{
-				Sender = "alina",
+				Sender = "Alina",
 				Text = messageText,
 				Timestamp = DateTime.UtcNow
 			});
@@ -52,23 +57,31 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 		// Получаем историю в формате для промпта
 		public string GetFormattedHistory(string userId)
 		{
-			if (!_conversations.ContainsKey(userId) || !_conversations[userId].Messages.Any())
+			var history = GetHistory(userId);
+			if (history == null)
+			{
 				return "No previous conversation history.";
-
-			var history = _conversations[userId].Messages
-				.OrderBy(m => m.Timestamp)
-				.TakeLast(_maxHistoryLength)
-				.ToList();
+			}
 
 			var formattedHistory = new List<string>();
 
 			foreach (var message in history)
 			{
-				var speaker = message.Sender == "user" ? "User" : "Alina";
-				formattedHistory.Add($"{speaker}: {message.Text}");
+				formattedHistory.Add($"{message.Sender}: {message.Text}");
 			}
 
 			return string.Join("\n", formattedHistory);
+		}
+
+		public List<ChatMessage> GetHistory(string userId)
+		{
+			if (!_conversations.ContainsKey(userId) || !_conversations[userId].Messages.Any())
+				return null;
+
+			return _conversations[userId].Messages
+				.OrderBy(m => m.Timestamp)
+				.TakeLast(_maxHistoryLength)
+				.ToList();
 		}
 
 		// Очищаем историю (например, при начале нового диалога)

@@ -4,13 +4,14 @@ using System.Text.Json.Serialization;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.Services;
+using static System.Net.WebRequestMethods;
 using static AlinaKrossManager.Helpers.Logger;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
 	public class InstagramService : SocialBaseService
 	{
-		private readonly HttpClient _http;
+		private readonly HttpClient _https;
 		private readonly string _accessToken;
 		private readonly ConversationService _conversationService;
 		public string _imgbbApiKey = "807392339c89019fcbe08fcdd068a19c";
@@ -22,14 +23,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public InstagramService(string accessToken
 			, IGenerativeLanguageModel generativeLanguage
-			, TelegramService telegramService
 			, ConversationService conversationService
 		)
-			: base(generativeLanguage, telegramService)
+			: base(generativeLanguage)
 		{
 			_accessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
 			_conversationService = conversationService;
-			_http = new HttpClient { BaseAddress = new Uri("https://graph.instagram.com/") };
+			_https = new HttpClient { BaseAddress = new Uri("https://graph.instagram.com/") };
+			//_https.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 		}
 
 		public async Task<CreateMediaResult> CreateMediaAsync(List<string> base64Strings, string caption = null)
@@ -89,7 +90,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 								  $"&caption={Uri.EscapeDataString(caption ?? "")}" +
 								  $"&access_token={_accessToken}";
 
-				var response = await _http.PostAsync(containerUrl, null);
+				var response = await _https.PostAsync(containerUrl, null);
 				var json = await response.Content.ReadAsStringAsync();
 
 				Console.WriteLine("CreateSingleMediaContainerAsync - 3");
@@ -122,7 +123,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 					// Создаем контейнер для этого изображения
 					var childUrl = $"me/media?image_url={Uri.EscapeDataString(imageUrl)}&access_token={_accessToken}";
-					var childResponse = await _http.PostAsync(childUrl, null);
+					var childResponse = await _https.PostAsync(childUrl, null);
 					var childJson = await childResponse.Content.ReadAsStringAsync();
 
 					if (childResponse.IsSuccessStatusCode)
@@ -156,7 +157,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					formData.Add(new StringContent(childrenIds[i]), $"children[{i}]");
 				}
 
-				var response = await _http.PostAsync(carouselUrl, formData);
+				var response = await _https.PostAsync(carouselUrl, formData);
 				var json = await response.Content.ReadAsStringAsync();
 
 				if (!response.IsSuccessStatusCode)
@@ -185,7 +186,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				try
 				{
 					var statusUrl = $"{containerId}?fields=status_code,status&access_token={_accessToken}";
-					var response = await _http.GetAsync(statusUrl);
+					var response = await _https.GetAsync(statusUrl);
 					var json = await response.Content.ReadAsStringAsync();
 
 					Console.WriteLine($"Статус ответ: {json}");
@@ -277,7 +278,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				Console.WriteLine($"Публикуем контейнер: {containerId}");
 
 				var publishUrl = $"me/media_publish?creation_id={containerId}&access_token={_accessToken}";
-				var response = await _http.PostAsync(publishUrl, null);
+				var response = await _https.PostAsync(publishUrl, null);
 				var json = await response.Content.ReadAsStringAsync();
 
 				Console.WriteLine($"Ответ публикации: {json}");
@@ -746,8 +747,13 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return SendInstagramMessage(_evgenyYushkoId, text, _accessToken);
 		}
 
-		private async Task SendInstagramMessage(string recipientId, string text, string accessToken)
+		public async Task SendInstagramMessage(string recipientId, string text, string accessToken = null)
 		{
+			if (accessToken is null)
+			{
+				accessToken = _accessToken;
+			}
+
 			//using var httpClient = new HttpClient();
 
 			var url = $"v19.0/me/messages";
@@ -755,16 +761,15 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var payload = new
 			{
 				recipient = new { id = recipientId },
-				message = new { text = text },
-				access_token = accessToken
+				message = new { text = text }
 			};
 
 			var json = JsonSerializer.Serialize(payload);
 			var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-			//_http.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+			//_https.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
 
-			var response = await _http.PostAsync(url, content);
+			var response = await _https.PostAsync(url, content);
 
 			if (response.IsSuccessStatusCode)
 			{
@@ -1347,7 +1352,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public async Task<InstagramUser> GetUserAsync()
 		{
 			var url = $"me?fields=id,username&access_token={_accessToken}";
-			var json = await _http.GetStringAsync(url);
+			var json = await _https.GetStringAsync(url);
 
 			return JsonSerializer.Deserialize<InstagramUser>(json);
 		}
@@ -1358,7 +1363,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public async Task<List<InstagramMedia>> GetUserMediaAsync()
 		{
 			var url = $"me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token={_accessToken}";
-			var json = await _http.GetStringAsync(url);
+			var json = await _https.GetStringAsync(url);
 
 			using (var doc = JsonDocument.Parse(json))
 			{
@@ -1426,6 +1431,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			public string Id { get; set; }
 			public bool Success { get; set; }
 			public string ErrorMessage { get; set; }
+
+			public string ExternalContentUrl { get; set; }
 		}
 
 		public class InstagramMedia

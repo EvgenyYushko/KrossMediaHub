@@ -7,10 +7,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Base
 		protected readonly IGenerativeLanguageModel _generativeLanguageModel;
 		private readonly TelegramService _telegramService;
 
-		protected SocialBaseService(IGenerativeLanguageModel generativeLanguageModel, TelegramService telegramService)
+		protected SocialBaseService(IGenerativeLanguageModel generativeLanguageModel)
 		{
 			_generativeLanguageModel = generativeLanguageModel;
-			_telegramService = telegramService;
 		}
 
 		protected abstract string GetBaseDescriptionPrompt(string base64Img);

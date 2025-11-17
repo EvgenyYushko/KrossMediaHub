@@ -12,8 +12,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		protected override string ServiceName => "FaceBook";
 
-		public FaceBookService(string longLivedUserToken, IGenerativeLanguageModel generativeLanguageModel, TelegramService telegramService)
-			: base(generativeLanguageModel, telegramService)
+		public FaceBookService(string longLivedUserToken, IGenerativeLanguageModel generativeLanguageModel)
+			: base(generativeLanguageModel)
 		{
 			_longLivedUserToken = longLivedUserToken;
 		}
