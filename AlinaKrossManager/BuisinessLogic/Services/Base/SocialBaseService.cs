@@ -28,12 +28,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Base
 					Console.WriteLine("Начниаем генерировать описание...");
 					var promptForeDescriptionPost = GetBaseDescriptionPrompt(images.FirstOrDefault());
 					var res = string.IsNullOrEmpty(replayText) ? await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost) : replayText;
+
 					Console.WriteLine("Сгенерированное описание: " + res);
 					return res;
 				}
 				catch (Exception e)
 				{
 					Console.WriteLine($"Ошикбка создания описания поста в {ServiceName}: " + e.Message);
+					Console.WriteLine(e.ToString());
 				}
 			}
 
