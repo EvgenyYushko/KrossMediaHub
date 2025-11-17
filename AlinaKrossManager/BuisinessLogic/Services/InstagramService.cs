@@ -2,26 +2,32 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AlinaKrossManager.BuisinessLogic.Instagram;
+using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.Services;
 using static AlinaKrossManager.Helpers.Logger;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
-	public class InstagramService
+	public class InstagramService : SocialBaseService
 	{
 		private readonly HttpClient _http;
 		private readonly string _accessToken;
-		private readonly IGenerativeLanguageModel _generativeLanguage;
 		private readonly ConversationService _conversationService;
 		public string _imgbbApiKey = "807392339c89019fcbe08fcdd068a19c";
 		private const string _alinaKrossId = "17841477563266256";
 		private const string _alinaKrossName = "alina.kross.ai";
 		private const string _evgenyYushkoId = "1307933750574022";
 
-		public InstagramService(string accessToken, IGenerativeLanguageModel generativeLanguage, ConversationService conversationService)
+		protected override string ServiceName => "Instagram";
+
+		public InstagramService(string accessToken
+			, IGenerativeLanguageModel generativeLanguage
+			, TelegramService telegramService
+			, ConversationService conversationService
+		)
+			: base(generativeLanguage, telegramService)
 		{
 			_accessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
-			_generativeLanguage = generativeLanguage;
 			_conversationService = conversationService;
 			_http = new HttpClient { BaseAddress = new Uri("https://graph.instagram.com/") };
 		}
@@ -393,7 +399,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			try
 			{
-				var finalResponse = await _generativeLanguage.GeminiRequest(prompt);
+				var finalResponse = await _generativeLanguageModel.GeminiRequest(prompt);
 				Log($"Generated reply comment: {finalResponse}");
 
 				await ReplyToComment(comment.Id, finalResponse);
@@ -480,7 +486,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				//Log($"SENDED PROMPT: {prompt}");
 
-				var responseText = await _generativeLanguage.GeminiRequest(prompt);
+				var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
 
 				// Только ПОСЛЕ генерации ответа добавляем оба сообщения в историю
 				_conversationService.AddUserMessage(senderId, messageText);
@@ -651,7 +657,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				string responseText = null;
 				try
 				{
-					responseText = await _generativeLanguage.GeminiRequest(prompt, base64Image);
+					responseText = await _generativeLanguageModel.GeminiRequest(prompt, base64Image);
 					Log($"Gemini response received: {responseText?.Substring(0, Math.Min(50, responseText.Length))}...");
 				}
 				catch (Exception geminiEx)
@@ -704,11 +710,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var promt = "Преобразуй эту просьбу в нормальный промпт для генерации изображения. Верни только качественный итоговый промпт на ангийском языке, " +
 				$"без пояснений и форматирования. Вот сама просьба {messageText}";
 
-			var responseText = await _generativeLanguage.GeminiRequest(promt);
+			var responseText = await _generativeLanguageModel.GeminiRequest(promt);
 			if (responseText is not null)
 			{
 				// 2. Генерируем фото (твой код генерации)
-				var imagesRes = await _generativeLanguage.GeminiRequestGenerateImage(responseText);
+				var imagesRes = await _generativeLanguageModel.GeminiRequestGenerateImage(responseText);
 				var generatedImageBase64 = imagesRes.FirstOrDefault();
 
 				if (!string.IsNullOrEmpty(generatedImageBase64))
@@ -757,7 +763,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var content = new StringContent(json, Encoding.UTF8, "application/json");
 
 			//_http.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-			
+
 			var response = await _http.PostAsync(url, content);
 
 			if (response.IsSuccessStatusCode)
@@ -1401,6 +1407,18 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				}
 				return result;
 			}
+		}
+
+		protected override string GetBaseDescriptionPrompt(string base64Img)
+		{
+			return "Придумай красивое, краткое описание на английском языке, возможно добавь эмодзи, к посту в instagram под постом с фотографией. " +
+				$"А так же придумай не более 15 хештогов, они должны соответствовать " +
+				$"теме изображения, а так же всегда включать пару обязательных хештегов для указания что это AI контент, например #aigirls. " +
+				$"Вот само изображение: {base64Img}" +
+				$"\n\n Формат ответа: Ответь строго только готовое описание с хештегами, " +
+				$"без всякого рода ковычек и экранирования. " +
+				$"Пример ответа: ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence " +
+				$"#neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
 		}
 
 		public class CreateMediaResult

@@ -36,22 +36,30 @@ builder.Services.AddSingleton(provider =>
 {
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
 	var conversationService = provider.GetService<ConversationService>();
+	var telegramService = provider.GetService<TelegramService>();
+
 	//var PageAccessToken = "IGAALt2MgjsilBZAFNKQ040cWM4TTl1Mkt5dFF5WXloekRJbGdwU1hqTmNBVFkzQU9mV29NWVk0X2hPdXZALZA3Q2ZA09VYXFyUnhrY3QweElHNVBnaExaS0c5TDJxS2RjN3lydlFYS0JzRUhkaGVyaTJyOTJFaHpYMVh0S2p1ZAy1xMAZDZD";
 	var accessToken = "IGAAQEMxhZAfcFBZAFM0NHhuZAjRRcnpkWEZANNGtiZAkZA2ZA1NUME8yYXFHMndXU29GUEVpUDh0bmVSeV9WSEs3M3Q4Sk93TWUzb0RWcXNYOGktekhFQ2x3YVE1Y0ZAOWm9fTEpDTXRiQlBkNXpzc0Y5dndfcS0tcm1veHNNTUUzSmRydwZDZD";
-	return new InstagramService(accessToken, geminiModel, conversationService);
+	return new InstagramService(accessToken, geminiModel,telegramService,  conversationService);
 });
 
 builder.Services.AddSingleton(provider =>
 {
 	const string IDENTIFIER_CLUE_SKY = "alinakross.bsky.social";
 	const string APP_PASSWORD_BLUE_SKY = "d4an-bvic-ssrd-r663";
-	return new BlueSkyService(IDENTIFIER_CLUE_SKY, APP_PASSWORD_BLUE_SKY);
+	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
+	var telegramService = provider.GetService<TelegramService>();
+
+	return new BlueSkyService(IDENTIFIER_CLUE_SKY, APP_PASSWORD_BLUE_SKY, geminiModel, telegramService);
 });
 
 builder.Services.AddSingleton(provider =>
 {
 	var longLiveToken = "EAAY5A6MrJHgBPZBQrANTL62IRrEdPNAFCTMBBRg1PraciiqfarhG98YZCdGO9wxEhza3uk7BE56KEDGtWHagB8hgaUsQUFiQ3x3uhPZBbZBDZC6BtGsmoQURUAO7aVSEktmGeer6TtQZC9PWA6ZAM0EEgInZAFtWmjkz7ow4IDsCl7B55O80n2VW9wsNil3Nh8F5lkRfbIpj";
-	return new FaceBookService(longLiveToken);
+	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
+	var telegramService = provider.GetService<TelegramService>();
+
+	return new FaceBookService(longLiveToken, geminiModel, telegramService);
 });
 
 builder.Services.AddSingleton<TelegramService>();

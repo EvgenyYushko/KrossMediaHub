@@ -1,15 +1,19 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using AlinaKrossManager.BuisinessLogic.Services.Base;
+using AlinaKrossManager.Services;
 
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
-	public class BlueSkyService
+	public class BlueSkyService : SocialBaseService
 	{
 		// Объявляем HttpClient как член класса (с использованием 'readonly' для потокобезопасности)
+		private const int MAX_GRAPHEME_LENGTH = 300;
 		private readonly HttpClient _httpClient;
 		private const string RefreshUrl = "https://bsky.social/xrpc/com.atproto.server.refreshSession";
 		private const string LoginUrl = "https://bsky.social/xrpc/com.atproto.server.createSession"; // Добавлен для удобства
@@ -17,19 +21,21 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly string _appPassword = "d4an-bvic-ssrd-r663";
 
 		// Свойства для хранения состояния сессии
-		public string AccessJwt { get; private set; } = string.Empty;
+		public string AccessJwt { get; private set; } = "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJFUzI1NksifQ.eyJzY29wZSI6ImNvbS5hdHByb3RvLmFwcFBhc3NQcml2aWxlZ2VkIiwic3ViIjoiZGlkOnBsYzpvcWFqM3V4Mml4b3d4MzZhaWZicWN2anoiLCJpYXQiOjE3NjMzNjkyMjMsImV4cCI6MTc2MzM3NjQyMywiYXVkIjoiZGlkOndlYjphdXJpcG9yaWEudXMtd2VzdC5ob3N0LmJza3kubmV0d29yayJ9.SoV2pX6i86ZvYOatcGFeDdMIGGugIL3G3O5yPT0A8B4d2aNfdZwfpKBoPEMJLI_ofoqGuED-EtV28Qati-6sfA";
 		public string RefreshJwt { get; private set; } = string.Empty;
 		public string Did { get; private set; } = "did:plc:oqaj3ux2ixowx36aifbqcvjz";//string.Empty;
 		public string PdsUrl { get; private set; } = "https://auriporia.us-west.host.bsky.network";//string.Empty;
+		protected override string ServiceName => "BlueSky";
 
-		public BlueSkyService(string identifire, string appPassword)
+		public BlueSkyService(string identifire, string appPassword, IGenerativeLanguageModel generativeLanguageModel, TelegramService telegramService)
+			: base(generativeLanguageModel, telegramService)
 		{
 			_identifire = identifire;
 			_appPassword = appPassword;
 			_httpClient = new HttpClient();
 		}
 
-		public bool BlueSkyLogin = false;
+		public bool BlueSkyLogin = false;		
 
 		// --- Шаг 1: Первичный вход (Login) ---
 
@@ -153,11 +159,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
 
 			// 2. Создаем тело запроса
-			var record = new
+			var record = new PostRecord
 			{
-				text = postText,
-				facets = facets.Any() ? facets : null,
-				createdAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+				Text = postText,
+				Facets = facets.Any() ? facets : null,
+				CreatedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 			};
 
 			var payload = new
@@ -167,7 +173,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				record = record
 			};
 
-			var jsonPayload = JsonSerializer.Serialize(payload);
+			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions 
+			{ 
+				WriteIndented = true, 
+				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
+			});
 			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
 			// 3. Отправляем запрос
@@ -223,7 +233,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			};
 
 			// 3. Сериализация и отправка
-			var jsonPayload = JsonSerializer.Serialize(payload);
+			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions 
+			{ 
+				WriteIndented = true, 
+				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
+			});
 			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
 			var response = await _httpClient.PostAsync(postEndpoint, content);
@@ -394,7 +408,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			};
 
 			// 3. Отправка и обработка
-			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }); // Включим WriteIndented для отладки
+			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions 
+			{ 
+				WriteIndented = true, 
+				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
+			});
 			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
 			var response = await _httpClient.PostAsync(postEndpoint, content);
@@ -446,6 +464,34 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 
 			return facets;
+		}
+
+		public async Task<string> TruncateTextToMaxLength(string text)
+		{
+			if (string.IsNullOrEmpty(text)) return text;
+
+			var stringInfo = new StringInfo(text);
+			if (stringInfo.LengthInTextElements <= MAX_GRAPHEME_LENGTH)
+				return text;
+
+			var prompt = "Данный текст для вставки в описание публикации в bluesky, must not be longer than 300 graphemes. " +
+				"Сократи его до 300, таким образом что бы по возможности сохранить смысл и хотя бы часть хештегов. " +
+				"Верни только готовый результат, без пояснений, дополнительных скобок и форматирования." +
+				$"Вот само описание: {text}";
+
+			return await _generativeLanguageModel.GeminiRequest(prompt);
+		}
+
+		protected override string GetBaseDescriptionPrompt(string base64Img)
+		{
+			return "Придумай красивое, краткое описание на английском языке, возможно добавь эмодзи, к посту в bluesky под постом с фотографией. " +
+				$"А так же придумай не более 15 хештогов, они должны соответствовать " +
+				$"теме изображения, а так же всегда включать пару обязательных хештегов для указания что это AI контент, например #aigirls. " +
+				$"Вот само изображение: {base64Img}" +
+				$"\n\n Формат ответа: Ответь строго только готовое описание с хештегами, " +
+				$"без всякого рода ковычек и экранирования. " +
+				$"Пример ответа: ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence " +
+				$"#neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
 		}
 	}
 

@@ -55,7 +55,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			// 1. Проверяем, есть ли видео в сообщении
 			if (rmsg.Video == null)
 			{
-				await _telegramBotClient.SendMessage(rmsg.Chat.Id, "❌ В сообщении не найдено видео для публикации.");
+				//await _telegramBotClient.SendMessage(rmsg.Chat.Id, "❌ В сообщении не найдено видео для публикации.");
 				return (null, null);
 			}
 
@@ -262,7 +262,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				}
 
 				// Удаляем обработанную группу
-				_activeMediaGroups.Remove(mediaGroupId);
+				//_activeMediaGroups.Remove(mediaGroupId);
 			}
 
 			return base64Images;

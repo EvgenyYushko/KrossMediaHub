@@ -139,16 +139,18 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private async Task<bool?> BlueSkyHandler(Update update, Message rmsg, CancellationToken ct)
 		{
 			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в bluesky...");
-
 			try
 			{
-				List<string> images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+
+				var images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var replayText = rmsg.GetMsgText() ?? "";
 				if (images.Count == 0 && string.IsNullOrWhiteSpace(replayText) && resVideos.base64Video is null)
 				{
 					return true;
 				}
+
+				var description = await _blueSkyService.TryCreateDescription(replayText, images);
 
 				// 1. Первичный вход при запуске
 				if (!_blueSkyService.BlueSkyLogin)
@@ -181,7 +183,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 					bool success = false;
 
-					replayText = await TruncateTextToMaxLength(replayText);
+					description = await _blueSkyService.TruncateTextToMaxLength(description);
 
 					if (resVideos.base64Video is not null)
 					{
@@ -194,15 +196,15 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						var ratio = new AspectRatio { Width = 9, Height = 16 };
 
 						// 3. Постинг
-						success = await _blueSkyService.CreatePostWithVideoAsync(replayText, videoBlob, ratio);
+						success = await _blueSkyService.CreatePostWithVideoAsync(description, videoBlob, ratio);
 					}
 					else if (attachments is not null)
 					{
-						success = await _blueSkyService.CreatePostWithImagesAsync(replayText, attachments);
+						success = await _blueSkyService.CreatePostWithImagesAsync(description, attachments);
 					}
 					else
 					{
-						success = await _blueSkyService.CreatePostAsync(replayText);
+						success = await _blueSkyService.CreatePostAsync(description);
 					}
 
 					if (success)
@@ -241,25 +243,27 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 		private async Task<bool> FaceBookHandler(Update update, Message rmsg, CancellationToken ct)
 		{
-			var replayText = rmsg.GetMsgText() ?? "";
-			var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
-			List<string> images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
-			if (images.Count == 0 && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
-			{
-				return false;
-			}
-
 			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в facebook...");
 			try
 			{
+				var replayText = rmsg.GetMsgText() ?? "";
+				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
+				var images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+				if (images.Count == 0 && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
+				{
+					return false;
+				}
+
+				string description = await _faceBookService.TryCreateDescription(replayText, images);
+
 				bool success = false;
 				if (images.Count > 0)
 				{
-					success = await _faceBookService.PublishToPageAsync(replayText, images);
+					success = await _faceBookService.PublishToPageAsync(description, images);
 				}
 				else if (resVideos.base64Video is not null)
 				{
-					success = await _faceBookService.PublishReelAsync(replayText, resVideos.base64Video);
+					success = await _faceBookService.PublishReelAsync(description, resVideos.base64Video);
 				}
 
 				if (success)
@@ -272,7 +276,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					}
 					catch { }
 				}
-
 			}
 			catch (Exception ex)
 			{
@@ -288,39 +291,18 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 		private async Task<bool> InstagramHandler(Update update, Message rmsg, CancellationToken ct)
 		{
-			var replayText = rmsg.GetMsgText();
-			List<string> images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
-			if (images.Count == 0)
-			{
-				return false;
-			}
-
-			string description = "";
-			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в инсту...");
+			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в instagram...");
 			try
 			{
-				var promptForeDescriptionPost = "Придумай красивое, краткое описание на английском языке, возможно добавь эмодзи, к посту в инстаграм под постом с фотографией. " +
-					$"А так же придумай не более 15 хештогов, они должны соответствовать " +
-					$"теме изображения, а так же всегда включать пару обязательных хештегов для указания что это AI контент, например #aigirls. " +
-					$"Вот само изображение: {images.FirstOrDefault()}" +
-					$"\n\n Формат ответа: Ответь строго только готовое описание с хештегами, " +
-					$"без всякого рода ковычек и экранирования. " +
-					$"Пример ответа: Golden hour glow ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence #neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
-
-				description = replayText ?? await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost);
-				try
+				var replayText = rmsg.GetMsgText() ?? "";
+				List<string> images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+				if (images.Count == 0)
 				{
-					await _telegramService.SendMessage(update.Message.Chat.Id, $"{description}", rmsg.MessageId);
+					return false;
 				}
-				catch { }
-			}
-			catch (Exception e)
-			{
-				Console.WriteLine("Ошикбка инсты создания описания: " + e.Message);
-			}
 
-			try
-			{
+				string description = await _instagramService.TryCreateDescription(replayText, images);
+
 				var result = await _instagramService.CreateMediaAsync(images, description);
 				if (result.Success)
 				{
@@ -343,25 +325,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 
 			return true;
-		}
-
-		private const int MAX_GRAPHEME_LENGTH = 300;
-
-		public async Task<string> TruncateTextToMaxLength(string text)
-		{
-			if (string.IsNullOrEmpty(text)) return text;
-
-			var stringInfo = new StringInfo(text);
-			if (stringInfo.LengthInTextElements <= MAX_GRAPHEME_LENGTH)
-				return text;
-
-			var prompt = "Данный текст для вставки в описание публикации в bluesky, must not be longer than 300 graphemes. " +
-				"Сократи его до 300, таким образом что бы по возможности сохранить смысл и хотя бы часть хештегов. " +
-				"Верни только готовый результат, без пояснений, дополнительных скобок и форматирования." +
-				$"Вот само описание: {text}";
-
-			return await _generativeLanguageModel.GeminiRequest(prompt);
-		}
+		}		
 
 		public async Task GenerateImageByText(Update update, CancellationToken ct)
 		{

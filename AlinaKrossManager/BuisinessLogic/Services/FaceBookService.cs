@@ -1,14 +1,19 @@
 using System.Text.Json;
+using AlinaKrossManager.BuisinessLogic.Services.Base;
+using AlinaKrossManager.Services;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
-	public class FaceBookService
+	public class FaceBookService : SocialBaseService
 	{
 		private readonly string _longLivedUserToken;
 		private string _userId = "122108650443054121";
 		string _pageIdToPublish = "872506142593246";
 
-		public FaceBookService(string longLivedUserToken)
+		protected override string ServiceName => "FaceBook";
+
+		public FaceBookService(string longLivedUserToken, IGenerativeLanguageModel generativeLanguageModel, TelegramService telegramService)
+			: base(generativeLanguageModel, telegramService)
 		{
 			_longLivedUserToken = longLivedUserToken;
 		}
@@ -417,6 +422,18 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				// Используем существующий метод для проверки ответа публикации
 				return await ProcessPublishResponseAsync(response);
 			}
+		}
+
+		protected override string GetBaseDescriptionPrompt(string base64Img)
+		{
+			return "Придумай красивое, краткое описание на английском языке, возможно добавь эмодзи, к посту в FaceBook под постом с фотографией. " +
+				$"А так же придумай не более 15 хештогов, они должны соответствовать " +
+				$"теме изображения, а так же всегда включать пару обязательных хештегов для указания что это AI контент, например #aigirls. " +
+				$"Вот само изображение: {base64Img}" +
+				$"\n\n Формат ответа: Ответь строго только готовое описание с хештегами, " +
+				$"без всякого рода ковычек и экранирования. " +
+				$"Пример ответа: ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence #neuralnetwork #digitalart " +
+				$"#generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
 		}
 	}
 
