@@ -126,11 +126,11 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
 
-						bool flowControl1 = await InstagramHandler(update, rmsg, ct);
-						await Task.Delay(TimeSpan.FromSeconds(20));
-						bool flowControl2 = await FaceBookHandler(update, rmsg, ct);
-						await Task.Delay(TimeSpan.FromSeconds(20));
-						bool? flowControl3 = await BlueSkyHandler(update, rmsg, ct);
+						//bool flowControl1 = await InstagramHandler(update, rmsg, ct);
+						//await Task.Delay(TimeSpan.FromSeconds(20));
+						//bool flowControl2 = await FaceBookHandler(update, rmsg, ct);
+						//await Task.Delay(TimeSpan.FromSeconds(20));
+						//bool? flowControl3 = await BlueSkyHandler(update, rmsg, ct);
 
 						Console.WriteLine("Конце операции публикации во все сети");
 					}
