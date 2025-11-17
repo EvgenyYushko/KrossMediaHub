@@ -28,7 +28,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Base
 					Console.WriteLine("Начниаем генерировать описание...");
 					var promptForeDescriptionPost = GetBaseDescriptionPrompt(images.FirstOrDefault());
 					var res = string.IsNullOrEmpty(replayText) ? await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost) : replayText;
-
+					Console.WriteLine("Начинаем задержку в 20 секунд...");					
+					await Task.Delay(TimeSpan.FromSeconds(20));
+					Console.WriteLine("Задржка окончена...");
 					Console.WriteLine("Сгенерированное описание: " + res);
 					return res;
 				}
