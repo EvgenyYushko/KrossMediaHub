@@ -18,13 +18,18 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Base
 
 		public virtual async Task<string> TryCreateDescription(string replayText, List<string> images)
 		{
+			Console.WriteLine("Вошли в метод генерации описание...");
+			Console.WriteLine("Текущее описание: " + replayText);
 			string description = replayText;
 			if (string.IsNullOrEmpty(replayText) && images.Count > 0)
 			{
 				try
 				{
+					Console.WriteLine("Начниаем генерировать описание...");
 					var promptForeDescriptionPost = GetBaseDescriptionPrompt(images.FirstOrDefault());
-					return string.IsNullOrEmpty(replayText) ? await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost) : replayText;
+					var res = string.IsNullOrEmpty(replayText) ? await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost) : replayText;
+					Console.WriteLine("Сгенерированное описание: " + res);
+					return res;
 				}
 				catch (Exception e)
 				{

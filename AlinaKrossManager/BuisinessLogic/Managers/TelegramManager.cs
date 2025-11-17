@@ -141,7 +141,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в bluesky...");
 			try
 			{
-
 				var images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var replayText = rmsg.GetMsgText() ?? "";
