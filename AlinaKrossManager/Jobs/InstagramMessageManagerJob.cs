@@ -8,7 +8,7 @@ namespace AlinaKrossManager.Jobs
 {
 	public class InstagramMessageManagerJob : SchedulerJob
 	{
-		public static string Time =>  "0 5 * * * ?";
+		public static string Time =>  "0 */5 * * * ?";
 
 		private readonly ConversationService _conversationService;
 		private readonly InstagramService _instagramService;
