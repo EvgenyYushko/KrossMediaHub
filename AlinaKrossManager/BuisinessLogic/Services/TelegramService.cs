@@ -153,8 +153,22 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				else
 				{
 					var sentMessages = await _telegramBotClient.SendMediaGroup(chatId, media);
-				}
 
+					try
+					{
+						Console.WriteLine("Пробуем сохранить MediaGroupId");
+						foreach (var message in sentMessages)
+						{
+							HandleMediaGroup(message);
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine(ex.Message);
+						return;	
+					}
+					Console.WriteLine("MediaGroupId успешно сохранили");
+				}
 			}
 			catch (Exception ex)
 			{

@@ -1,7 +1,5 @@
 using AlinaKrossManager.Services;
 using Quartz;
-using Telegram.Bot;
-using Telegram.Bot.Types.Enums;
 
 namespace AlinaKrossManager.Jobs.Base
 {
@@ -16,9 +14,6 @@ namespace AlinaKrossManager.Jobs.Base
 			_generativeLanguageModel = generativeLanguageModel;
 		}
 
-		public async virtual Task Execute(IJobExecutionContext context)
-		{
-			
-		}
+		public abstract Task Execute(IJobExecutionContext context);
 	}
 }

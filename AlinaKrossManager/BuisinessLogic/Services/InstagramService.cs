@@ -527,7 +527,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public static bool AlinaOnline = true;	
 
-		private async Task SendMessageWithHistory(string messageText, string senderId)
+		public async Task SendMessageWithHistory(string messageText, string senderId)
 		{
 			if (!AlinaOnline)
 			{

@@ -2,7 +2,8 @@ namespace AlinaKrossManager.Jobs.Helpers
 {
 	public static class JobHelper
 	{
-		public static string INSTAGRAM_DAILY_POST_JOB = "InstagramDailyPostJob";
+		public static string INSTAGRAM_DAILY_POST_JOB_KEY = "InstagramDailyPostJob";
+		public static string INSTAGRAM_MESSAGE_MANAGER_JOB_KEY = "InstagramMessageManagerJob";
 
 		public static List<JobsSetting> JobSettings { get; set; } = new();
 
@@ -14,7 +15,8 @@ namespace AlinaKrossManager.Jobs.Helpers
 			//JobSettings.Add(new() { Type = typeof(AllNewsJob), Key = AllNewsKey, Time = "", Castum = true });
 			//JobSettings.Add(new() { Type = typeof(WeatherJob), Key = WeatherKey, Time = "", Castum = true });
 
-			JobSettings.Add(new() { Type = typeof(DilyPostJob), Key = INSTAGRAM_DAILY_POST_JOB, Time = DilyPostJob.Time, Castum = false });
+			JobSettings.Add(new() { Type = typeof(DilyPostJob), Key = INSTAGRAM_DAILY_POST_JOB_KEY, Time = DilyPostJob.Time, Castum = false });
+			JobSettings.Add(new() { Type = typeof(InstagramMessageManagerJob), Key = INSTAGRAM_MESSAGE_MANAGER_JOB_KEY, Time = InstagramMessageManagerJob.Time, Castum = false });
 		}
 	}
 

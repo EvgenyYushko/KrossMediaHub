@@ -9,7 +9,7 @@ namespace AlinaKrossManager.Jobs
 {
 	public class DilyPostJob : SchedulerJob
 	{
-		public const string Time = "0 0 10 * * ?";
+		public static string Time => "0 0 10 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly ConversationService _conversationService;
@@ -32,58 +32,58 @@ namespace AlinaKrossManager.Jobs
 		{
 			try
 			{
-				await _instagramService.SendInstagramMessage("1307933750574022", "Привет, 💋");
+				await _instagramService.SendInstagramMessage("1307933750574022", "Привет, я сейчас буду выкладывать новый пост)");
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine(ex.ToString());
 			}
 
-			try
-			{
-				var allUsers = _conversationService.GetAllUserConversations();
+			//try
+			//{
+			//	var allUsers = _conversationService.GetAllUserConversations();
 
-				Console.WriteLine("Count All Users: " + allUsers.Count);
-				foreach (var userId in allUsers)
-				{
-					Console.WriteLine("UsersId: " + userId);
+			//	Console.WriteLine("Count All Users: " + allUsers.Count);
+			//	foreach (var userId in allUsers)
+			//	{
+			//		Console.WriteLine("UsersId: " + userId);
 
-					var userHistory = _conversationService.GetHistory(userId);
-					if (userHistory != null)
-					{
-						var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
-						Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}");
+			//		var userHistory = _conversationService.GetHistory(userId);
+			//		if (userHistory != null)
+			//		{
+			//			var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
+			//			Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}");
 
-						if (lastMsg != null && lastMsg.Sender == "User")
-						{
-							await _instagramService.SendInstagramMessage(userId, "))))");
-							await Task.Delay(TimeSpan.FromSeconds(5));
-						}
-					}
-				}
+			//			if (lastMsg != null && lastMsg.Sender == "User")
+			//			{
+			//				await _instagramService.SendInstagramMessage(userId, "))))");
+			//				await Task.Delay(TimeSpan.FromSeconds(5));
+			//			}
+			//		}
+			//	}
 
-				foreach (var userId in allUsers)
-				{
-					await _instagramService.SendInstagramMessage(userId, "💋");
-					//Console.WriteLine("начали генерацию фото");
-					//InstagramMedia randomItem = GetRandomMedia(_mediaList);
-					//Console.WriteLine("получили фото");
-					//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
-					//Console.WriteLine("закончили фото");
+			//	foreach (var userId in allUsers)
+			//	{
+			//		await _instagramService.SendInstagramMessage(userId, "💋");
+			//		//Console.WriteLine("начали генерацию фото");
+			//		//InstagramMedia randomItem = GetRandomMedia(_mediaList);
+			//		//Console.WriteLine("получили фото");
+			//		//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
+			//		//Console.WriteLine("закончили фото");
 
-					await Task.Delay(TimeSpan.FromSeconds(6));
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(ex.ToString());
-			}
+			//		await Task.Delay(TimeSpan.FromSeconds(6));
+			//	}
+			//}
+			//catch (Exception ex)
+			//{
+			//	Console.WriteLine(ex.ToString());
+			//}
 
 			var chatId = 1231047171;
 
 			Console.WriteLine("Генерация сцен для Instagram...\n");
 
-			string promptForCreateImage = null;//_randomGenerator.GenerateRandomPrompt();
+			string promptForCreateImage = null;
 
 			Message msg = null;
 			List<string> images = new();
@@ -92,7 +92,7 @@ namespace AlinaKrossManager.Jobs
 			try
 			{
 				promptForCreateImage = await OriginalPrompt();
-				//promptForCreateImage = await _generativeLanguageModel.GeminiRequest(promptVar);
+
 				if (promptForCreateImage is not null)
 				{
 					var imagesRes = await CreateImage(chatId, promptForCreateImage, msg);
@@ -158,22 +158,23 @@ namespace AlinaKrossManager.Jobs
 					Console.WriteLine("_telegramService is null");
 				}
 
-
 				if (images.Count > 1)
 				{
 					Console.WriteLine($"Первое изображение null: {images.First() == null}");
 					//Console.WriteLine($"Длина base64 строки: {images.First()?.Length ?? 0}");
-					await _telegramService.SendPhotoAlbumAsync(chatId, images, null, "Сгенерированные фото по промптам");
+					await _telegramService.SendPhotoAlbumAsync(chatId, images, null, "");
 				}
 				else
 				{
-					await _telegramService.SendSinglePhotoAsync(chatId, images.First(), null, "Сгенерированное фото по промпту");
-					try
-					{
-						await _telegramService.DeleteMessage(msg.Chat.Id, msg.MessageId);
-					}
-					catch { }
+					await _telegramService.SendSinglePhotoAsync(chatId, images.First(), null, "");
+					//try
+					//{
+					//	await _telegramService.DeleteMessage(msg.Chat.Id, msg.MessageId);
+					//}
+					//catch { }
 				}
+
+
 			}
 			catch (Exception e)
 			{
@@ -247,13 +248,22 @@ namespace AlinaKrossManager.Jobs
 			{
 				Console.WriteLine($"❌ Ошибка: {ex.Message}");
 			}
+
+			try
+			{
+				await _instagramService.SendInstagramMessage("1307933750574022", "Всё, я всё выложила, можешь проверить и постатвить лайк 💋");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(ex.ToString());
+			}
 		}
 
 		private async Task<ImageResult> CreateImage(int chatId, string promptForCreateImage, Message msg)
 		{
 			try
 			{
-				msg = await _telegramService.SendMessage(chatId, $"Сгенерированный промпт:\n\n{promptForCreateImage}");
+				msg = await _telegramService.SendMessage(chatId, promptForCreateImage);
 			}
 			catch { }
 
@@ -279,7 +289,7 @@ namespace AlinaKrossManager.Jobs
 
 				try
 				{
-					msg = await _telegramService.SendMessage(chatId, $"Смягчённый промпт:\n\n{promptForCreateImage}");
+					msg = await _telegramService.SendMessage(chatId, promptForCreateImage);
 				}
 				catch { }
 
@@ -312,7 +322,7 @@ namespace AlinaKrossManager.Jobs
 		private async Task<string> GetDress()
 		{
 			var prompt = "Измени или оставь это описание сексуальной девушки. " +
-				"Оно должно быть не менее откровенной и вызывающей чем эта: Attire: She is wearing a two-piece bikini in a light, neutral, possibly beige or pale peach color. " +
+				"Оно должно быть не менее откровенной и вызывающей чем эта, возми его за основу: Attire: She is wearing a two-piece bikini in a light, neutral, possibly beige or pale peach color. " +
 				"Top: A classic triangle bikini top with thin straps, providing excellent support and emphasizing her ample cleavage. The fabric appears smooth and slightly reflective in the light. " +
 				" Bottom: Matching tie-side bikini bottoms, sitting low on her curvy hips, with adjustable strings tied at each side. The cut is moderately revealing but tasteful, accentuating her figure." +
 				$"\n\n**Формат ответа:** Строго только готовый промпт на английском, без пояснений и предодложений разных вариантов.";
@@ -322,9 +332,128 @@ namespace AlinaKrossManager.Jobs
 
 		private async Task<string> Background()
 		{
-			var prompt = "Придумай описание местанахождения девушки, модельной внешности, где бы она могла оказаться. Например где-то у себя дома в квартире. ВОзможно лежит на кровати и т.п." +
-				"Вот пример стиля описания места: Background: soft white sandy beach, turquoise ocean waves gently rolling, palm trees silhouetted against a warm orange-pink sunset sky." +
-				$"\n\n**Формат ответа:** Строго только готовый промпт на английском, без пояснений и предодложений разных вариантов.";
+			var locations = new[]
+			{
+				// Домашние интимные локации
+				"in a cozy apartment bedroom, lying on a soft bed with fluffy pillows",
+				"in a modern living room, sitting on a comfortable sofa near a large window",
+				"in a stylish kitchen, leaning against the marble countertop",
+				"on a balcony with city view, enjoying the sunset",
+				"in a bathroom with elegant decorations, near a large mirror",
+				"in a walk-in closet, trying on fashionable clothes",
+				"in a home office, sitting at a minimalist desk",
+				"by the window in a cozy nook, reading a book",
+				"in a rooftop garden with panoramic city views",
+        
+				// Спальня и постельные сцены
+				"lying seductively on satin sheets in a dimly lit bedroom",
+				"on a luxurious king-size bed surrounded by velvet pillows",
+				"in bed wearing delicate lingerie with soft morning light",
+				"reclining on a fur rug in front of a fireplace",
+				"on a canopy bed with sheer curtains partially drawn",
+				"sprawled across a messy bed with crumpled sheets",
+				"on a bed covered in rose petals with candlelight",
+				"lying on stomach on the bed, looking over shoulder",
+				"curled up in fetal position on soft blankets",
+				"stretching sensually upon waking up in bed",
+        
+				// Ванная комната и душевые сцены
+				"stepping out of shower with wet hair and steam",
+				"in a bubble bath surrounded by candles",
+				"leaning against bathroom counter in towel",
+				"sitting on edge of bathtub with legs crossed",
+				"steam-filled bathroom with foggy mirror",
+				"in a luxurious jacuzzi with rose petals",
+				"drying hair with towel in front of mirror",
+				"applying makeup at vanity in silk robe",
+				"relaxing in sauna with beads of sweat",
+        
+				// Гардеробная и примерочная
+				"trying on lingerie in walk-in closet",
+				"adjusting stockings in front of full-length mirror",
+				"wearing only boyfriend's shirt in closet",
+				"selecting clothes from extensive wardrobe",
+				"in lingerie surrounded by designer clothes",
+				"wearing silk robe that's slightly open",
+				"barefoot on plush carpet in dressing room",
+        
+				// Кухня и интимные моменты
+				"drinking wine alone at kitchen island",
+				"leaning against refrigerator in nightgown",
+				"sitting on kitchen counter barefoot",
+				"preparing breakfast wearing only apron",
+				"eating fruits sensually at kitchen table",
+        
+				// Гостиная и расслабляющие позы
+				"curled up on sofa with blanket",
+				"lying on Persian rug with book",
+				"stretching like cat on floor pillows",
+				"lounging on chaise lounge dramatically",
+				"sitting by window in sheer curtains",
+        
+				// Балкон и приватные открытые пространства
+				"on balcony wearing only silk robe at night",
+				"leaning over balcony railing in moonlight",
+				"sipping coffee on balcony in morning",
+				"watching rain from covered balcony",
+				"sunbathing on private terrace",
+        
+				// Неожиданные интимные локации
+				"in home library leaning against bookshelf",
+				"on staircase sitting on steps",
+				"in wine cellar holding glass",
+				"by piano in living room",
+				"in attic surrounded by memories",
+        
+				// Сезонные и погодные сцены
+				"curled up by window during thunderstorm",
+				"in bed with snow falling outside",
+				"under blanket during rainy afternoon",
+				"by fireplace on cold winter night",
+				"with summer breeze blowing curtains",
+        
+				// Утренние и вечерние сцены
+				"waking up with messy hair and sleepy eyes",
+				"morning light streaming across bed",
+				"getting ready for bed in nightwear",
+				"late night insomnia in living room",
+				"early morning yoga in bedroom",
+        
+				// Эмоциональные и мечтательные сцены
+				"lost in thought while staring out window",
+				"crying softly in dimly lit room",
+				"laughing to self while remembering something",
+				"dancing alone in living room",
+				"singing quietly while doing chores",
+        
+				// Сенсорные и тактильные сцены
+				"feeling texture of velvet curtains",
+				"running fingers through own hair",
+				"touching own skin softly",
+				"playing with necklace absentmindedly",
+				"massaging own feet after long day",
+        
+				// Игривые и кокетливые сцены
+				"peeking from behind door playfully",
+				"hiding behind sheer canopy",
+				"looking over shoulder seductively",
+				"biting lip while thinking",
+				"playing with hem of short dress",
+        
+				// Романтические и ностальгические сцены
+				"looking at old photos in attic",
+				"holding love letter in bedroom",
+				"wearing partner's clothing",
+				"surrounded by dried flowers",
+				"with wedding dress in background"
+			};
+
+			var random = new Random();
+			var randomLocation = locations[random.Next(locations.Length)];
+
+			var prompt = $"Beautiful girl with model appearance {randomLocation}. " +
+				 "Soft natural lighting, photorealistic style, high quality." +
+				 "\n\n**Response format:** Strictly only the ready prompt in English, without explanations or multiple options";
 			return await _generativeLanguageModel.GeminiRequest(prompt);
 		}
 		private string descPhoto => "Soft ambient lighting, cinematic shallow depth of field, photorealistic, ultra-detailed skin texture, 8K resolution, professional fashion photography style, sharp focus on face and figure. --ar 9:16 --v 6.0 --style raw --q 2 --s 750";
