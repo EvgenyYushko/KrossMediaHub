@@ -28,7 +28,8 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 			{
 				Sender = "User",
 				Text = messageText,
-				Timestamp = DateTime.UtcNow
+				Timestamp = DateTime.UtcNow,
+				Readed = false
 			});
 
 			TrimHistory(userId);
@@ -67,10 +68,20 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 
 			foreach (var message in history)
 			{
-				formattedHistory.Add($"{message.Sender}: {message.Text}");
+				formattedHistory.Add($"{message.Sender}{(message.Readed ? "" : "[Unreaded]")}: {message.Text}");
 			}
 
 			return string.Join("\n", formattedHistory);
+		}
+
+		public bool MakeHistoryAsReaded(string userId)
+		{
+			if (!_conversations.ContainsKey(userId) || !_conversations[userId].Messages.Any())
+				return false;
+
+			_conversations[userId].Messages.ForEach(m => m.Readed = true);
+
+			return true;
 		}
 
 		public List<ChatMessage> GetHistory(string userId)
@@ -132,6 +143,7 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 	{
 		public string Sender { get; set; } // "user" или "alina"
 		public string Text { get; set; }
+		public bool Readed { get; set; }
 		public DateTime Timestamp { get; set; }
 	}
 

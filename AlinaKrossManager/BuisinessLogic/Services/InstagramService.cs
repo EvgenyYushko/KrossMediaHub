@@ -529,7 +529,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task SendMessageWithHistory(string messageText, string senderId)
 		{
-			if (!AlinaOnline)
+			if (true)
 			{
 				_conversationService.AddUserMessage(senderId, messageText);
 				var history = _conversationService.GetFormattedHistory(senderId);
@@ -538,21 +538,44 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 
 			var conversationHistory = _conversationService.GetFormattedHistory(senderId);
-			var prompt = await GetMainPromptWithHistory(messageText, conversationHistory);
+			var prompt = await GetMainPromptWithHistory(conversationHistory);
 
 			//Log($"SENDED PROMPT: {prompt}");
 
 			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
 
-			_conversationService.AddUserMessage(senderId, messageText);
+			_conversationService.AddUserMessage(senderId, messageText);			
 			_conversationService.AddBotMessage(senderId, responseText);
 
 			await SendResponse(senderId, responseText);
 		}
 
-		private async Task<string> GetMainPromptWithHistory(string currentMessage, string conversationHistory)
+
+		public async Task SendDellayMessageWithHistory(string senderId)
 		{
-			return await GetMainPromtAlinaKross(currentMessage, conversationHistory);
+			try
+			{
+				var conversationHistory = _conversationService.GetFormattedHistory(senderId);
+				var prompt = await GetMainPromptWithHistory(conversationHistory);
+
+				//Log($"SENDED PROMPT: {prompt}");
+
+				var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
+			
+				_conversationService.AddBotMessage(senderId, responseText);
+
+				await SendResponse(senderId, responseText);
+			}
+			finally
+			{
+				var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
+				Console.WriteLine("historyIsReaded: " + historyIsReaded);
+			}
+		}
+
+		private async Task<string> GetMainPromptWithHistory(string conversationHistory)
+		{
+			return await GetMainPromtAlinaKross(conversationHistory);
 		}
 
 		private bool IsValidMessage(InstagramMessaging messaging)
@@ -1315,7 +1338,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private string _todaysSpecifics = null;
 		private string _currentInteres = null;
 
-		private async Task<string> GetMainPromtAlinaKross(string currentMessage, string conversationHistory)
+		private async Task<string> GetMainPromtAlinaKross(string conversationHistory)
 		{
 			_mediaList = _mediaList ?? await GetUserMediaAsync();
 			//var eligibleMedia = _mediaList
@@ -1440,8 +1463,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					CHAT HISTORY:
 					""{conversationHistory}""
 
-					CONTINUE THE CONVERSATION NATURALLY. USER JUST SENT:
-					""{currentMessage}""
+					Continue the conversation. Analyze the latest unread messages from User[Unreaded]. And respond to them, taking into account the context of the entire message history.
 
 					Answer as the real Alina would text back right now (only response text, no explanations or formatting).";
 		}

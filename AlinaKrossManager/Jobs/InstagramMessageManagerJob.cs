@@ -29,8 +29,8 @@ namespace AlinaKrossManager.Jobs
 			try
 			{
 				var allUsers = _conversationService.GetAllUserConversations();
-
-				Console.WriteLine("Count All Users: " + allUsers.Count);
+				Console.WriteLine("start - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
+				Console.WriteLine(" Count All Users: " + allUsers.Count);
 				foreach (var userId in allUsers)
 				{
 					Console.WriteLine("UsersId: " + userId);
@@ -39,15 +39,16 @@ namespace AlinaKrossManager.Jobs
 					if (userHistory != null)
 					{
 						var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
-						Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}");
+						Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}, Readed: {lastMsg.Readed}");
 
 						if (lastMsg != null && lastMsg.Sender == "User")
 						{
-							await _instagramService.SendMessageWithHistory(userId, lastMsg.Text);
+							await _instagramService.SendDellayMessageWithHistory(userId);
 							//await Task.Delay(TimeSpan.FromSeconds(5));
 						}
 					}
 				}
+				Console.WriteLine("end - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
 
 				//foreach (var userId in allUsers)
 				//{
