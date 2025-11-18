@@ -21,7 +21,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly string _appPassword = "d4an-bvic-ssrd-r663";
 
 		// Свойства для хранения состояния сессии
-		public string AccessJwt { get; private set; } = "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJFUzI1NksifQ.eyJzY29wZSI6ImNvbS5hdHByb3RvLmFwcFBhc3NQcml2aWxlZ2VkIiwic3ViIjoiZGlkOnBsYzpvcWFqM3V4Mml4b3d4MzZhaWZicWN2anoiLCJpYXQiOjE3NjMzNjkyMjMsImV4cCI6MTc2MzM3NjQyMywiYXVkIjoiZGlkOndlYjphdXJpcG9yaWEudXMtd2VzdC5ob3N0LmJza3kubmV0d29yayJ9.SoV2pX6i86ZvYOatcGFeDdMIGGugIL3G3O5yPT0A8B4d2aNfdZwfpKBoPEMJLI_ofoqGuED-EtV28Qati-6sfA";
+		public string AccessJwt { get; private set; } = string.Empty;
 		public string RefreshJwt { get; private set; } = string.Empty;
 		public string Did { get; private set; } = "did:plc:oqaj3ux2ixowx36aifbqcvjz";//string.Empty;
 		public string PdsUrl { get; private set; } = "https://auriporia.us-west.host.bsky.network";//string.Empty;
@@ -35,7 +35,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			_httpClient = new HttpClient();
 		}
 
-		public bool BlueSkyLogin = false;		
+		public bool BlueSkyLogin = false;
 
 		// --- Шаг 1: Первичный вход (Login) ---
 
@@ -173,10 +173,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				record = record
 			};
 
-			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions 
-			{ 
-				WriteIndented = true, 
-				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
+			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+			{
+				WriteIndented = true,
+				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 			});
 			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
@@ -233,10 +233,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			};
 
 			// 3. Сериализация и отправка
-			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions 
-			{ 
-				WriteIndented = true, 
-				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
+			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+			{
+				WriteIndented = true,
+				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 			});
 			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
@@ -408,10 +408,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			};
 
 			// 3. Отправка и обработка
-			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions 
-			{ 
-				WriteIndented = true, 
-				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
+			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+			{
+				WriteIndented = true,
+				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 			});
 			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
@@ -468,18 +468,28 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task<string> TruncateTextToMaxLength(string text)
 		{
-			if (string.IsNullOrEmpty(text)) return text;
+			try
+			{
+				if (string.IsNullOrEmpty(text)) return text;
 
-			var stringInfo = new StringInfo(text);
-			if (stringInfo.LengthInTextElements <= MAX_GRAPHEME_LENGTH)
-				return text;
+				var stringInfo = new StringInfo(text);
+				if (stringInfo.LengthInTextElements <= MAX_GRAPHEME_LENGTH)
+					return text;
 
-			var prompt = "Данный текст для вставки в описание публикации в bluesky, must not be longer than 300 graphemes. " +
-				"Сократи его до 300, таким образом что бы по возможности сохранить смысл и хотя бы часть хештегов. " +
-				"Верни только готовый результат, без пояснений, дополнительных скобок и форматирования." +
-				$"Вот само описание: {text}";
+				var prompt = "Данный текст для вставки в описание публикации в bluesky, must not be longer than 300 graphemes. " +
+					"Сократи его до 300, таким образом что бы по возможности сохранить смысл и хотя бы часть хештегов. " +
+					"Верни только готовый результат, без пояснений, дополнительных скобок и форматирования." +
+					$"Вот само описание: {text}";
 
-			return await _generativeLanguageModel.GeminiRequest(prompt);
+				return await _generativeLanguageModel.GeminiRequest(prompt);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(ex.ToString());
+			}
+
+			return "#ai #aiart #aigenerated #aiartwork #artificialintelligence " +
+				$"#neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty";
 		}
 
 		protected override string GetBaseDescriptionPrompt(string base64Img)

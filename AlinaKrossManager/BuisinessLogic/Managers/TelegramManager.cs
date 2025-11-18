@@ -29,6 +29,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			_telegramService = telegramService;
 		}
 
+		private string _tempPostDescription = null;
 		public async Task HandleUpdateAsync(Update update, CancellationToken ct)
 		{
 			if (update.Message?.Text is not { } text)
@@ -38,7 +39,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 
 			//await _instagramService.SendInstagramAdminMessage($"Hello form google cloude console, now ");
-
 
 			var msgText = update.Message.GetMsgText() ?? "";
 
@@ -136,6 +136,97 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 		}
 
+		private async Task<bool> InstagramHandler(Update update, Message rmsg, CancellationToken ct)
+		{
+			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в instagram...");
+			try
+			{
+				var replayText = rmsg.GetMsgText() ?? "";
+				List<string> images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+				if (images.Count == 0)
+				{
+					return false;
+				}
+
+				string description = await _instagramService.TryCreateDescription(replayText, images);
+				_tempPostDescription = description;
+
+				var result = await _instagramService.CreateMediaAsync(images, description);
+				if (result.Success)
+				{
+					var msgRes = $"✅ Пост в инсте успешно создан! ID: {result.Id}";
+					Console.WriteLine(msgRes);
+					try
+					{
+						await _telegramService.SendMessage(update.Message.Chat.Id, msgRes, rmsg.MessageId);
+					}
+					catch { }
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"❌ Ошибка в посте для инсты: {ex.Message}");
+			}
+			finally
+			{
+				try { await _telegramService.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
+			}
+
+			return true;
+		}	
+		
+		private async Task<bool> FaceBookHandler(Update update, Message rmsg, CancellationToken ct)
+		{
+			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в facebook...");
+			try
+			{
+				var replayText = rmsg.GetMsgText() ?? "";
+				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
+				var images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+				if (images.Count == 0 && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
+				{
+					return false;
+				}
+
+				string description = await _faceBookService.TryCreateDescription(replayText, images);
+				if (string.IsNullOrEmpty(description))
+				{
+					description = _tempPostDescription;
+				}
+
+				bool success = false;
+				if (images.Count > 0)
+				{
+					success = await _faceBookService.PublishToPageAsync(description, images);
+				}
+				else if (resVideos.base64Video is not null)
+				{
+					success = await _faceBookService.PublishReelAsync(description, resVideos.base64Video);
+				}
+
+				if (success)
+				{
+					var msgRes = $"✅ Пост в facebook успешно создан!";
+					Console.WriteLine(msgRes);
+					try
+					{
+						await _telegramService.SendMessage(update.Message.Chat.Id, msgRes, rmsg.MessageId);
+					}
+					catch { }
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка facebook: {ex.Message}");
+			}
+			finally
+			{
+				try { await _telegramService.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
+			}
+
+			return true;
+		}	
+
 		private async Task<bool?> BlueSkyHandler(Update update, Message rmsg, CancellationToken ct)
 		{
 			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в bluesky...");
@@ -150,6 +241,10 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				}
 
 				var description = await _blueSkyService.TryCreateDescription(replayText, images);
+				if (string.IsNullOrEmpty(description))
+				{
+					description = _tempPostDescription;
+				}
 
 				// 1. Первичный вход при запуске
 				if (!_blueSkyService.BlueSkyLogin)
@@ -238,93 +333,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 
 			return null;
-		}
-
-		private async Task<bool> FaceBookHandler(Update update, Message rmsg, CancellationToken ct)
-		{
-			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в facebook...");
-			try
-			{
-				var replayText = rmsg.GetMsgText() ?? "";
-				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
-				var images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
-				if (images.Count == 0 && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
-				{
-					return false;
-				}
-
-				string description = await _faceBookService.TryCreateDescription(replayText, images);
-
-				bool success = false;
-				if (images.Count > 0)
-				{
-					success = await _faceBookService.PublishToPageAsync(description, images);
-				}
-				else if (resVideos.base64Video is not null)
-				{
-					success = await _faceBookService.PublishReelAsync(description, resVideos.base64Video);
-				}
-
-				if (success)
-				{
-					var msgRes = $"✅ Пост в facebook успешно создан!";
-					Console.WriteLine(msgRes);
-					try
-					{
-						await _telegramService.SendMessage(update.Message.Chat.Id, msgRes, rmsg.MessageId);
-					}
-					catch { }
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"Ошибка facebook: {ex.Message}");
-			}
-			finally
-			{
-				try { await _telegramService.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
-			}
-
-			return true;
-		}
-
-		private async Task<bool> InstagramHandler(Update update, Message rmsg, CancellationToken ct)
-		{
-			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в instagram...");
-			try
-			{
-				var replayText = rmsg.GetMsgText() ?? "";
-				List<string> images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
-				if (images.Count == 0)
-				{
-					return false;
-				}
-
-				string description = await _instagramService.TryCreateDescription(replayText, images);
-
-				var result = await _instagramService.CreateMediaAsync(images, description);
-				if (result.Success)
-				{
-					var msgRes = $"✅ Пост в инсте успешно создан! ID: {result.Id}";
-					Console.WriteLine(msgRes);
-					try
-					{
-						await _telegramService.SendMessage(update.Message.Chat.Id, msgRes, rmsg.MessageId);
-					}
-					catch { }
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"❌ Ошибка в посте для инсты: {ex.Message}");
-			}
-			finally
-			{
-				try { await _telegramService.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
-			}
-
-			return true;
-		}		
+		}				
 
 		public async Task GenerateImageByText(Update update, CancellationToken ct)
 		{

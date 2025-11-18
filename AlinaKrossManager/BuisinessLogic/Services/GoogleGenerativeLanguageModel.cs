@@ -20,6 +20,17 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			_geminiServiceClient = geminiServiceClient;
 		}
 
+		public async Task<string> GeminiAudioToText(string base64Iaudio)
+		{
+			var prompt = "Распознай что сказано на этом аудио файле и верни только его содержимое, на том же языке, без всяких дополнителных кооментариев.";
+			var response = await _geminiServiceClient.RequestWithAudioAsync(new()
+			{
+				Prompt = { new Prompt { Text = prompt } },
+				Base64Idata = base64Iaudio
+			});
+			return response.GeneratedText;
+		}
+
 		public async Task<string> GeminiRequest(string prompt)
 		{
 			var response = await _geminiServiceClient.RequestAsync(new Prompt { Text = prompt });

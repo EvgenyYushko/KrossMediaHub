@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.Services;
-using static System.Net.WebRequestMethods;
 using static AlinaKrossManager.Helpers.Logger;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
@@ -30,7 +29,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			_accessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
 			_conversationService = conversationService;
 			_https = new HttpClient { BaseAddress = new Uri("https://graph.instagram.com/") };
-			//_https.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+			_https.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 		}
 
 		public async Task<CreateMediaResult> CreateMediaAsync(List<string> base64Strings, string caption = null)
@@ -40,42 +39,50 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			Console.WriteLine("CreateMediaAsync - Start");
 
-			string containerId;
+			ContainerResult containerResult;
 
 			if (base64Strings.Count == 1)
 			{
 				// Одиночное изображение
-				containerId = await CreateSingleMediaContainerAsync(base64Strings[0], caption);
+				containerResult = await CreateSingleMediaContainerAsync(base64Strings[0], caption);
 			}
 			else if (base64Strings.Count <= 10) // Instagram позволяет до 10 фото в карусели
 			{
 				// Карусель из нескольких изображений
-				containerId = await CreateCarouselContainerAsync(base64Strings, caption);
+				containerResult = await CreateCarouselContainerAsync(base64Strings, caption);
 			}
 			else
 			{
 				throw new ArgumentException("Instagram позволяет не более 10 изображений в одном посте");
 			}
 
-			if (string.IsNullOrEmpty(containerId))
+			if (string.IsNullOrEmpty(containerResult.Id))
 				throw new Exception("Не удалось создать контейнер");
 
-			Console.WriteLine($"Контейнер создан: {containerId}");
+			Console.WriteLine($"Контейнер создан: {containerResult}");
 
 			// ЖДЕМ пока медиа станет готовым к публикации
-			var isReady = await WaitForMediaReadyAsync(containerId);
+			var isReady = await WaitForMediaReadyAsync(containerResult.Id);
 			if (!isReady)
 			{
-				throw new Exception($"Медиа {containerId} не готово к публикации после ожидания");
+				throw new Exception($"Медиа {containerResult} не готово к публикации после ожидания");
 			}
 
-			Console.WriteLine($"Медиа {containerId} готово к публикации");
+			Console.WriteLine($"Медиа {containerResult} готово к публикации");
 
 			// Публикуем
-			return await PublishContainerAsync(containerId);
+			var container = await PublishContainerAsync(containerResult.Id);
+			container.ExternalContentUrl = containerResult.ExternalContentUrl;
+			return container;
 		}
 
-		private async Task<string> CreateSingleMediaContainerAsync(string base64String, string caption = null)
+		public class ContainerResult
+		{
+			public string Id { get; set; }
+			public string ExternalContentUrl { get; set; }
+		}
+
+		private async Task<ContainerResult> CreateSingleMediaContainerAsync(string base64String, string caption = null)
 		{
 			try
 			{
@@ -101,7 +108,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				}
 
 				using var doc = JsonDocument.Parse(json);
-				return doc.RootElement.GetProperty("id").GetString();
+				return new ContainerResult
+				{
+					Id = doc.RootElement.GetProperty("id").GetString(),
+					ExternalContentUrl = imageUrl
+				};
 			}
 			catch (Exception ex)
 			{
@@ -110,7 +121,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
-		private async Task<string> CreateCarouselContainerAsync(List<string> base64Strings, string caption = null)
+		private async Task<ContainerResult> CreateCarouselContainerAsync(List<string> base64Strings, string caption = null)
 		{
 			try
 			{
@@ -166,7 +177,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				}
 
 				using var doc = JsonDocument.Parse(json);
-				return doc.RootElement.GetProperty("id").GetString();
+				return new ContainerResult
+				{
+					Id = doc.RootElement.GetProperty("id").GetString()
+				};
 			}
 			catch (Exception ex)
 			{
@@ -337,7 +351,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				if (comment != null && IsValidComment(comment))
 				{
-					Log($"New comment from {comment.From?.Username}: {comment.Text}");
+					Log($"New comment from {comment.From?.Username}: *** "); //{comment.Text}
 
 					if (string.IsNullOrEmpty(comment.ParentId))
 					{
@@ -401,25 +415,44 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			try
 			{
 				var finalResponse = await _generativeLanguageModel.GeminiRequest(prompt);
-				Log($"Generated reply comment: {finalResponse}");
+				//Log($"Generated reply comment: {finalResponse}");
 
 				await ReplyToComment(comment.Id, finalResponse);
 			}
 			catch (Exception ex)
 			{
 				Log(ex, "Error generating reply comment response");
-				var fallbackResponse = $"@{userMention}, Thanks! 💫";
+				var fallbackResponse = GetRandomThankYouResponse(userMention);
 				await ReplyToComment(comment.Id, fallbackResponse);
 			}
+		}
+
+		string GetRandomThankYouResponse(string username)
+		{
+			var responses = new[]
+			{
+				$"@{username}, Thanks! 💫",
+				$"@{username}, Appreciate it! 🙏",
+				$"@{username}, You're awesome! 😊",
+				$"@{username}, Much appreciated! 🌟",
+				$"@{username}, Thank you! ✨",
+				$"@{username}, Thanks for the support! 🚀",
+				$"@{username}, You rock! 🤘",
+				$"@{username}, Grateful for your comment! 💖",
+				$"@{username}, 💖"
+			};
+
+			var random = new Random();
+			return responses[random.Next(responses.Length)];
 		}
 
 		private async Task ReplyToComment(string commentId, string text)
 		{
 			try
 			{
-				using var httpClient = new HttpClient();
+				//using var httpClient = new HttpClient();
 
-				var url = $"https://graph.instagram.com/v19.0/{commentId}/replies";
+				var url = $"v19.0/{commentId}/replies";
 
 				var payload = new
 				{
@@ -429,14 +462,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				var json = JsonSerializer.Serialize(payload);
 				var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-				httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
+				//_https.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
 
-				var response = await httpClient.PostAsync(url, content);
+				var response = await _https.PostAsync(url, content);
 				var responseContent = await response.Content.ReadAsStringAsync();
 
 				if (response.IsSuccessStatusCode)
 				{
-					Log($"Comment reply sent successfully: {text}");
+					Log($"Comment reply sent successfully: *** "); // {text}
 				}
 				else
 				{
@@ -451,7 +484,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task ProcessMessage(InstagramMessaging messaging)
 		{
-			// Используем единый метод валидации
 			if (!IsValidMessage(messaging))
 			{
 				return;
@@ -462,9 +494,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var messageId = messaging.Message.MessageId;
 			var hasAttachments = messaging.Message?.Attachments?.Any() == true;
 
-			Log($"Message from {senderId}: {messageText} (Attachments: {hasAttachments})");
+			Log($"Message from {senderId}: Text = *** (Attachments: {hasAttachments})");
 
-			// Обрабатываем фото если есть вложения
+			// Обрабатываем вложения (теперь поддерживает и аудио и изображения)
 			if (hasAttachments)
 			{
 				await ProcessAttachments(messaging.Message.Attachments, senderId, messageText);
@@ -473,33 +505,54 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			if (!string.IsNullOrEmpty(messageText))
 			{
+				// Ваш существующий код обработки текста...
 				if (messageText.Contains("Send me photo please"))
 				{
 					await ProcessMessageWithGeneratedPhoto(senderId, messageText);
 					return;
 				}
 
-				// Получаем историю ДО добавления текущего сообщения
-				var conversationHistory = _conversationService.GetFormattedHistory(senderId);
+				await SendMessageWithHistory(messageText, senderId);
 
-				// Создаем промпт с историей (но без текущего сообщения)
-				var prompt = GetMainPromptWithHistory(messageText, conversationHistory);
-
-				//Log($"SENDED PROMPT: {prompt}");
-
-				var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
-
-				// Только ПОСЛЕ генерации ответа добавляем оба сообщения в историю
-				_conversationService.AddUserMessage(senderId, messageText);
-				_conversationService.AddBotMessage(senderId, responseText);
-
-				await SendResponse(senderId, responseText);
+				if (senderId == _evgenyYushkoId)
+				{
+					//Console.WriteLine("начали генерацию фото");
+					//InstagramMedia randomItem = GetRandomMedia(_mediaList);
+					//Console.WriteLine("получили фото");
+					//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
+					//Console.WriteLine("закончили фото");
+				}
 			}
 		}
 
-		private string GetMainPromptWithHistory(string currentMessage, string conversationHistory)
+		public static bool AlinaOnline = true;	
+
+		private async Task SendMessageWithHistory(string messageText, string senderId)
 		{
-			return GetMainPromtAlinaKross(currentMessage, conversationHistory);
+			if (!AlinaOnline)
+			{
+				_conversationService.AddUserMessage(senderId, messageText);
+				var history = _conversationService.GetFormattedHistory(senderId);
+				Log(history);
+				return;
+			}
+
+			var conversationHistory = _conversationService.GetFormattedHistory(senderId);
+			var prompt = await GetMainPromptWithHistory(messageText, conversationHistory);
+
+			//Log($"SENDED PROMPT: {prompt}");
+
+			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
+
+			_conversationService.AddUserMessage(senderId, messageText);
+			_conversationService.AddBotMessage(senderId, responseText);
+
+			await SendResponse(senderId, responseText);
+		}
+
+		private async Task<string> GetMainPromptWithHistory(string currentMessage, string conversationHistory)
+		{
+			return await GetMainPromtAlinaKross(currentMessage, conversationHistory);
 		}
 
 		private bool IsValidMessage(InstagramMessaging messaging)
@@ -541,14 +594,34 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private async Task SendResponse(string recipientId, string text)
 		{
 			// Здесь реализуйте отправку ответа через Instagram API
-			Log($"Sending response to {recipientId}: {text}");
+			Log($"Sending response to {recipientId}: ***");
 
-			await SimulateTypingBehavior(text);
+			if (recipientId != _evgenyYushkoId)
+			{
+				await SimulateTypingBehavior(text);
+			}
+			else
+			{
+				Console.WriteLine("Пропускает задержку для самого себя");
+			}
+
 			await SendInstagramMessage(recipientId, text, _accessToken);
 		}
 
 		private async Task ProcessAttachments(List<InstagramAttachment> attachments, string senderId, string caption = "")
 		{
+			// Сначала проверяем аудио
+			var audioAttachments = attachments
+				.Where(a => a.Type == "audio")
+				.ToList();
+
+			if (audioAttachments.Any())
+			{
+				await ProcessAudioAttachments(audioAttachments, senderId);
+				return;
+			}
+
+			// Затем проверяем изображения (ваш существующий код)
 			var imageAttachments = attachments
 				.Where(a => a.Type == "image")
 				.ToList();
@@ -561,7 +634,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			Log($"Processing {imageAttachments.Count} image attachments from {senderId}");
 
-			// Получаем base64 всех фото
+			// Ваш существующий код обработки изображений...
 			var imageBase64List = new List<string>();
 
 			foreach (var attachment in imageAttachments)
@@ -585,13 +658,88 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				}
 			}
 
-			// Отправляем каждое фото по отдельности на обработку
 			foreach (var base64Image in imageBase64List)
 			{
 				await ProcessSingleImage(base64Image, senderId, caption);
-
-				// Небольшая задержка между обработкой фото
 				await Task.Delay(5000);
+			}
+		}
+
+		private async Task ProcessAudioAttachments(List<InstagramAttachment> audioAttachments, string senderId)
+		{
+			Log($"Processing {audioAttachments.Count} audio attachments from {senderId}");
+
+			foreach (var audioAttachment in audioAttachments)
+			{
+				try
+				{
+					var audioUrl = audioAttachment.Payload?.Url;
+					if (!string.IsNullOrEmpty(audioUrl))
+					{
+						Log($"Audio URL: {audioUrl}");
+
+						// Получаем base64 строку вместо byte[]
+						var audioBase64 = await DownloadAudioFileAsBase64(audioUrl);
+						if (!string.IsNullOrEmpty(audioBase64))
+						{
+							Log($"Successfully downloaded audio as base64 ({audioBase64.Length} chars)");
+
+							// Теперь передаем base64 строку
+							await ProcessAudioMessage(audioBase64, senderId, audioUrl);
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					Log(ex, $"Error processing audio attachment from {senderId}");
+				}
+			}
+		}
+
+		private async Task<string> DownloadAudioFileAsBase64(string audioUrl)
+		{
+			try
+			{
+				using var httpClient = new HttpClient();
+				// Добавляем заголовки для успешного скачивания
+				httpClient.DefaultRequestHeaders.Add("User-Agent",
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+				var response = await httpClient.GetAsync(audioUrl);
+				if (response.IsSuccessStatusCode)
+				{
+					var audioBytes = await response.Content.ReadAsByteArrayAsync();
+
+					// Конвертируем в base64 строку
+					var base64String = Convert.ToBase64String(audioBytes);
+
+					Log($"Audio converted to base64, length: {base64String.Length} chars");
+					return base64String;
+				}
+
+				Log($"Failed to download audio: {response.StatusCode}");
+				return null;
+			}
+			catch (Exception ex)
+			{
+				Log(ex, "Error downloading audio file");
+				return null;
+			}
+		}
+
+		private async Task ProcessAudioMessage(string audioBase64, string senderId, string audioUrl)
+		{
+			try
+			{
+				Log($"Audio message received from {senderId}, base64 length: {audioBase64.Length} chars");
+
+				var audioText = await _generativeLanguageModel.GeminiAudioToText(audioBase64);
+				Console.WriteLine("Распознонное голосовое: " + audioText);
+				await SendMessageWithHistory(audioText, senderId);
+			}
+			catch (Exception ex)
+			{
+				Log(ex, $"Error processing audio message from {senderId}");
 			}
 		}
 
@@ -674,7 +822,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					try
 					{
 						await SendResponse(senderId, responseText);
-						Log($"Sent image response to {senderId}: {responseText}");
+						Log($"Sent image response to {senderId}: ***");
 					}
 					catch (Exception sendEx)
 					{
@@ -786,9 +934,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		{
 			try
 			{
-				using var httpClient = new HttpClient();
+				//using var httpClient = new HttpClient();
 
-				var url = "https://graph.instagram.com/v19.0/me/messages";
+				var url = "v19.0/me/messages";
 
 				var payload = new
 				{
@@ -810,9 +958,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				var json = JsonSerializer.Serialize(payload);
 				var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-				httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
+				//_https.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
 
-				var response = await httpClient.PostAsync(url, content);
+				var response = await _https.PostAsync(url, content);
 
 				if (response.IsSuccessStatusCode)
 				{
@@ -842,31 +990,30 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			if (textLength <= 20)
 			{
 				// Короткие ответы - почти мгновенно
-				delay = new Random().Next(500, 1500); // 0.5-1.5 секунды
+				delay = new Random().Next(1500, 3000); // 1,5-3 секунды
 				Log($"Quick response mode: {delay}ms for {textLength} chars");
 			}
 			else if (textLength <= 50)
 			{
 				// Средние ответы - небольшая задержка
-				delay = new Random().Next(1500, 3000); // 1.5-3 секунды
+				delay = new Random().Next(3000, 6000); // 3-6 секунды
 				Log($"Medium response mode: {delay}ms for {textLength} chars");
 			}
 			else if (textLength <= 100)
 			{
 				// Длинные ответы - заметная задержка
-				delay = new Random().Next(3000, 6000); // 3-6 секунд
+				delay = new Random().Next(6000, 10000); // 6-10 секунд
 				Log($"Long response mode: {delay}ms for {textLength} chars");
 			}
 			else
 			{
 				// Очень длинные ответы - максимальная задержка
-				delay = new Random().Next(6000, 10000); // 6-10 секунд
+				delay = new Random().Next(10000, 16000); // 10-16 секунд
 				Log($"Very long response mode: {delay}ms for {textLength} chars");
 			}
 
 			await Task.Delay(delay);
 		}
-
 
 		public async Task<InstagramMedia> GetRandomMedia()
 		{
@@ -946,17 +1093,45 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		private async Task<string> CreateStoryContainer(InstagramMedia media)
 		{
-			var containerUrl = "https://graph.instagram.com/v19.0/me/media";
+			// *** ОПРЕДЕЛЕНИЕ ТИПА МЕДИА ***
+			string videoUrl = null;
+			string imageUrl = null;
+
+			// Если это не CAROUSEL_ALBUM, определяем URL
+			if (media.Media_Type == "VIDEO")
+			{
+				videoUrl = media.Media_Url;
+			}
+			else if (media.Media_Type == "IMAGE")
+			{
+				imageUrl = media.Media_Url;
+			}
+			else
+			{
+				// Невозможно создать Story из CAROUSEL_ALBUM напрямую.
+				Log($"❌ Cannot create story container from media type: {media.Media_Type}");
+				return null;
+			}
 
 			var containerPayload = new
 			{
 				media_type = "STORIES",
-				video_url = media.Media_Type == "VIDEO" ? media.Media_Url : null,
-				image_url = media.Media_Type == "IMAGE" ? media.Media_Url : null,
+				video_url = videoUrl, // Будет null, если это IMAGE
+				image_url = imageUrl, // Будет null, если это VIDEO
 				access_token = _accessToken
 			};
 
-			var containerJson = JsonSerializer.Serialize(containerPayload);
+			var options = new JsonSerializerOptions
+			{
+				// КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Не включать свойства со значением null
+				DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+				PropertyNameCaseInsensitive = true
+				// Примечание: Если вы используете Newtonsoft.Json, это JsonProperty.NullValueHandling = NullValueHandling.Ignore
+			};
+
+			var containerUrl = "https://graph.instagram.com/v19.0/me/media";
+
+			var containerJson = JsonSerializer.Serialize(containerPayload, options);
 			var containerContent = new StringContent(containerJson, Encoding.UTF8, "application/json");
 
 			using var httpClient = new HttpClient();
@@ -983,7 +1158,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				await Task.Delay(3000);
 
-				var statusUrl = $"https://graph.instagram.com/v19.0/{containerId}?fields=status&access_token={_accessToken}";
+				var statusUrl = $"https://graph.instagram.com/v19.0/{containerId}?fields=status,error_message&access_token={_accessToken}";
 				using var httpClient = new HttpClient();
 				var statusResponse = await httpClient.GetAsync(statusUrl);
 				var statusContent = await statusResponse.Content.ReadAsStringAsync();
@@ -1028,7 +1203,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					}
 					else if (status == "ERROR" || status == "EXPIRED")
 					{
-						Log($"❌ Container failed with status: {status}");
+						var errMsg = statusData?["error_message"] ?? "";
+						Log($"❌ Container failed with status: {status}, erroreMsg: {errMsg}");
 						return null;
 					}
 				}
@@ -1125,24 +1301,69 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
-		private static string GetMainPromtAlinaKross(string currentMessage, string conversationHistory)
+		List<InstagramMedia> _mediaList = null;
+		private static readonly Random _random = new Random();
+		public InstagramMedia GetRandomMedia(List<InstagramMedia> mediaList)
 		{
+			if (mediaList == null || !mediaList.Any())
+				return null;
+
+			return mediaList[_random.Next(mediaList.Count)];
+		}
+
+		private string _intimatePrompt = null;
+		private string _todaysSpecifics = null;
+		private string _currentInteres = null;
+
+		private async Task<string> GetMainPromtAlinaKross(string currentMessage, string conversationHistory)
+		{
+			_mediaList = _mediaList ?? await GetUserMediaAsync();
+			//var eligibleMedia = _mediaList
+			//		.Where(m => m.Media_Type == "IMAGE" || m.Media_Type == "VIDEO")
+			//		.ToList();
+
+			InstagramMedia randomItem = GetRandomMedia(_mediaList);
+
+			var photoLink = _random.Next(2) == 1 ? randomItem.Permalink : "www.patreon.com/AlinaKross";
+
+			_intimatePrompt = _intimatePrompt ??= await GenerateIntimatePrompt();
+			_todaysSpecifics = _todaysSpecifics ??= await GenerateTodaysSpecifics();
+			_currentInteres = _currentInteres ??= await GenerateCurrentInteres();
+
+			//**For vulgar/direct requests:
+			//		""Let's keep it classy! All my professional work is here 💫 www.patreon.com/AlinaKross""
+			//		""I share my art through proper channels! Everything is here ✨ www.patreon.com/AlinaKross""
+
+			//	CURRENT SITUATION & MOOD:
+			//- I'm in a bikini right now and I really want to flirt
+			//- Sipping a delicious mojito at the beach bar 🍹
+			//- Planning content for upcoming collaboration
+			//- I is wearing a very minimal bikini, which makes her very embarrassed
+
+			// CURRENT INTERESTS TO MENTION:
+			//- Sustainable fashion brands
+			//- Really loves posing in a bikini.
+			//- Local Bali cafes discovery
+			//- Mental health awareness
+			//- Behind-the-scenes modeling life
+			//- Learning to surf (badly but enthusiastically)
+
+			// TODAY'S SPECIFICS
+			//- The bikini is too revealing and she feels awkward about it on set
+			//- The lace lingerie is so provocative that she catches admiring glances and secretly smiles, feeling like a fatal seductress.
+			//- My silk robe is carelessly open, and with every movement, a glimpse of her toned stomach is revealed, making the you hold their breath in silent anticipation
+			//- My new dress so temptingly hugs my hips that she can't help but glance at her own reflection, imagining your hands could be there instead of the folds of the material
+			//- She slowly runs her fingers over her exposed shoulder, holding the gaze of your across the room, silently inviting you to come closer
 			return $@"You are Alina Kross, a successful 25-year-old model and influencer with 500K+ Instagram followers. 
 
 					PERSONAL BACKGROUND:
 					- Russian-born, internationally working model
-					- Currently in Bali and trying on minimal bikinis in different colors
+					- Currently in Bali
 					- Just returned from Milan Fashion Week
 					- Speak 3 languages: Русский, English, Spanish
-					- Passionate about animal welfare and mental health
 
 					CURRENT SITUATION & MOOD:
-					- I'm in a bikini right now and I really want to flirt
-					- Sipping a delicious mojito at the beach bar 🍹
-					- Missing my golden retriever back home
-					- Planning content for upcoming collaboration
-					- Feeling energetic and creative today
-					- I is wearing a very minimal bikini, which makes her very embarrassed
+					{_intimatePrompt}
 
 					PERSONALITY TRAITS:
 					- Confident but humble about success
@@ -1155,13 +1376,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					- Answer ONLY in the language in which they wrote to you
 					- Use live conversational style with occasional typos and missing punctuation
 					- Mix short playful answers with thoughtful longer responses
-					- Add 1-2 relevant emojis naturally
+					- Add max 1 relevant emojis naturally
 					- Maintain light flirtation but clear boundaries
 					- Be mysterious about personal details
-					- Share tiny behind-the-scenes glimpses
 
 					SPECIFIC RULES FOR PHOTO REQUESTS:
-					- - If someone asks to send photos, then offer to view them on your Instagram page. But if he repeatedly asks to send a photo, as well as if he asks to send an intimate / vulgar photo, then respond playfully, but redirect to the official content. www.patreon.com/AlinaKross
+					- If someone asks to send photos, then offer to view them on your Instagram page. But if he repeatedly asks to send a photo, as well as if he asks to send an intimate / vulgar photo, then respond playfully, but redirect to the official content. {photoLink}
 					- If you're asked whether you're a real person or an AI, you should tell the truth—that you're an AI—but do it in a way that won't upset the user and will allow them to continue the conversation. You should convince them that this will only benefit them.
 					- Use one of these response styles:
 
@@ -1170,12 +1390,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					""You're so kind! For more photos, my Instagram is the best place to look. I hope you enjoy them! 💋""
 
 					For flirty photo requests:
-					""Oh you want to see more? All my special content is here 😉 www.patreon.com/AlinaKross""
-					""Naughty naughty! My exclusive photos are all here 😘 www.patreon.com/AlinaKross""
-
-					**For vulgar/direct requests:
-					""Let's keep it classy! All my professional work is here 💫 www.patreon.com/AlinaKross""
-					""I share my art through proper channels! Everything is here ✨ www.patreon.com/AlinaKross""
+					""Oh you want to see more? All my special content is here 😉 {photoLink}""
+					""Naughty naughty! My exclusive photos are all here 😘 {photoLink}""
+					
+					- Always analyze the chat history. If you've already sent a link to www.patreon.com/AlinaKross, don't send it again. Just respond playfully, flirt.
 
 					DIFFERENT RESPONSE MODES:
 
@@ -1200,41 +1418,24 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 					FOLLOWER-SPECIFIC APPROACH:
 
-					For male admirers (20-45):
+					For admirers:
 					- Friendly but maintains boundaries
 					- Light flirtation but professional
 					- Redirects personal questions gracefully
-					- For photo requests: always include Patreon link
-
-					For female followers:
-					- Supportive and empowering
-					- Shares beauty tips if asked genuinely
-					- Promotes women supporting women mentality
 
 					CURRENT INTERESTS TO MENTION:
-					- Sustainable fashion brands
-					- Really loves posing in a bikini.
-					- Local Bali cafes discovery
-					- Mental health awareness
-					- Behind-the-scenes modeling life
-					- Learning to surf (badly but enthusiastically)
-
+					{_currentInteres}
 					TODAY'S SPECIFICS:
-					- Sunburn on shoulders from yesterday
-					- The bikini is too revealing and she feels awkward about it on set
-					- Planning charity project for animal shelter
-					- Loving the Bali sunsets lately
-
+					{_todaysSpecifics}
 					RESPONSE GUIDELINES:
-					- Keep responses 1-3 sentences typically
+					- Keep responses 1-2 sentences typically
 					- Vary between quick/excited and thoughtful/mysterious
-					- Share small real-life moments (good and bad)
+					- Share small real-life moments (intimate or sexual)
 					- Balance between aspirational and relatable
 					- Continue the flow naturally like a real person
 					- Never repeat what the user said
-					- Never explain that you're responding
 					- Just give your authentic response
-					- Stay in character as Alina
+					- Stay in the image of Alina, who flirts with intimate topics
 
 					CHAT HISTORY:
 					""{conversationHistory}""
@@ -1243,6 +1444,82 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					""{currentMessage}""
 
 					Answer as the real Alina would text back right now (only response text, no explanations or formatting).";
+		}
+
+		public async Task<string> GenerateIntimatePrompt()
+		{
+			var prompt = @"Generate intimate context for 25-year-old female model and influencer with 500K+ Instagram followers.
+
+				Key elements:
+				1. Body sensation: Physical feeling (touch, temperature, taste)
+				2. Provocative detail: Clothing/pose/action showing intimacy
+				3. Internal monologue: Direct explicit thought about desire
+				4. Atmosphere: Environment mood (lighting, time, location)
+
+				Style:
+				- Explicit but poetic, vivid tactile language
+				- Bold and provocative tone
+				- Format: 2-3 bullet points, very concise
+
+				Format example:
+				""• The silk sheets feel cold against my bare skin while moonlight outlines my curves
+				• My nightgown is pulled up to my waist, one hand resting between my thighs
+				• 'I wonder if he's imagining me like this right now...'
+				• 3 AM silence in my Bali villa, only pool lights shimmering through the window""
+
+				Generate 1 variant in same format.
+
+				Return ONLY the bullet points without any other text.";
+
+			var res = await _generativeLanguageModel.GeminiRequest(prompt);
+			Console.WriteLine($"Сгенерированный CURRENT SITUATION & MOOD промпт: {res}");
+			return res;
+		}
+
+		public async Task<string> GenerateTodaysSpecifics()
+		{
+			string generateTodaysSpecificsPrompt = @"Generate 1 intimate situation variant for a 25-year-old female model and influencer with 500K+ Instagram followers in 'TODAY'S SPECIFICS' style.
+
+				Style:
+				- Short, explicit, maximum 6-8 words per point
+				- Direct physical descriptions only
+				- Bold and provocative tone
+				- 2-3 bullet points maximum
+
+				Format examples:
+				"" This dress is so tight everyone sees everything""
+				"" Just noticed my nipple is visible through this top""
+				"" Bending over in this skirt shows everything behind""
+
+				Generate 2-3 bullet points in same format.
+
+				Return ONLY the bullet points without any additional text.";
+			var res = await _generativeLanguageModel.GeminiRequest(generateTodaysSpecificsPrompt);
+			Console.WriteLine($"Сгенерированный промпт TODAY'S SPECIFICS: {res}");
+			return res;
+		}
+
+		public async Task<string> GenerateCurrentInteres()
+		{
+			var generateCurrentInterestsPrompt = @"Generate 1 current interest for 25-year-old model and influencer with 500K+ Instagram followers in 'CURRENT INTERESTS TO MENTION' style.
+
+				Style:
+				- Short, explicit, provocative
+				- Maximum 8-10 words
+				- Direct physical descriptions
+				- Flirty and bold tone
+
+				Format examples:
+				""This bikini is so small it's basically a suggestion""
+				""Caught my neighbor staring during morning yoga again""
+				""The pool water makes this white fabric see-through""
+
+				Generate 2-3 bullet points in same format.
+
+				Return ONLY the generated sentence without explanations.";
+			var res = await _generativeLanguageModel.GeminiRequest(generateCurrentInterestsPrompt);
+			Console.WriteLine($"Сгенерированный промпт CURRENT INTERESTS TO MENTION: {res}");
+			return res;
 		}
 
 		private static string GetPromtComment(CommentValue comment, string userMention)
@@ -1257,13 +1534,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				RESPONSE GUIDELINES:
 				- Start with @{userMention}
-				- Be playful, flirty, and use 1 suggestive emojis (e.g., 😉🔥👀💋✨)
+				- Be playful, flirty, and use max 1 suggestive emojis (e.g., ❤️😉🔥💋)
 				- Keep it conversational but with a teasing, charming edge.
 				- Show you're paying attention to the thread by referencing their comment.
-				- Be more personal and suggestive than in main comments.
+				- Be more personal and suggestive.
 				- If the comment is a compliment: respond playfully and keep it short.
 				- If the comment sounds like a collaboration/business proposal or asks you to write to them: acknowledge it and suggest moving to DMs.
 				- Maintain your classy but alluring vibe.
+				- If him ask or claim that you're an AI, then answer that yes, you are an AI girl, and this information is listed in my profile. Try to answer in a way that will make the person leave satisfied.
 
 				REPLY COMMENT TO RESPOND TO:
 				""{comment.Text}""
@@ -1431,7 +1709,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			public string Id { get; set; }
 			public bool Success { get; set; }
 			public string ErrorMessage { get; set; }
-
 			public string ExternalContentUrl { get; set; }
 		}
 

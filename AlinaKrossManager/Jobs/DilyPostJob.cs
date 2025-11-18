@@ -9,7 +9,7 @@ namespace AlinaKrossManager.Jobs
 {
 	public class DilyPostJob : SchedulerJob
 	{
-		public const string Time = "0 0 12 * * ?";
+		public const string Time = "0 0 10 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly ConversationService _conversationService;
@@ -163,11 +163,11 @@ namespace AlinaKrossManager.Jobs
 				{
 					Console.WriteLine($"Первое изображение null: {images.First() == null}");
 					//Console.WriteLine($"Длина base64 строки: {images.First()?.Length ?? 0}");
-					await _telegramService.SendPhotoAlbumAsync(chatId, images, null, "Сгенерированное фото по данному промпту:\n\n" + promptForCreateImage);
+					await _telegramService.SendPhotoAlbumAsync(chatId, images, null, "Сгенерированные фото по промптам");
 				}
 				else
 				{
-					await _telegramService.SendSinglePhotoAsync(chatId, images.First(), null, "Сгенерированное фото по данному промпту:\n\n" + promptForCreateImage);
+					await _telegramService.SendSinglePhotoAsync(chatId, images.First(), null, "Сгенерированное фото по промпту");
 					try
 					{
 						await _telegramService.DeleteMessage(msg.Chat.Id, msg.MessageId);

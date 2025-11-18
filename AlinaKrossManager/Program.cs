@@ -64,6 +64,7 @@ builder.Services.AddSingleton(provider =>
 
 builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<TelegramManager>();
+builder.Services.AddSingleton<ConversationService>();
 
 builder.Services.AddHostedService<HealthCheckBackgroundService>();
 
