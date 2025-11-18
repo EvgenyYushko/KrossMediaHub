@@ -553,24 +553,18 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task SendDellayMessageWithHistory(string senderId)
 		{
-			try
-			{
-				var conversationHistory = _conversationService.GetFormattedHistory(senderId);
-				var prompt = await GetMainPromptWithHistory(conversationHistory);
+			var conversationHistory = _conversationService.GetFormattedHistory(senderId);
+			var prompt = await GetMainPromptWithHistory(conversationHistory);
 
-				//Log($"SENDED PROMPT: {prompt}");
+			//Log($"SENDED PROMPT: {prompt}");
 
-				var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
+			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
 			
-				_conversationService.AddBotMessage(senderId, responseText);
+			_conversationService.AddBotMessage(senderId, responseText);
 
-				await SendResponse(senderId, responseText);
-			}
-			finally
-			{
-				var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
-				Console.WriteLine("historyIsReaded: " + historyIsReaded);
-			}
+			await SendResponse(senderId, responseText);
+			var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
+			Console.WriteLine("historyIsReaded: " + historyIsReaded);
 		}
 
 		private async Task<string> GetMainPromptWithHistory(string conversationHistory)
@@ -619,14 +613,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			// Здесь реализуйте отправку ответа через Instagram API
 			Log($"Sending response to {recipientId}: ***");
 
-			if (recipientId != _evgenyYushkoId)
-			{
-				await SimulateTypingBehavior(text);
-			}
-			else
-			{
-				Console.WriteLine("Пропускает задержку для самого себя");
-			}
+			//if (recipientId != _evgenyYushkoId)
+			//{
+			//	await SimulateTypingBehavior(text);
+			//}
+			//else
+			//{
+			//	Console.WriteLine("Пропускает задержку для самого себя");
+			//}
 
 			await SendInstagramMessage(recipientId, text, _accessToken);
 		}
@@ -1463,7 +1457,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					CHAT HISTORY:
 					""{conversationHistory}""
 
-					Continue the conversation. Analyze the latest unread messages from User[Unreaded]. And respond to them, taking into account the context of the entire message history.
+					Continue the conversation. Review the most recent unread messages from User[Unreaded]. And respond to them, taking into account the context of YOUR ENTIRE message history. That is, always consider all previously sent messages from you (Alina) and User..
 
 					Answer as the real Alina would text back right now (only response text, no explanations or formatting).";
 		}
