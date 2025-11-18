@@ -1,4 +1,5 @@
 using AlinaKrossManager.BuisinessLogic.Instagram;
+using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
@@ -7,6 +8,7 @@ using Telegram.Bot.Types;
 
 namespace AlinaKrossManager.Jobs
 {
+	[DisallowConcurrentExecution]
 	public class DilyPostJob : SchedulerJob
 	{
 		public static string Time => "0 0 10 * * ?";
@@ -14,18 +16,21 @@ namespace AlinaKrossManager.Jobs
 		private readonly InstagramService _instagramService;
 		private readonly ConversationService _conversationService;
 		private readonly TelegramService _telegramService;
+		private readonly TelegramManager _telegramManager;
 
 		public DilyPostJob(IServiceProvider serviceProvider
 			, InstagramService instagramService
 			, ConversationService conversationService
 			, IGenerativeLanguageModel generativeLanguageModel
 			, TelegramService telegramService
+			, TelegramManager telegramManager
 		)
 			: base(serviceProvider, generativeLanguageModel)
 		{
 			_instagramService = instagramService;
 			_conversationService = conversationService;
 			_telegramService = telegramService;
+			_telegramManager = telegramManager;
 		}
 
 		public override async Task Execute(IJobExecutionContext context)
@@ -37,49 +42,7 @@ namespace AlinaKrossManager.Jobs
 			catch (Exception ex)
 			{
 				Console.WriteLine(ex.ToString());
-			}
-
-			//try
-			//{
-			//	var allUsers = _conversationService.GetAllUserConversations();
-
-			//	Console.WriteLine("Count All Users: " + allUsers.Count);
-			//	foreach (var userId in allUsers)
-			//	{
-			//		Console.WriteLine("UsersId: " + userId);
-
-			//		var userHistory = _conversationService.GetHistory(userId);
-			//		if (userHistory != null)
-			//		{
-			//			var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
-			//			Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}");
-
-			//			if (lastMsg != null && lastMsg.Sender == "User")
-			//			{
-			//				await _instagramService.SendInstagramMessage(userId, "))))");
-			//				await Task.Delay(TimeSpan.FromSeconds(5));
-			//			}
-			//		}
-			//	}
-
-			//	foreach (var userId in allUsers)
-			//	{
-			//		await _instagramService.SendInstagramMessage(userId, "💋");
-			//		//Console.WriteLine("начали генерацию фото");
-			//		//InstagramMedia randomItem = GetRandomMedia(_mediaList);
-			//		//Console.WriteLine("получили фото");
-			//		//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
-			//		//Console.WriteLine("закончили фото");
-
-			//		await Task.Delay(TimeSpan.FromSeconds(6));
-			//	}
-			//}
-			//catch (Exception ex)
-			//{
-			//	Console.WriteLine(ex.ToString());
-			//}
-
-			var chatId = 1231047171;
+			}			
 
 			Console.WriteLine("Генерация сцен для Instagram...\n");
 
@@ -95,7 +58,7 @@ namespace AlinaKrossManager.Jobs
 
 				if (promptForCreateImage is not null)
 				{
-					var imagesRes = await CreateImage(chatId, promptForCreateImage, msg);
+					var imagesRes = await CreateImage(promptForCreateImage, msg);
 					images = imagesRes.Images;
 					msg = imagesRes.Msg;
 
@@ -107,7 +70,7 @@ namespace AlinaKrossManager.Jobs
 							$"\n\n**Формат ответа:** Только готовый промпт на английском, без пояснений.";
 						promptForCreateImage = await _generativeLanguageModel.GeminiRequest(promptVar);
 
-						imagesRes = await CreateImage(chatId, promptForCreateImage, msg);
+						imagesRes = await CreateImage(promptForCreateImage, msg);
 
 						if (imagesRes.Images.Count > 0)
 						{
@@ -122,7 +85,7 @@ namespace AlinaKrossManager.Jobs
 								$"\n\n**Формат ответа:** Только готовый промпт на английском, без пояснений.";
 							promptForCreateImage = await _generativeLanguageModel.GeminiRequest(promptVar);
 
-							imagesRes = await CreateImage(chatId, promptForCreateImage, msg);
+							imagesRes = await CreateImage(promptForCreateImage, msg);
 
 							if (imagesRes.Images.Count > 0)
 							{
@@ -142,7 +105,7 @@ namespace AlinaKrossManager.Jobs
 
 			if (images.Count == 0)
 			{
-				await _telegramService.SendMessage(chatId, "Не удалось сгенерировать изображения");
+				await _telegramService.SendMessage("Не удалось сгенерировать изображения");
 				return;
 			}
 
@@ -151,30 +114,18 @@ namespace AlinaKrossManager.Jobs
 				images.Reverse();
 			}
 
+			Message[] loadedPictureMessages = null;
 			try
 			{
-				if (_telegramService is null)
-				{
-					Console.WriteLine("_telegramService is null");
-				}
-
 				if (images.Count > 1)
 				{
-					Console.WriteLine($"Первое изображение null: {images.First() == null}");
-					//Console.WriteLine($"Длина base64 строки: {images.First()?.Length ?? 0}");
-					await _telegramService.SendPhotoAlbumAsync(chatId, images, null, "");
+					loadedPictureMessages = await _telegramService.SendPhotoAlbumAsync(images, null, "");
 				}
 				else
 				{
-					await _telegramService.SendSinglePhotoAsync(chatId, images.First(), null, "");
-					//try
-					//{
-					//	await _telegramService.DeleteMessage(msg.Chat.Id, msg.MessageId);
-					//}
-					//catch { }
+					var message = await _telegramService.SendSinglePhotoAsync(images.First(), null, "");
+					loadedPictureMessages = [message];
 				}
-
-
 			}
 			catch (Exception e)
 			{
@@ -195,7 +146,7 @@ namespace AlinaKrossManager.Jobs
 				description = await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost);
 				try
 				{
-					await _telegramService.SendMessage(chatId, $"{description}");
+					await _telegramService.SendMessage(description);
 				}
 				catch { }
 			}
@@ -215,32 +166,18 @@ namespace AlinaKrossManager.Jobs
 					Console.WriteLine(msgRes);
 					try
 					{
-						msg = await _telegramService.SendMessage(chatId, msgRes);
+						msg = await _telegramService.SendMessage(msgRes);
 					}
 					catch { }
 
 					try
 					{
 						await Task.Delay(TimeSpan.FromSeconds(15));
-
-						msg = await _telegramService.SendMessage(chatId, "Начинаем публиковать его в сториc..");
-
-						var allMedia = await _instagramService.GetUserMediaAsync();
-						var newMedia = allMedia.FirstOrDefault(all => all.Id == result.Id);
-						newMedia.Media_Url = result.ExternalContentUrl ?? newMedia.Media_Url;
-
-						Console.WriteLine("Найдена новая публикация ExternalContentUrl: " + result.ExternalContentUrl);
-						Console.WriteLine("Найдена новая публикация Media_Url: " + newMedia.Media_Url);
-
-						var storyId = await _instagramService.PublishStoryFromMedia(newMedia);
-						if (storyId is not null)
-						{
-							msg = await _telegramService.SendMessage(chatId, $"✅ Сториз успешно опублиткованна: {storyId}");
-						}
+						await _telegramManager.InstagramStoryHandler(null, loadedPictureMessages?.FirstOrDefault(), new());
 					}
 					catch (Exception ex)
 					{
-						throw new Exception($"Ошибка создания сторис: {ex}");
+						Console.WriteLine($"Ошибка создания сторис: {ex}");
 					}
 				}
 			}
@@ -259,11 +196,12 @@ namespace AlinaKrossManager.Jobs
 			}
 		}
 
-		private async Task<ImageResult> CreateImage(int chatId, string promptForCreateImage, Message msg)
+		private async Task<ImageResult> CreateImage(string promptForCreateImage, Message msg)
 		{
+			int chatId = TelegramService.EVGENY_YUSHKO_TG_ID;
 			try
 			{
-				msg = await _telegramService.SendMessage(chatId, promptForCreateImage);
+				msg = await _telegramService.SendMessage(promptForCreateImage);
 			}
 			catch { }
 
@@ -289,7 +227,7 @@ namespace AlinaKrossManager.Jobs
 
 				try
 				{
-					msg = await _telegramService.SendMessage(chatId, promptForCreateImage);
+					msg = await _telegramService.SendMessage(promptForCreateImage);
 				}
 				catch { }
 

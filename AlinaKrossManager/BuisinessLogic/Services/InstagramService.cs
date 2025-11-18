@@ -1108,6 +1108,53 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
+		public async Task<string> PublishStoryFromBase64(string base64Img)
+		{
+			try
+			{
+				if (base64Img == null)
+				{
+					Log("❌ No media provided for story");
+					return null;
+				}
+
+				var imageUrl = await UploadToImgBBAsync(base64Img);
+				if(imageUrl is null)
+				{
+					Log($"Не получили ссылку на изображение");
+					return null;
+				}
+
+				var media = new InstagramMedia
+				{
+					Media_Type = "IMAGE",
+					Media_Url = imageUrl,
+				};
+
+				var containerId = await CreateStoryContainer(media);
+				if (string.IsNullOrEmpty(containerId))
+				{
+					return null;
+				}
+
+				// Ждем и публикуем БЕЗ ССЫЛКИ
+				var storyId = await WaitAndPublishContainer(containerId);
+
+				if (!string.IsNullOrEmpty(storyId))
+				{
+					Log($"✅ Regular story published successfully: {storyId}");
+					return storyId;
+				}
+
+				return null;
+			}
+			catch (Exception ex)
+			{
+				Log(ex, "❌ Error publishing regular story");
+				return null;
+			}
+		}
+
 		private async Task<string> CreateStoryContainer(InstagramMedia media)
 		{
 			// *** ОПРЕДЕЛЕНИЕ ТИПА МЕДИА ***
@@ -1166,7 +1213,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return containerData?["id"];
 		}
 
-		private async Task<string> WaitAndPublishContainer(string containerId, string postLink = null)
+		private async Task<string> WaitAndPublishContainer(string containerId)
 		{
 			var maxAttempts = 30;
 			var attempt = 0;
@@ -1190,16 +1237,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					if (status == "FINISHED")
 					{
 						// Публикуем сторис
-						var publishUrl = $"https://graph.instagram.com/v19.0/me/media_publish?creation_id={containerId}";
-
-						// ДОБАВЛЯЕМ ПАРАМЕТР ДЛЯ ССЫЛКИ
-						if (!string.IsNullOrEmpty(postLink))
-						{
-							publishUrl += $"&attachment_url={Uri.EscapeDataString(postLink)}";
-							Log($"🔗 Adding post link to story: {postLink}");
-						}
-
-						publishUrl += $"&access_token={_accessToken}";
+						var publishUrl = $"https://graph.instagram.com/v19.0/me/media_publish?creation_id={containerId}&access_token={_accessToken}";
 
 						Log($"📤 Publishing story to: {publishUrl}");
 
@@ -1234,12 +1272,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return null;
 		}
 
-		public async Task<bool> PublishRandomStoryWithPostLink()
-		{
-			return await PublishRandomStory(true);
-		}
-
-		public async Task<bool> PublishRandomStory(bool withPostLink = false)
+		public async Task<bool> PublishRandomStory()
 		{
 			try
 			{
@@ -1252,18 +1285,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				string storyId;
 
-				if (withPostLink)
-				{
-					// Публикуем сторис со ссылкой на пост
-					storyId = await PublishStoryFromMediaWithLink(randomMedia);
-					Log($"🔗 Publishing story WITH post link: {randomMedia.Permalink}");
-				}
-				else
-				{
-					// Публикуем обычную сторис (как раньше)
-					storyId = await PublishStoryFromMedia(randomMedia);
-					Log($"📸 Publishing regular story");
-				}
+				storyId = await PublishStoryFromMedia(randomMedia);
+				Log($"📸 Publishing regular story");
 
 				if (!string.IsNullOrEmpty(storyId))
 				{
@@ -1277,44 +1300,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				Log(ex, "❌ Error in publish random story");
 				return false;
-			}
-		}
-
-		public async Task<string> PublishStoryFromMediaWithLink(InstagramMedia media)
-		{
-			try
-			{
-				if (media == null)
-				{
-					Log("❌ No media provided for story");
-					return null;
-				}
-
-				Log($"📱 Publishing story with post link: {media.Id}");
-				Log($"🔗 Post permalink: {media.Permalink}");
-
-				// Создаем контейнер
-				var containerId = await CreateStoryContainer(media);
-				if (string.IsNullOrEmpty(containerId))
-				{
-					return null;
-				}
-
-				// Ждем и публикуем С СО ССЫЛКОЙ
-				var storyId = await WaitAndPublishContainer(containerId, media.Permalink);
-
-				if (!string.IsNullOrEmpty(storyId))
-				{
-					Log($"✅ Story with post link published successfully: {storyId}");
-					return storyId;
-				}
-
-				return null;
-			}
-			catch (Exception ex)
-			{
-				Log(ex, "❌ Error publishing story with link");
-				return null;
 			}
 		}
 

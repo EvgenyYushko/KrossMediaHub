@@ -6,7 +6,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 {
 	public class TelegramService
 	{
-		private const long EVGENY_YUSHKO_TG_ID = 1231047171;
+		public const int EVGENY_YUSHKO_TG_ID = 1231047171;
 		private readonly ITelegramBotClient _telegramBotClient;
 
 		public TelegramService(ITelegramBotClient telegramBotClient)
@@ -14,40 +14,40 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			_telegramBotClient = telegramBotClient;
 		}
 
-		public async Task<List<string>> TryGetIMagesPromTelegram(Update update, Message rmsg)
+		public async Task<List<string>> TryGetImagesPromTelegram(string? mediaGroupId, PhotoSize[]? photo)
 		{
 			List<string> images = new();
 
 			// Проверяем, это фотоальбом или одиночное фото
-			if (rmsg.MediaGroupId != null)
+			if (mediaGroupId != null)
 			{
 				// Это фотоальбом - нужно получить все фото из группы
-				images = await TryGetAllImagesFromMediaGroup(rmsg.MediaGroupId);
+				images = await TryGetAllImagesFromMediaGroup(mediaGroupId);
 			}
-			else if (rmsg.Photo != null && rmsg.Photo.Length > 0)
+			else if (photo != null && photo.Length > 0)
 			{
 				// Одиночное фото - берем самый большой размер
-				var base64Image = await TryGetImage(rmsg.Photo);
+				var base64Image = await TryGetImage(photo);
 				images = new List<string>() { base64Image };
 			}
 
 			if (images.Count == 0)
 			{
-				await _telegramBotClient.SendMessage(update.Message.Chat.Id, "❌ Не найдено фото для публикации");
+				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "❌ Не найдено фото для публикации");
 				return images;
 			}
 
 			return images;
 		}
 
-		public Task<Message> SendMessage(ChatId chatId, string text, int? replayMsgId = null)
+		public Task<Message> SendMessage(string text, int? replayMsgId = null)
 		{
 			if (replayMsgId is null)
 			{
-				return _telegramBotClient.SendMessage(chatId, text);
+				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text);
 			}
 
-			return _telegramBotClient.SendMessage(chatId, text, replyParameters: new ReplyParameters { MessageId = replayMsgId.Value });
+			return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, replyParameters: new ReplyParameters { MessageId = replayMsgId.Value });
 		}
 
 		public async Task<(string? base64Video, string? mimeType)> TryGetVideoBase64FromTelegram(Message rmsg)
@@ -55,7 +55,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			// 1. Проверяем, есть ли видео в сообщении
 			if (rmsg.Video == null)
 			{
-				//await _telegramBotClient.SendMessage(rmsg.Chat.Id, "❌ В сообщении не найдено видео для публикации.");
+				//await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "❌ В сообщении не найдено видео для публикации.");
 				return (null, null);
 			}
 
@@ -65,7 +65,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			// 3. Проверяем наличие FileId и MIME-типа
 			if (string.IsNullOrEmpty(video.FileId) || string.IsNullOrEmpty(video.MimeType))
 			{
-				await _telegramBotClient.SendMessage(rmsg.Chat.Id, "❌ Видео найдено, но отсутствует FileId или MIME-тип.");
+				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "❌ Видео найдено, но отсутствует FileId или MIME-тип.");
 				return (null, null);
 			}
 
@@ -84,7 +84,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Ошибка при загрузке видео из Telegram: {ex.Message}");
-				await _telegramBotClient.SendMessage(rmsg.Chat.Id, $"❌ Критическая ошибка при загрузке видео: {ex.Message}");
+				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, $"❌ Критическая ошибка при загрузке видео: {ex.Message}");
 			}
 
 			return (null, null);
@@ -94,20 +94,20 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		{
 			if (update.Message.Chat.Id != EVGENY_YUSHKO_TG_ID || update.Message.Chat.Type is not ChatType.Private)
 			{
-				await _telegramBotClient.SendMessage(update.Message.Chat.Id, "Данная комманда доступна только в ЛС чата, и только для его администратора!");
+				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "Данная комманда доступна только в ЛС чата, и только для его администратора!");
 				return false;
 			}
 			return true;
 		}
 
-		public async Task SendSinglePhotoAsync(long chatId, string base64Image, int? msgId, string caption = "")
+		public async Task<Message> SendSinglePhotoAsync(string base64Image, int? msgId, string caption = "")
 		{
 			var imageBytes = Convert.FromBase64String(base64Image);
 			using var stream = new MemoryStream(imageBytes);
 
 			if (msgId is not null)
 			{
-				var sentMessage = await _telegramBotClient.SendPhoto(chatId,
+				return await _telegramBotClient.SendPhoto(EVGENY_YUSHKO_TG_ID,
 					InputFile.FromStream(stream, "image.jpg"),
 					caption,
 					replyParameters:
@@ -118,14 +118,15 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 			else
 			{
-				var sentMessage = await _telegramBotClient.SendPhoto(chatId, InputFile.FromStream(stream, "image.jpg"), caption);
+				return await _telegramBotClient.SendPhoto(EVGENY_YUSHKO_TG_ID, InputFile.FromStream(stream, "image.jpg"), caption);
 			}
 		}
 
-		public async Task SendPhotoAlbumAsync(long chatId, List<string> base64Images, int? msgId, string caption = "")
+		public async Task<Message[]> SendPhotoAlbumAsync(List<string> base64Images, int? msgId, string caption = "")
 		{
 			var media = new List<IAlbumInputMedia>();
 			var streams = new List<MemoryStream>(); // храним ссылки на стримы
+			Message[] messages = null;
 
 			try
 			{
@@ -148,16 +149,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				if (msgId is not null)
 				{
-					var sentMessages = await _telegramBotClient.SendMediaGroup(chatId, media, new ReplyParameters { MessageId = msgId.Value });
-				}
-				else
-				{
-					var sentMessages = await _telegramBotClient.SendMediaGroup(chatId, media);
-
+					messages = await _telegramBotClient.SendMediaGroup(EVGENY_YUSHKO_TG_ID, media, new ReplyParameters { MessageId = msgId.Value });
 					try
 					{
 						Console.WriteLine("Пробуем сохранить MediaGroupId");
-						foreach (var message in sentMessages)
+						foreach (var message in messages)
 						{
 							HandleMediaGroup(message);
 						}
@@ -165,14 +161,36 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					catch (Exception ex)
 					{
 						Console.WriteLine(ex.Message);
-						return;	
+						return messages;
 					}
 					Console.WriteLine("MediaGroupId успешно сохранили");
 				}
+				else
+				{
+					messages = await _telegramBotClient.SendMediaGroup(EVGENY_YUSHKO_TG_ID, media);
+
+					try
+					{
+						Console.WriteLine("Пробуем сохранить MediaGroupId");
+						foreach (var message in messages)
+						{
+							HandleMediaGroup(message);
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine(ex.Message);
+						return messages;
+					}
+					Console.WriteLine("MediaGroupId успешно сохранили");
+				}
+
+				return messages;
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine(ex.Message);
+				return null;
 			}
 			finally
 			{
@@ -228,15 +246,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return base64Video;
 		}
 
-		public Task DeleteMessage(ChatId chatId, int messageId)
+		public Task DeleteMessage(int messageId, CancellationToken ct)
 		{
-			var ct = new CancellationToken();
-			return _telegramBotClient.DeleteMessage(chatId, messageId, ct);
-		}
-
-		public Task DeleteMessage(ChatId chatId, int messageId, CancellationToken ct)
-		{
-			return _telegramBotClient.DeleteMessage(chatId, messageId, ct);
+			return _telegramBotClient.DeleteMessage(new ChatId(EVGENY_YUSHKO_TG_ID), messageId, ct);
 		}
 
 		private async Task<string> TryGetImage(PhotoSize[] photo)

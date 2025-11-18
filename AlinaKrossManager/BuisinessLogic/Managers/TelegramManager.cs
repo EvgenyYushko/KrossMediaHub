@@ -1,4 +1,3 @@
-using System.Globalization;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Services;
 using Telegram.Bot.Types;
@@ -51,15 +50,15 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						Message msgStart = null;
 						try
 						{
-							msgStart = await _telegramService.SendMessage(update.Message.Chat.Id, "Генерируем изображение...");
+							msgStart = await _telegramService.SendMessage("Генерируем изображение...");
 							await GenerateImageByText(update, ct);
 						}
 						finally
 						{
 							try
 							{
-								await _telegramService.DeleteMessage(update.Message.Chat.Id, update.Message.MessageId, ct);
-								await _telegramService.DeleteMessage(update.Message.Chat.Id, msgStart.MessageId, ct);
+								await _telegramService.DeleteMessage(update.Message.MessageId, ct);
+								await _telegramService.DeleteMessage(msgStart.MessageId, ct);
 							}
 							catch { }
 						}
@@ -88,15 +87,21 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						}
 					}
 					break;
-				case UpdateType.Message when msgText.IsCommand("post_to_bluesky") && update.Message.ReplyToMessage is Message rmsg:
+				case UpdateType.Message when msgText.IsCommand("post_to_insta") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
-						bool? flowControl = await BlueSkyHandler(update, rmsg, ct);
-						if (flowControl == false)
+						bool flowControl = await InstagramPostHandler(update, rmsg, ct);
+						if (!flowControl)
 						{
-							break;
+							return;
 						}
-						else if (flowControl == true)
+					}
+					break;
+				case UpdateType.Message when msgText.IsCommand("story_to_insta") && update.Message.ReplyToMessage is Message rmsg:
+					{
+						if (!await _telegramService.CanUseBot(update, ct)) return;
+						bool flowControl = await InstagramStoryHandler(update, rmsg, ct);
+						if (!flowControl)
 						{
 							return;
 						}
@@ -112,11 +117,15 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						}
 					}
 					break;
-				case UpdateType.Message when msgText.IsCommand("post_to_insta") && update.Message.ReplyToMessage is Message rmsg:
+				case UpdateType.Message when msgText.IsCommand("post_to_bluesky") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
-						bool flowControl = await InstagramHandler(update, rmsg, ct);
-						if (!flowControl)
+						bool? flowControl = await BlueSkyHandler(update, rmsg, ct);
+						if (flowControl == false)
+						{
+							break;
+						}
+						else if (flowControl == true)
 						{
 							return;
 						}
@@ -126,9 +135,10 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
 
-						bool flowControl1 = await InstagramHandler(update, rmsg, ct);
-						bool flowControl2 = await FaceBookHandler(update, rmsg, ct);
-						bool? flowControl3 = await BlueSkyHandler(update, rmsg, ct);
+						bool flowControl1 = await InstagramPostHandler(update, rmsg, ct);
+						bool flowControl2 = await InstagramStoryHandler(update, rmsg, ct);
+						bool flowControl3 = await FaceBookHandler(update, rmsg, ct);
+						bool? flowControl4 = await BlueSkyHandler(update, rmsg, ct);
 
 						Console.WriteLine("Конце операции публикации во все сети");
 					}
@@ -136,13 +146,13 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 		}
 
-		private async Task<bool> InstagramHandler(Update update, Message rmsg, CancellationToken ct)
+		private async Task<bool> InstagramPostHandler(Update update, Message rmsg, CancellationToken ct)
 		{
-			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в instagram...");
+			var startMsg = await _telegramService.SendMessage("Начинаем процесс публикации в instagram...");
 			try
 			{
 				var replayText = rmsg.GetMsgText() ?? "";
-				List<string> images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+				List<string> images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
 				if (images.Count == 0)
 				{
 					return false;
@@ -158,7 +168,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					Console.WriteLine(msgRes);
 					try
 					{
-						await _telegramService.SendMessage(update.Message.Chat.Id, msgRes, rmsg.MessageId);
+						await _telegramService.SendMessage(msgRes, rmsg.MessageId);
 					}
 					catch { }
 				}
@@ -169,20 +179,55 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 			finally
 			{
-				try { await _telegramService.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
+				try { await _telegramService.DeleteMessage(startMsg.MessageId, ct); } catch { }
 			}
 
 			return true;
-		}	
-		
+		}
+
+		public async Task<bool> InstagramStoryHandler(Update update, Message rmsg, CancellationToken ct)
+		{
+			var startMsg = await _telegramService.SendMessage("Начинаем выкладывать сториз в instagram...");
+			try
+			{
+				List<string> images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
+				if (images.Count == 0)
+				{
+					return false;
+				}
+
+				var storyId = await _instagramService.PublishStoryFromBase64(images.FirstOrDefault());
+				if (storyId is not null)
+				{
+					var msgRes = $"✅ История в инсте успешно опуликованна! ID: {storyId}";
+					Console.WriteLine(msgRes);
+					try
+					{
+						await _telegramService.SendMessage(msgRes, rmsg.MessageId);
+					}
+					catch { }
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"❌ Ошибка в публикации сториз для инсты: {ex.Message}");
+			}
+			finally
+			{
+				try { await _telegramService.DeleteMessage(startMsg.MessageId, ct); } catch { }
+			}
+
+			return true;
+		}
+
 		private async Task<bool> FaceBookHandler(Update update, Message rmsg, CancellationToken ct)
 		{
-			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в facebook...");
+			var startMsg = await _telegramService.SendMessage("Начинаем процесс публикации в facebook...");
 			try
 			{
 				var replayText = rmsg.GetMsgText() ?? "";
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
-				var images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
 				if (images.Count == 0 && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
 				{
 					return false;
@@ -210,7 +255,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					Console.WriteLine(msgRes);
 					try
 					{
-						await _telegramService.SendMessage(update.Message.Chat.Id, msgRes, rmsg.MessageId);
+						await _telegramService.SendMessage(msgRes, rmsg.MessageId);
 					}
 					catch { }
 				}
@@ -221,18 +266,18 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 			finally
 			{
-				try { await _telegramService.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
+				try { await _telegramService.DeleteMessage(startMsg.MessageId, ct); } catch { }
 			}
 
 			return true;
-		}	
+		}
 
 		private async Task<bool?> BlueSkyHandler(Update update, Message rmsg, CancellationToken ct)
 		{
-			var startMsg = await _telegramService.SendMessage(update.Message.Chat.Id, "Начинаем процесс публикации в bluesky...");
+			var startMsg = await _telegramService.SendMessage("Начинаем процесс публикации в bluesky...");
 			try
 			{
-				var images = await _telegramService.TryGetIMagesPromTelegram(update, rmsg);
+				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var replayText = rmsg.GetMsgText() ?? "";
 				if (images.Count == 0 && string.IsNullOrWhiteSpace(replayText) && resVideos.base64Video is null)
@@ -307,7 +352,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						Console.WriteLine(msgRes);
 						try
 						{
-							await _telegramService.SendMessage(update.Message.Chat.Id, msgRes, rmsg.MessageId);
+							await _telegramService.SendMessage(msgRes, rmsg.MessageId);
 						}
 						catch { }
 					}
@@ -329,11 +374,11 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 			finally
 			{
-				try { await _telegramService.DeleteMessage(update.Message.Chat.Id, startMsg.MessageId, ct); } catch { }
+				try { await _telegramService.DeleteMessage(startMsg.MessageId, ct); } catch { }
 			}
 
 			return null;
-		}				
+		}
 
 		public async Task GenerateImageByText(Update update, CancellationToken ct)
 		{
@@ -344,13 +389,13 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			switch (imagesList.Count)
 			{
 				case 0:
-					await _telegramService.SendMessage(chatId, "📭 Изображения не сгенерированы.\nВозможно запрос не прошёл цензуру.");
+					await _telegramService.SendMessage("📭 Изображения не сгенерированы.\nВозможно запрос не прошёл цензуру.");
 					break;
 				case 1:
-					await _telegramService.SendSinglePhotoAsync(chatId, imagesList[0], msgId, caption);
+					await _telegramService.SendSinglePhotoAsync(imagesList[0], msgId, caption);
 					break;
 				default:
-					await _telegramService.SendPhotoAlbumAsync(chatId, imagesList, msgId, caption);
+					await _telegramService.SendPhotoAlbumAsync(imagesList, msgId, caption);
 					break;
 			}
 		}

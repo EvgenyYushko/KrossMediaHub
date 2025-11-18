@@ -1,6 +1,6 @@
-start - Начать
 generate_image - создать изображение
 post_to_insta - пост в инсту
+story_to_insta - история в инсте
 post_to_threads - Пост в Threads
 post_to_facebook - пост в FaceBook
 post_to_bluesky - пост в BlueSky
