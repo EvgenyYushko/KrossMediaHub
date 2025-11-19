@@ -152,16 +152,15 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			try
 			{
 				var replayText = rmsg.GetMsgText() ?? "";
-				List<string> images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
-				if (images.Count == 0)
+				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
+				if (!images.Existst)
 				{
 					return false;
 				}
 
-				string description = await _instagramService.TryCreateDescription(replayText, images);
-				_tempPostDescription = description;
+				var description = await GetDescription(rmsg, images, replayText);
 
-				var result = await _instagramService.CreateMediaAsync(images, description);
+				var result = await _instagramService.CreateMediaAsync(images.Images, description);
 				if (result.Success)
 				{
 					var msgRes = $"✅ Пост в инсте успешно создан! ID: {result.Id}";
@@ -190,13 +189,13 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			var startMsg = await _telegramService.SendMessage("Начинаем выкладывать сториз в instagram...");
 			try
 			{
-				List<string> images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
-				if (images.Count == 0)
+				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
+				if (!images.Existst)
 				{
 					return false;
 				}
 
-				var storyId = await _instagramService.PublishStoryFromBase64(images.FirstOrDefault());
+				var storyId = await _instagramService.PublishStoryFromBase64(images.Images.FirstOrDefault());
 				if (storyId is not null)
 				{
 					var msgRes = $"✅ История в инсте успешно опуликованна! ID: {storyId}";
@@ -228,21 +227,17 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var replayText = rmsg.GetMsgText() ?? "";
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
-				if (images.Count == 0 && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
+				if (!images.Existst && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
 				{
 					return false;
 				}
 
-				string description = await _faceBookService.TryCreateDescription(replayText, images);
-				if (string.IsNullOrEmpty(description))
-				{
-					description = _tempPostDescription;
-				}
+				var description = await GetDescription(rmsg, images, replayText);
 
 				bool success = false;
-				if (images.Count > 0)
+				if (images.Existst)
 				{
-					success = await _faceBookService.PublishToPageAsync(description, images);
+					success = await _faceBookService.PublishToPageAsync(description, images.Images);
 				}
 				else if (resVideos.base64Video is not null)
 				{
@@ -280,16 +275,12 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var replayText = rmsg.GetMsgText() ?? "";
-				if (images.Count == 0 && string.IsNullOrWhiteSpace(replayText) && resVideos.base64Video is null)
+				if (!images.Existst && string.IsNullOrWhiteSpace(replayText) && resVideos.base64Video is null)
 				{
 					return true;
 				}
 
-				var description = await _blueSkyService.TryCreateDescription(replayText, images);
-				if (string.IsNullOrEmpty(description))
-				{
-					description = _tempPostDescription;
-				}
+				var description = await GetDescription(rmsg, images, replayText);
 
 				// 1. Первичный вход при запуске
 				if (!_blueSkyService.BlueSkyLogin)
@@ -308,10 +299,10 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				{
 					// 3. Публикуем с новым токеном, который теперь хранится внутри service.AccessJwt
 					List<ImageAttachment> attachments = null;
-					if (images.Count > 0)
+					if (images.Existst)
 					{
 						attachments = new();
-						foreach (var image in images)
+						foreach (var image in images.Images)
 						{
 							attachments.Add(new ImageAttachment
 							{
@@ -379,6 +370,18 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 			return null;
 		}
+
+		private async Task<string> GetDescription(Message rmsg, TelegramService.ImagesTelegram images, string replayText)
+		{
+			string description = string.IsNullOrEmpty(replayText) ? images.Caption : replayText;
+			if (string.IsNullOrEmpty(description))
+			{
+				description = await _instagramService.TryCreateDescription(replayText, images.Images);
+				_telegramService.UpdateCaptionMediaGrup(rmsg, description);
+			}
+
+			return description;
+		}		
 
 		public async Task GenerateImageByText(Update update, CancellationToken ct)
 		{

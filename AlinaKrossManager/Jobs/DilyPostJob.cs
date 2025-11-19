@@ -149,11 +149,16 @@ namespace AlinaKrossManager.Jobs
 					await _telegramService.SendMessage(description);
 				}
 				catch { }
+
+				_telegramService.UpdateCaptionMediaGrup(loadedPictureMessages.FirstOrDefault(), description);
 			}
 			catch (Exception e)
 			{
 				Console.WriteLine(e.Message);
 			}
+
+			// пока не будем автоматически выкладывать в инсту.
+			return;
 
 			Console.WriteLine($"Начнаем отправку в инсту");
 

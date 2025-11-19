@@ -79,7 +79,7 @@ namespace AlinaKrossManager.Jobs
 					if (userHistory != null)
 					{
 						var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
-						Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}, Readed: {lastMsg.Readed}");
+						Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}");
 
 						if (lastMsg != null && lastMsg.Sender == "User")
 						{
