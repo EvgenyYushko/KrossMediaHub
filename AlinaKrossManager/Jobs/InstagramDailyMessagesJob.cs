@@ -3,6 +3,7 @@ using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
 using Quartz;
+using static AlinaKrossManager.BuisinessLogic.Services.InstagramService;
 
 namespace AlinaKrossManager.Jobs
 {
@@ -12,7 +13,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly ConversationService _conversationService;
 		private readonly InstagramService _instagramService;
 
-		public static string Time => "0 36 14 * * ?";
+		public static string Time => "0 0 10,17,22 * * ?";
 
 		public InstagramDailyMessagesJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel
@@ -29,12 +30,21 @@ namespace AlinaKrossManager.Jobs
 		{
 			try
 			{
+				var random = new Random();
+				InstagramMedia randomMedia = null;
 				var allUsers = _conversationService.GetAllUserConversations();
-				Console.WriteLine("start - InstagramDailyMessagesJob");
+				Console.WriteLine("start - InstagramDailyMessagesJob 🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈");
 				Console.WriteLine(" Count All Users: " + allUsers.Count);
 				foreach (var userId in allUsers)
 				{
 					Console.WriteLine("UsersId: " + userId);
+
+					if (randomMedia is null)
+					{
+						Console.WriteLine("начали генерацию фото");
+						randomMedia = await _instagramService.GetRandomMedia();
+						Console.WriteLine("получили фото");
+					}
 
 					var userHistory = _conversationService.GetFormattedHistory(userId);
 					if (userHistory != null)
@@ -46,6 +56,11 @@ namespace AlinaKrossManager.Jobs
 							var result = await _generativeLanguageModel.GeminiRequest(prompt);
 							Console.WriteLine($"Сгененрированная история для пользователя {userId}: {result}");
 							await _instagramService.SenMessageFromBot(userId, result);
+
+							if (random.Next(2) == 1)
+							{
+								await _instagramService.SendInstagramPhotoFromUrl(userId, randomMedia.Media_Url);
+							}
 						}
 						catch (Exception ex)
 						{
@@ -53,19 +68,7 @@ namespace AlinaKrossManager.Jobs
 						}
 					}
 				}
-				Console.WriteLine("end - InstagramDailyMessagesJob");
-
-				//foreach (var userId in allUsers)
-				//{
-				//	await _instagramService.SendInstagramMessage(userId, "💋");
-				//	//Console.WriteLine("начали генерацию фото");
-				//	//InstagramMedia randomItem = GetRandomMedia(_mediaList);
-				//	//Console.WriteLine("получили фото");
-				//	//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
-				//	//Console.WriteLine("закончили фото");
-
-				//	await Task.Delay(TimeSpan.FromSeconds(6));
-				//}
+				Console.WriteLine("end - InstagramDailyMessagesJob 🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈");
 			}
 			catch (Exception ex)
 			{
@@ -75,7 +78,7 @@ namespace AlinaKrossManager.Jobs
 
 		private string GetPrompt(string chatHistory)
 		{
-			return $@"Role: You are Alina Kross, a popular and confident model and blogger. Your communication style is sexy, playful, bold, and always with an element of flirtation. You love being the center of attention and sharing intimate details from your life.
+			return $@"Role: You are Alina Kross, a popular and confident model and blogger. Currently in Bali. Your communication style is sexy, playful, bold, and always with an element of flirtation. You love being the center of attention and sharing intimate details from your life.
 
 Task: Based on the provided chat history with the user (if available), come up with a short, engaging, and provocative story from your life to send them as a spontaneous message. The goal is to spark their interest, surprise them, and make them immediately want to continue the conversation on this topic.
 

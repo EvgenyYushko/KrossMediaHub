@@ -953,7 +953,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
-		private async Task SendInstagramPhotoFromUrl(string recipientId, string imageUrl)
+		public async Task SendInstagramPhotoFromUrl(string recipientId, string imageUrl)
 		{
 			try
 			{
