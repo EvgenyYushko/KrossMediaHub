@@ -12,7 +12,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly ConversationService _conversationService;
 		private readonly InstagramService _instagramService;
 
-		public static string Time => "0 25 14 * * ?";
+		public static string Time => "0 36 14 * * ?";
 
 		public InstagramDailyMessagesJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel
@@ -45,7 +45,7 @@ namespace AlinaKrossManager.Jobs
 							var prompt = GetPrompt(userHistory);
 							var result = await _generativeLanguageModel.GeminiRequest(prompt);
 							Console.WriteLine($"Сгененрированная история для пользователя {userId}: {result}");
-							await _instagramService.SendDellayMessageWithHistory(userId);
+							await _instagramService.SenMessageFromBot(userId, result);
 						}
 						catch (Exception ex)
 						{

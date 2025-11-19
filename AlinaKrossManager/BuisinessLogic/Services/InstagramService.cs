@@ -567,6 +567,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			Console.WriteLine("historyIsReaded: " + historyIsReaded);
 		}
 
+		public async Task SenMessageFromBot(string senderId, string text)
+		{
+			_conversationService.AddBotMessage(senderId, text);
+			await SendResponse(senderId, text);
+		}
+
 		private async Task<string> GetMainPromptWithHistory(string conversationHistory)
 		{
 			return await GetMainPromtAlinaKross(conversationHistory);
