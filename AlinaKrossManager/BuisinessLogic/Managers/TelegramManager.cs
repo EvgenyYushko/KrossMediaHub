@@ -28,10 +28,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			_telegramService = telegramService;
 		}
 
-		private string _tempPostDescription = null;
 		public async Task HandleUpdateAsync(Update update, CancellationToken ct)
 		{
-			return;
 			if (update.Message?.Text is not { } text)
 			{
 				_telegramService.HandleMediaGroup(update.Message);

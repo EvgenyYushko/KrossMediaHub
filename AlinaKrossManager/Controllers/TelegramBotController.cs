@@ -28,7 +28,7 @@ namespace AlinaKrossManager.Controllers
 			try
 			{
 				Log($"{update.Message?.Text}");
-				await _telegramManager.HandleUpdateAsync(update, CancellationToken.None); // Передайте update вашему обработчику
+				 _ = Task.Run(() => _telegramManager.HandleUpdateAsync(update, CancellationToken.None));
 			}
 			catch (Exception ex)
 			{
