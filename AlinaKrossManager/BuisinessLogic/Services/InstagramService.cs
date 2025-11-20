@@ -13,6 +13,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly HttpClient _https;
 		private readonly string _accessToken;
 		private readonly ConversationService _conversationService;
+		private readonly IWebHostEnvironment _env;
 		public string _imgbbApiKey = "807392339c89019fcbe08fcdd068a19c";
 		private const string _alinaKrossId = "17841477563266256";
 		private const string _alinaKrossName = "alina.kross.ai";
@@ -23,11 +24,13 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public InstagramService(string accessToken
 			, IGenerativeLanguageModel generativeLanguage
 			, ConversationService conversationService
+			, IWebHostEnvironment env
 		)
 			: base(generativeLanguage)
 		{
 			_accessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
 			_conversationService = conversationService;
+			_env = env;
 			_https = new HttpClient { BaseAddress = new Uri("https://graph.instagram.com/") };
 			_https.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 		}
@@ -562,9 +565,56 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			_conversationService.AddBotMessage(senderId, responseText);
 
-			await SendResponse(senderId, responseText);
-			var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
-			Console.WriteLine("historyIsReaded: " + historyIsReaded);
+			if (senderId == _evgenyYushkoId)
+			{
+				// 1. Генерируем base64 (здесь симуляция)
+				string base64Audio = await _generativeLanguageModel.GeminiTextToSpeech(responseText);
+				var audioBytes = Convert.FromBase64String(base64Audio);
+
+				Console.WriteLine("WebRootPath: " + _env.WebRootPath); // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
+				Console.WriteLine("ContentRootPath: " + _env.ContentRootPath); // <-- И ЭТУ, ДЛЯ ИНТЕРЕСА
+
+				// Получаем путь к wwwroot. Если WebRootPath null, строим путь вручную от корня приложения
+				string webRootPath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+
+				// 1. Убедимся, что папка wwwroot существует (на случай, если её нет в контейнере)
+				if (!Directory.Exists(webRootPath))
+				{
+					Directory.CreateDirectory(webRootPath);
+				}
+
+				Console.WriteLine("webRootPath = " + webRootPath);
+
+				// 2. Создаем подпапку temp_audio ds
+				var tempFolder = Path.Combine(webRootPath, "temp_audio");
+				if (!Directory.Exists(tempFolder))
+				{
+					Directory.CreateDirectory(tempFolder);
+				}
+
+				// 3. Сохраняем файл
+				var fileName = $"{Guid.NewGuid()}.wav";
+				var filePath = Path.Combine(tempFolder, fileName);
+				await System.IO.File.WriteAllBytesAsync(filePath, audioBytes);
+
+				// 4. Публичная ссылка
+				var serverBaseUrl = "https://krossmediahub-783314764029.europe-west1.run.app";
+				var publicUrl = $"{serverBaseUrl}/temp_audio/{fileName}";
+
+				Console.WriteLine($"File saved: {filePath}");
+				Console.WriteLine($"Link: {publicUrl}");
+
+				//"https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_500KB_WAV.wav"
+				await SendInstagramAudioFromUrl(_evgenyYushkoId, publicUrl);
+				var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
+				Console.WriteLine("audio sended");
+			}
+			else
+			{
+				await SendResponse(senderId, responseText);
+				var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
+				Console.WriteLine("historyIsReaded: " + historyIsReaded);
+			}
 		}
 
 		public async Task SenMessageFromBot(string senderId, string text)
