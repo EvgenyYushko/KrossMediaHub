@@ -150,7 +150,7 @@ using (var scope = app.Services.CreateScope())
 		await bot.RunLocalTest();
 	}
 }
-
+app.UseStaticFiles();
 // ВНИМАНИЕ: Закомментировать или удалить в Cloud Run/Kubernetes
 // app.UseHttpsRedirection();
 app.UseAuthorization();
