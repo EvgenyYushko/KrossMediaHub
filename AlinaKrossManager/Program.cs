@@ -36,11 +36,12 @@ builder.Services.AddSingleton(provider =>
 {
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
 	var conversationService = provider.GetService<ConversationService>();
+	var hostedInvarment = provider.GetService<IWebHostEnvironment>();
 	//var telegramService = provider.GetService<TelegramService>();
 
 	//var PageAccessToken = "IGAALt2MgjsilBZAFNKQ040cWM4TTl1Mkt5dFF5WXloekRJbGdwU1hqTmNBVFkzQU9mV29NWVk0X2hPdXZALZA3Q2ZA09VYXFyUnhrY3QweElHNVBnaExaS0c5TDJxS2RjN3lydlFYS0JzRUhkaGVyaTJyOTJFaHpYMVh0S2p1ZAy1xMAZDZD";
 	var accessToken = "IGAAQEMxhZAfcFBZAFM0NHhuZAjRRcnpkWEZANNGtiZAkZA2ZA1NUME8yYXFHMndXU29GUEVpUDh0bmVSeV9WSEs3M3Q4Sk93TWUzb0RWcXNYOGktekhFQ2x3YVE1Y0ZAOWm9fTEpDTXRiQlBkNXpzc0Y5dndfcS0tcm1veHNNTUUzSmRydwZDZD";
-	return new InstagramService(accessToken, geminiModel, conversationService);
+	return new InstagramService(accessToken, geminiModel, conversationService, hostedInvarment);
 });
 
 builder.Services.AddSingleton(provider =>
