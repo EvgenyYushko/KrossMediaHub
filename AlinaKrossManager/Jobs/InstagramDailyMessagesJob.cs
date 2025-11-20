@@ -12,6 +12,8 @@ namespace AlinaKrossManager.Jobs
 	{
 		private readonly ConversationService _conversationService;
 		private readonly InstagramService _instagramService;
+		private readonly IWebHostEnvironment _env;
+		private const string _evgenyYushkoId = "1307933750574022";
 
 		public static string Time => "0 0 10,17,22 * * ?";
 
@@ -19,11 +21,13 @@ namespace AlinaKrossManager.Jobs
 			, IGenerativeLanguageModel generativeLanguageModel
 			, ConversationService conversationService
 			, InstagramService instagramService
+			, IWebHostEnvironment env
 			)
 		: base(serviceProvider, generativeLanguageModel)
 		{
 			_conversationService = conversationService;
 			_instagramService = instagramService;
+			_env = env;
 		}
 
 		public override async Task Execute(IJobExecutionContext context)

@@ -525,7 +525,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
-		public static bool AlinaOnline = true;	
+		public static bool AlinaOnline = true;
 
 		public async Task SendMessageWithHistory(string messageText, string senderId)
 		{
@@ -544,7 +544,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
 
-			_conversationService.AddUserMessage(senderId, messageText);			
+			_conversationService.AddUserMessage(senderId, messageText);
 			_conversationService.AddBotMessage(senderId, responseText);
 
 			await SendResponse(senderId, responseText);
@@ -559,7 +559,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			//Log($"SENDED PROMPT: {prompt}");
 
 			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
-			
+
 			_conversationService.AddBotMessage(senderId, responseText);
 
 			await SendResponse(senderId, responseText);
@@ -1001,6 +1001,50 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
+		public async Task SendInstagramAudioFromUrl(string recipientId, string audioUrl)
+		{
+			try
+			{
+				var url = "v19.0/me/messages";
+
+				var payload = new
+				{
+					recipient = new { id = recipientId },
+					message = new
+					{
+						attachment = new
+						{
+							type = "audio",
+							payload = new
+							{
+								url = audioUrl,
+								is_reusable = true
+							}
+						}
+					}
+				};
+
+				var json = JsonSerializer.Serialize(payload);
+				var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+				var response = await _https.PostAsync(url, content);
+
+				if (response.IsSuccessStatusCode)
+				{
+					Log("Audio from URL sent successfully");
+				}
+				else
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					Log($"Failed to send audio from URL: {error}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Log(ex, "Exception while sending audio from URL");
+			}
+		}
+
 		private async Task SimulateTypingBehavior(string responseText)
 		{
 			if (string.IsNullOrEmpty(responseText))
@@ -1125,7 +1169,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				}
 
 				var imageUrl = await UploadToImgBBAsync(base64Img);
-				if(imageUrl is null)
+				if (imageUrl is null)
 				{
 					Log($"Не получили ссылку на изображение");
 					return null;

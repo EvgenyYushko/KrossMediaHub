@@ -1,5 +1,8 @@
+using AlinaKrossManager.Models;
 using AlinaKrossManager.Services;
 using Protos.GoogleGeminiService;
+using Telegram.Bot;
+using Telegram.Bot.Types;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
@@ -29,6 +32,19 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				Base64Idata = base64Iaudio
 			});
 			return response.GeneratedText;
+		}
+
+		public async Task<string> GeminiTextToSpeech(string text)
+		{
+			var response = await _geminiServiceClient.SynthesizeSpeechAsync(new()
+			{
+				Text = text,
+				LanguageName = "ru-RU-Standard-A",
+				LanguageCode = "ru-RU",
+				AudioEncoding = "LINEAR16"
+			});
+
+			return response.AudioContent;
 		}
 
 		public async Task<string> GeminiRequest(string prompt)
