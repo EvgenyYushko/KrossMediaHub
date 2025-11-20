@@ -8,14 +8,12 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-# --- ИСПРАВЛЕНИЕ НАЧИНАЕТСЯ ЗДЕСЬ ---
 # Временно переключаемся на root, чтобы установить пакеты
 USER root
 # НОВЫЙ ШАГ ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ SSL/TLS
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 # Снова переключаемся на не-рутового пользователя для последующих шагов и запуска
 USER $APP_UID
-# --- ИСПРАВЛЕНИЕ ЗАКАНЧИВАЕТСЯ ЗДЕСЬ ---
 
 # Этот этап используется для сборки проекта сервиса
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
@@ -58,6 +56,24 @@ WORKDIR /app
 
 # Копируем опубликованные файлы
 COPY --from=publish /app/publish .
+
+# --- ИСПРАВЛЕНИЕ ПРАВ ДОСТУПА (Начало) ---
+# 1. Переключаемся на root, чтобы иметь право создавать папки и менять владельца
+USER root
+
+# 2. Принудительно создаем папку для аудио
+RUN mkdir -p /app/wwwroot/temp_audio
+
+# 3. Меняем владельца папки wwwroot на пользователя приложения ($APP_UID),
+#    чтобы приложение могло писать внутрь.
+RUN chown -R $APP_UID:$APP_UID /app/wwwroot
+
+# 4. На всякий случай даем полные права на папку temp_audio
+RUN chmod 777 /app/wwwroot/temp_audio
+
+# 5. Возвращаемся к обычному пользователю для запуска приложения
+USER $APP_UID
+# --- ИСПРАВЛЕНИЕ ПРАВ ДОСТУПА (Конец) ---
 
 # Точка входа
 ENTRYPOINT ["dotnet", "AlinaKrossManager.dll"]
