@@ -15,7 +15,6 @@ using static AlinaKrossManager.Constants.AppConstants;
 using static AlinaKrossManager.Jobs.Helpers.JobHelper;
 
 var builder = WebApplication.CreateBuilder(args);
-//builder.WebHost.UseWebRoot("wwwroot");
 
 builder.Configuration.AddJsonFile("appsettings.json", optional: false);
 builder.Services.AddControllers();
