@@ -50,7 +50,7 @@ namespace AlinaKrossManager.Jobs
 
 				Console.WriteLine("webRootPath = " + webRootPath);
 
-				// 2. Создаем подпапку temp_audio 
+				// 2. Создаем подпапку temp_audio ds
 				var tempFolder = Path.Combine(webRootPath, "temp_audio");
 				if (!Directory.Exists(tempFolder))
 				{
