@@ -567,25 +567,23 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			if (senderId == _evgenyYushkoId)
 			{
-				// 1. Генерируем base64 (здесь симуляция)
+				// 1. Генерируем base64
 				string base64Audio = await _generativeLanguageModel.GeminiTextToSpeech(responseText);
 				var audioBytes = Convert.FromBase64String(base64Audio);
 
-				Console.WriteLine("WebRootPath: " + _env.WebRootPath); // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
-				Console.WriteLine("ContentRootPath: " + _env.ContentRootPath); // <-- И ЭТУ, ДЛЯ ИНТЕРЕСА
+				Console.WriteLine("WebRootPath: " + _env.WebRootPath);
+				Console.WriteLine("ContentRootPath: " + _env.ContentRootPath);
 
-				// Получаем путь к wwwroot. Если WebRootPath null, строим путь вручную от корня приложения
+				// Получаем путь к wwwroot
 				string webRootPath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
 
-				// 1. Убедимся, что папка wwwroot существует (на случай, если её нет в контейнере)
+				// Убедимся, что папка wwwroot существует
 				if (!Directory.Exists(webRootPath))
 				{
 					Directory.CreateDirectory(webRootPath);
 				}
 
-				Console.WriteLine("webRootPath = " + webRootPath);
-
-				// 2. Создаем подпапку temp_audio ds
+				// Создаем подпапку temp_audio
 				var tempFolder = Path.Combine(webRootPath, "temp_audio");
 				if (!Directory.Exists(tempFolder))
 				{
@@ -604,9 +602,41 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				Console.WriteLine($"File saved: {filePath}");
 				Console.WriteLine($"Link: {publicUrl}");
 
-				//"https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_500KB_WAV.wav"
-				await SendInstagramAudioFromUrl(_evgenyYushkoId, publicUrl);
-				var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
+				try
+				{
+					// 5. Отправляем в Instagram
+					await SendInstagramAudioFromUrl(_evgenyYushkoId, publicUrl);
+				}
+				finally
+				{
+					// 6. Очистка (выполняется всегда, даже если была ошибка)
+
+					// Ждем 5 секунд, чтобы серверы Meta гарантированно успели скачать файл по ссылке
+					await Task.Delay(5000);
+
+					if (System.IO.File.Exists(filePath))
+					{
+						System.IO.File.Delete(filePath);
+						Console.WriteLine($"Temp file deleted: {filePath}");
+					}
+
+					// ОПЦИОНАЛЬНО: Если вы хотите чистить "мусор", который мог остаться от старых падений,
+					// можно удалять файлы старше 10 минут (но не удалять всю папку целиком!)
+					try
+					{
+						var oldFiles = Directory.GetFiles(tempFolder)
+							 .Select(f => new FileInfo(f))
+							 .Where(f => f.CreationTime < DateTime.Now.AddMinutes(-10)) // Старее 10 минут
+							 .ToList();
+
+						foreach (var file in oldFiles)
+						{
+							file.Delete();
+							Console.WriteLine($"Cleaned up old file: {file.Name}");
+						}
+					}
+					catch { /* Игнорируем ошибки очистки старых файлов */ }
+				}
 				Console.WriteLine("audio sended");
 			}
 			else

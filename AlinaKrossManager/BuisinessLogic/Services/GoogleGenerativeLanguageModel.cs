@@ -39,9 +39,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var response = await _geminiServiceClient.SynthesizeSpeechAsync(new()
 			{
 				Text = text,
-				LanguageName = "ru-RU-Standard-A",
-				LanguageCode = "ru-RU",
-				AudioEncoding = "LINEAR16"
+				LanguageName = "en-US-Studio-O",
+				LanguageCode = "en-US",
+				AudioEncoding = "MP3"
 			});
 
 			return response.AudioContent;
