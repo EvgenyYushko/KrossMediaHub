@@ -565,10 +565,16 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			_conversationService.AddBotMessage(senderId, responseText);
 
-			if (senderId == _evgenyYushkoId)
+			if (_random.Next(7) == 1)
 			{
+				var promt = "Отредактируй данный тепкст таким образом, что бы он был пригрдным для генерации по нему речи моделью от google en-US-Studio-O. " +
+					"Убери разные смайлы, сдлеай этот тепкст максимально пригодным для генерации по нему красивого и чёткого голосовго сообщения. Так же если этот текст не английский то переведи его на ангийский. " +
+					"Формат ответа: верни сторого только готовый ответ, бес всякого рода форматирования и пояснений. " +
+					$"Вот этот текст: {responseText}";
+				string cleanText = await _generativeLanguageModel.GeminiRequest(promt);
+
 				// 1. Генерируем base64
-				string base64Audio = await _generativeLanguageModel.GeminiTextToSpeech(responseText);
+				string base64Audio = await _generativeLanguageModel.GeminiTextToSpeech(cleanText);
 				var audioBytes = Convert.FromBase64String(base64Audio);
 
 				Console.WriteLine("WebRootPath: " + _env.WebRootPath);
