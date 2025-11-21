@@ -567,14 +567,70 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			if (_random.Next(7) == 1)
 			{
-				var promt = "Отредактируй данный тепкст таким образом, что бы он был пригрдным для генерации по нему речи моделью от google en-US-Studio-O. " +
-					"Убери разные смайлы, сдлеай этот тепкст максимально пригодным для генерации по нему красивого и чёткого голосовго сообщения. Так же если этот текст не английский то переведи его на ангийский. " +
+				var promt = "Отредактируй данный тепкст таким образом, что бы он был пригрдным для генерации по нему речи моделью от google. " +
+					"Убери разные смайлы, сдлеай этот тепкст максимально пригодным для генерации по нему красивого и чёткого голосового сообщения. " +
 					"Формат ответа: верни сторого только готовый ответ, бес всякого рода форматирования и пояснений. " +
 					$"Вот этот текст: {responseText}";
 				string cleanText = await _generativeLanguageModel.GeminiRequest(promt);
 
+				var promptLanguageAnalyze =
+					"Твоя задача — определить язык текста. " +
+					"Если текст написан на русском языке — верни цифру 1. " +
+					"Во всех остальных случаях (другой язык, смешанный текст, не понятно) — верни цифру 0. " +
+					"СТРОГИЕ ПРАВИЛА: " +
+					"1. В ответе должна быть ТОЛЬКО одна цифру (1 или 0). " +
+					"2. Никаких пояснений, никаких знаков препинания, никаких слов 'Ответ' или 'Язык'. " +
+					"3. Если не уверен — возвращай 0. " +
+					$"\nТекст для анализа: \"{cleanText}\"";
+				// 1. Отправляем запрос
+				string rawResponse = await _generativeLanguageModel.GeminiRequest(promptLanguageAnalyze);
+
+				// 2. Метод для жесткой очистки и проверки
+				int isRussian = ParseBooleanResponse(rawResponse);
+
+				Console.WriteLine($"Is Russian: {isRussian}"); // Выведет строго 1 или 0
+
+				// ---------------------------------------------------------
+				// Вспомогательный метод (можно вынести в Helpers)
+				// ---------------------------------------------------------
+				int ParseBooleanResponse(string llmResponse)
+				{
+					if (string.IsNullOrWhiteSpace(llmResponse))
+						return 0; // Если пусто — считаем, что нет
+
+					// Убираем всё лишнее (пробелы, переносы строк, кавычки, markdown)
+					// Например, превратит "  1. \n" в "1"
+					string clean = llmResponse.Trim()
+											  .Replace(".", "")
+											  .Replace("`", "")
+											  .Replace("'", "")
+											  .Replace("\"", "");
+
+					// Пытаемся превратить в число
+					if (int.TryParse(clean, out int result))
+					{
+						// Проверяем, что это именно 1 или 0 (на случай если модель сглючит и вернет 5)
+						if (result == 1) return 1;
+						if (result == 0) return 0;
+					}
+
+					// Если модель вернула текст типа "Это русский", ищем цифру 1 внутри
+					if (llmResponse.Contains("1")) return 1;
+
+					// Безопасный дефолт - если ничего не понятно, считаем за 0
+					return 0;
+				}
+
 				// 1. Генерируем base64
-				string base64Audio = await _generativeLanguageModel.GeminiTextToSpeech(cleanText);
+				string base64Audio= null;
+				if (isRussian == 1)
+				{
+					base64Audio = await _generativeLanguageModel.GeminiTextToSpeechRu(cleanText);
+				}
+				else
+				{
+					base64Audio = await _generativeLanguageModel.GeminiTextToSpeechEn(cleanText);
+				}
 				var audioBytes = Convert.FromBase64String(base64Audio);
 
 				Console.WriteLine("WebRootPath: " + _env.WebRootPath);
@@ -611,7 +667,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				try
 				{
 					// 5. Отправляем в Instagram
-					await SendInstagramAudioFromUrl(_evgenyYushkoId, publicUrl);
+					await SendInstagramAudioFromUrl(senderId, publicUrl);
 				}
 				finally
 				{

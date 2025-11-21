@@ -35,6 +35,7 @@ namespace AlinaKrossManager.Controllers
 				Log(ex.ToString());
 			}
 
+			Console.WriteLine("Поцесс завершён!");
 			return Ok(); // Важно: всегда возвращайте 200 OK быстро
 		}
 

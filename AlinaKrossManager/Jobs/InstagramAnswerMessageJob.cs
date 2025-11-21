@@ -33,7 +33,7 @@ namespace AlinaKrossManager.Jobs
 			try
 			{
 				//// 1. Генерируем base64 (здесь симуляция)
-				//string base64Audio = await _generativeLanguageModel.GeminiTextToSpeech("Hello, how are you");
+				//string base64Audio = await _generativeLanguageModel.GeminiTextToSpeechEn("Hello, how are you");
 				//var audioBytes = Convert.FromBase64String(base64Audio);
 
 				//Console.WriteLine("WebRootPath: " + _env.WebRootPath); // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
