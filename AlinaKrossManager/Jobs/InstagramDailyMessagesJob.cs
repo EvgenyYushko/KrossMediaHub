@@ -1,9 +1,9 @@
 using AlinaKrossManager.BuisinessLogic.Instagram;
-using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
 using Quartz;
-using static AlinaKrossManager.BuisinessLogic.Services.InstagramService;
+using static AlinaKrossManager.BuisinessLogic.Services.Instagram.InstagramService;
 
 namespace AlinaKrossManager.Jobs
 {
@@ -15,7 +15,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly IWebHostEnvironment _env;
 		private const string _evgenyYushkoId = "1307933750574022";
 
-		public static string Time => "0 0 10,17,22 * * ?";
+		public static string Time => "0 0 10,22 * * ?";
 
 		public InstagramDailyMessagesJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel

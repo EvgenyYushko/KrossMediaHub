@@ -1,4 +1,5 @@
 using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.Services;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;

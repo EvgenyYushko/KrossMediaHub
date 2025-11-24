@@ -1,7 +1,7 @@
 using System.Text.Json;
-using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using Microsoft.AspNetCore.Mvc;
-using static AlinaKrossManager.BuisinessLogic.Services.InstagramService;
+using static AlinaKrossManager.BuisinessLogic.Services.Instagram.InstagramService;
 
 namespace AlinaKrossManager.Controllers
 {

@@ -1,5 +1,5 @@
 using AlinaKrossManager.BuisinessLogic.Instagram;
-using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
 using Quartz;
