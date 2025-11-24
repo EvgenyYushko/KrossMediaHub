@@ -76,7 +76,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return response.GeneratedText;
 		}
 
-		public async Task<List<string>> GeminiRequestGenerateImage(string prompt/*, int maxAttemptsPerModel = 2, int delayBetweenAttempts = 1000*/)
+		public async Task<List<string>> GeminiRequestGenerateImage(string prompt, int countImage = 1/*, int maxAttemptsPerModel = 2, int delayBetweenAttempts = 1000*/)
 		{
 			var maxAttemptsPerModel = 2;
 			var delayBetweenAttempts = 1000;
@@ -94,7 +94,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 							Prompt = { new Prompt { Text = prompt } },
 							MimeType = "image/jpeg",
 							AspectRatio = "3:4",
-							SampleCount = 2,
+							SampleCount = countImage,
 							SelectedModel = model
 						});
 

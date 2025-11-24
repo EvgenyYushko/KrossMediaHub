@@ -385,7 +385,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 		public async Task GenerateImageByText(Update update, CancellationToken ct)
 		{
-			var imagesList = await _generativeLanguageModel.GeminiRequestGenerateImage(update.Message.ReplyToMessage.Text);
+			var imagesList = await _generativeLanguageModel.GeminiRequestGenerateImage(update.Message.ReplyToMessage.Text, 2);
 			var chatId = update.Message.Chat.Id;
 			var msgId = update.Message.ReplyToMessage.MessageId;
 			string caption = "";
