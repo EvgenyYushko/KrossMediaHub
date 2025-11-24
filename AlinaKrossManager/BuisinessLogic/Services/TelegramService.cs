@@ -197,7 +197,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				// Освобождаем ресурсы после отправки
 				foreach (var stream in streams)
 				{
-					stream.Dispose();
+					stream?.Dispose();
 				}
 			}
 		}
