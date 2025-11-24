@@ -94,7 +94,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 							Prompt = { new Prompt { Text = prompt } },
 							MimeType = "image/jpeg",
 							AspectRatio = "3:4",
-							SampleCount = 1,
+							SampleCount = 2,
 							SelectedModel = model
 						});
 

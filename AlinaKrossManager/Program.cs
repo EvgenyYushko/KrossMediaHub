@@ -2,6 +2,7 @@ using AlinaKrossManager.BackgroundServices;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.Controllers;
 using AlinaKrossManager.Helpers;
 using AlinaKrossManager.Jobs.Base;
