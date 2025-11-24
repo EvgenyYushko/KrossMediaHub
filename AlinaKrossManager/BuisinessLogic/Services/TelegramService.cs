@@ -319,7 +319,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public class ImagesTelegram
 		{
-			public List<string> Images { get; set; }
+			public List<string> Images { get; set; } = new();
 			public string Caption { get; set; }
 			public bool Existst => Images?.Count > 0;
 		}
