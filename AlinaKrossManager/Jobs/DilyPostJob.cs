@@ -12,7 +12,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class DilyPostJob : SchedulerJob
 	{
-		public static string Time => "0 0 11,12,13,14,17,18,20,21 * * ?";
+		public static string Time => "0 0 11,12,13,14,17,18,20,21,0,1,2,3,4,5,6 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly ConversationService _conversationService;
