@@ -12,16 +12,14 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class DilyPostJob : SchedulerJob
 	{
-		public static string Time => "0 0 11,12,13,14,17,18,20,21,0,1,2,3,4,5,6 * * ?";
+		public static string Time => "0 0 11,12,13,14,15,16,17,18,19,20,21,22,23,0,1,2,3,4,5,6 * * ?";
 
 		private readonly InstagramService _instagramService;
-		private readonly ConversationService _conversationService;
 		private readonly TelegramService _telegramService;
 		private readonly TelegramManager _telegramManager;
 
 		public DilyPostJob(IServiceProvider serviceProvider
 			, InstagramService instagramService
-			, ConversationService conversationService
 			, IGenerativeLanguageModel generativeLanguageModel
 			, TelegramService telegramService
 			, TelegramManager telegramManager
@@ -29,7 +27,6 @@ namespace AlinaKrossManager.Jobs
 			: base(serviceProvider, generativeLanguageModel)
 		{
 			_instagramService = instagramService;
-			_conversationService = conversationService;
 			_telegramService = telegramService;
 			_telegramManager = telegramManager;
 		}
@@ -38,12 +35,12 @@ namespace AlinaKrossManager.Jobs
 		{
 			try
 			{
-				await _instagramService.SendInstagramMessage("1307933750574022", "Привет, я сейчас буду выкладывать новый пост)");
+				await _instagramService.SendInstagramAdminMessage("Привет, я сейчас буду выкладывать новый пост)");
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine(ex.ToString());
-			}			
+			}
 
 			Console.WriteLine("Генерация сцен для Instagram...\n");
 
@@ -265,8 +262,10 @@ namespace AlinaKrossManager.Jobs
 		private string face => "A stunning young woman in her late 20s, with long glossy dark brown hair, radiant warm smile, and natural makeup, at golden hour. ";
 		private async Task<string> GetDress()
 		{
-			var prompt = "Измени или оставь это описание сексуальной девушки. " +
-				"Оно должно быть не менее откровенной и вызывающей чем эта, возми его за основу: Attire: She is wearing a two-piece bikini in a light, neutral, possibly beige or pale peach color. " +
+			var prompt = "Измени это описание сексуальной девушки. " +
+				"Оно должно быть не менее откровенной и вызывающей чем эта, возьми его за основу. " +
+				"Но не используй в её одежде латекс и подобные блестящие элементы одежды. Возможно вообще не используй бикини: " +
+				"Attire: She is wearing a two-piece bikini in a light, neutral, possibly beige or pale peach color. " +
 				"Top: A classic triangle bikini top with thin straps, providing excellent support and emphasizing her ample cleavage. The fabric appears smooth and slightly reflective in the light. " +
 				" Bottom: Matching tie-side bikini bottoms, sitting low on her curvy hips, with adjustable strings tied at each side. The cut is moderately revealing but tasteful, accentuating her figure." +
 				$"\n\n**Формат ответа:** Строго только готовый промпт на английском, без пояснений и предодложений разных вариантов.";
@@ -275,6 +274,19 @@ namespace AlinaKrossManager.Jobs
 		private string bodyType = "Body Type: She has a very fit, athletic, and notably curvaceous physique. She possesses a remarkably slim waist that contrasts beautifully with her fuller, shapely hips and noticeably plump, rounded breasts. Her body shows clear muscle definition, particularly in her toned arms and a flat, defined abdomen, indicating a very well-exercised and strong yet feminine physique.";
 
 		private async Task<string> Background()
+		{
+			var randomLocation = GetUniqueRandomLocation();
+
+			var prompt = $"Beautiful girl with model appearance {randomLocation}. " +
+				 "Soft natural lighting, photorealistic style, high quality." +
+				 "\n\n**Response format:** Strictly only the ready prompt in English, without explanations or multiple options";
+			return await _generativeLanguageModel.GeminiRequest(prompt);
+		}
+
+		private static List<string> usedLocations = new List<string>();
+		private static Random random = new Random();
+
+		public static string GetUniqueRandomLocation()
 		{
 			var locations = new[]
 			{
@@ -392,13 +404,19 @@ namespace AlinaKrossManager.Jobs
 				"with wedding dress in background"
 			};
 
-			var random = new Random();
-			var randomLocation = locations[random.Next(locations.Length)];
+			var available = locations.Except(usedLocations).ToArray();
 
-			var prompt = $"Beautiful girl with model appearance {randomLocation}. " +
-				 "Soft natural lighting, photorealistic style, high quality." +
-				 "\n\n**Response format:** Strictly only the ready prompt in English, without explanations or multiple options";
-			return await _generativeLanguageModel.GeminiRequest(prompt);
+			if (available.Length == 0)
+			{
+				// Все локации использованы, сбрасываем
+				usedLocations.Clear();
+				available = locations;
+			}
+
+			string location = available[random.Next(available.Length)];
+			usedLocations.Add(location);
+
+			return location;
 		}
 		private string descPhoto => "Soft ambient lighting, cinematic shallow depth of field, photorealistic, ultra-detailed skin texture, 8K resolution, professional fashion photography style, sharp focus on face and figure. --ar 9:16 --v 6.0 --style raw --q 2 --s 750";
 		private async Task<string> DecsPhotoNew()
