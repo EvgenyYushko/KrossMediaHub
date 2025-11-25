@@ -9,7 +9,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class InstagramAnswerMessageJob : SchedulerJob
 	{
-		public static string Time => "0 0-29,30-50/2,51-59/3 * * * ?";
+		public static string Time => "0 10,30,50 * * * ?";
 		private const string _evgenyYushkoId = "1307933750574022";
 		private readonly IWebHostEnvironment _env;
 		private readonly ConversationService _conversationService;
