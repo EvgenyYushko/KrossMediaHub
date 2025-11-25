@@ -310,6 +310,68 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
+		public async Task<bool> PublishStoryAsync(string base64Image)
+		{
+			// 1. Получаем токен страницы
+			string pageAccessToken;
+			try
+			{
+				pageAccessToken = await GetPageAccessTokenAsync();
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка при получении токена для сторис: {ex.Message}");
+				return false;
+			}
+
+			using (var httpClient = new HttpClient())
+			{
+				// 2. Загружаем изображение (используем твой существующий метод)
+				// Он загружает фото с флагом published=false, что идеально подходит для сторис.
+				string photoId = await UploadImageAsync(pageAccessToken, _pageIdToPublish, base64Image, httpClient);
+
+				if (string.IsNullOrEmpty(photoId))
+				{
+					Console.WriteLine("Не удалось загрузить изображение для истории.");
+					return false;
+				}
+
+				// 3. Публикуем загруженное фото как Историю (Story)
+				// Конечная точка для фото-историй: /{page-id}/photo_stories
+				string publishUrl = $"https://graph.facebook.com/v24.0/{_pageIdToPublish}/photo_stories";
+
+				var postData = new Dictionary<string, string>
+				{
+					{ "photo_id", photoId },
+					{ "access_token", pageAccessToken }
+				};
+
+				try
+				{
+					using (var content = new FormUrlEncodedContent(postData))
+					{
+						var publishResponse = await httpClient.PostAsync(publishUrl, content);
+
+						// Используем твой существующий метод обработки ответа
+						// API вернет ID созданной истории
+						bool success = await ProcessPublishResponseAsync(publishResponse);
+
+						if (success)
+						{
+							Console.WriteLine("История успешно опубликована!");
+						}
+
+						return success;
+					}
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Исключение при публикации истории: {ex.Message}");
+					return false;
+				}
+			}
+		}
+
 		private async Task<(string videoId, string uploadUrl)> StartReelUploadSessionAsync(string pageAccessToken, string pageId, HttpClient httpClient)
 		{
 			// Используем конечную точку /{page-id}/video_reels

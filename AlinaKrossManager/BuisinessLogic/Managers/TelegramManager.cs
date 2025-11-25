@@ -117,6 +117,16 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						}
 					}
 					break;
+				case UpdateType.Message when msgText.IsCommand("story_to_facebook") && update.Message.ReplyToMessage is Message rmsg:
+					{
+						if (!await _telegramService.CanUseBot(update, ct)) return;
+						bool flowControl = await FaceBookStoryHandler(update, rmsg, ct);
+						if (!flowControl)
+						{
+							return;
+						}
+					}
+					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_bluesky") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
@@ -258,6 +268,41 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Ошибка facebook: {ex.Message}");
+			}
+			finally
+			{
+				try { await _telegramService.DeleteMessage(startMsg.MessageId, ct); } catch { }
+			}
+
+			return true;
+		}
+
+		private async Task<bool> FaceBookStoryHandler(Update update, Message rmsg, CancellationToken ct)
+		{
+			var startMsg = await _telegramService.SendMessage("Начинаем выкладывать сториз в Facebook...");
+			try
+			{
+				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
+				if (!images.Existst)
+				{
+					return false;
+				}
+
+				var res = await _faceBookService.PublishStoryAsync(images.Images.FirstOrDefault());
+				if (res)
+				{
+					var msgRes = $"✅ История в Facebook успешно опуликованна!";
+					Console.WriteLine(msgRes);
+					try
+					{
+						await _telegramService.SendMessage(msgRes, rmsg.MessageId);
+					}
+					catch { }
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"❌ Ошибка в публикации сториз для Facebook: {ex.Message}");
 			}
 			finally
 			{

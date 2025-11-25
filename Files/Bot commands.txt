@@ -3,5 +3,6 @@ post_to_insta - пост в инсту
 story_to_insta - история в инсте
 post_to_threads - Пост в Threads
 post_to_facebook - пост в FaceBook
+story_to_facebook - история в FaceBook
 post_to_bluesky - пост в BlueSky
 post_to_all - пост везде
