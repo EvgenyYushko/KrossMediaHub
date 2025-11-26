@@ -1,4 +1,3 @@
-using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
@@ -12,7 +11,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class DilyPostJob : SchedulerJob
 	{
-		public static string Time => "0 0 11,12,13,14,15,16,17,18,19,20,21,22,23,0,1,2,3,4,5,6 * * ?";
+		public static string Time => "0 0 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly TelegramService _telegramService;
@@ -60,35 +59,35 @@ namespace AlinaKrossManager.Jobs
 					images = imagesRes.Images;
 					msg = imagesRes.Msg;
 
-					if (random.Next(4) != 1)
+					var promptVar =
+						$"Измени этот шикарный промпт таким образом, что бы эта девушка немного повернулась к нам и стало более отчётливо видны её бёдра или же просто поменяй её позу" +
+						$"Вот этот промпт:\n\n{promptForCreateImage}" +
+						$"\n\n**Формат ответа:** Только готовый промпт на английском, без пояснений.";
+					promptForCreateImage = await _generativeLanguageModel.GeminiRequest(promptVar);
+
+					imagesRes = await CreateImage(promptForCreateImage, msg);
+
+					if (imagesRes.Images.Count > 0)
 					{
-						var promptVar =
-							$"Измени этот шикарный промпт таким образом, что бы эта девушка немного повернулась к нам и стало более отчётливо видны её бёдра или же просто поменяй её позу" +
-							$"Вот этот промпт:\n\n{promptForCreateImage}" +
-							$"\n\n**Формат ответа:** Только готовый промпт на английском, без пояснений.";
-						promptForCreateImage = await _generativeLanguageModel.GeminiRequest(promptVar);
-
-						imagesRes = await CreateImage(promptForCreateImage, msg);
-
-						if (imagesRes.Images.Count > 0)
+						foreach (var image in imagesRes.Images)
 						{
-							images.Add(imagesRes.Images.First());
+							images.Add(image);
 						}
+					}
 
-						if (random.Next(2) != 1)
+					promptVar =
+						$"Измени этот шикарный промпт таким образом, что бы эта девушка стала выглядеть ещё более вульгарно и вызывающе, но в пределах разумного, что бы пройти цензуру а так же измени позу. " +
+						$"Вот этот промпт:\n\n{promptForCreateImage}" +
+						$"\n\n**Формат ответа:** Только готовый промпт на английском, без пояснений.";
+					promptForCreateImage = await _generativeLanguageModel.GeminiRequest(promptVar);
+
+					imagesRes = await CreateImage(promptForCreateImage, msg);
+
+					if (imagesRes.Images.Count > 0)
+					{
+						foreach (var image in imagesRes.Images)
 						{
-							promptVar =
-								$"Измени этот шикарный промпт таким образом, что бы эта девушка стала выглядеть ещё более вульгарно и вызывающе, но в пределах разумного, что бы пройти цензуру а так же измени позу. " +
-								$"Вот этот промпт:\n\n{promptForCreateImage}" +
-								$"\n\n**Формат ответа:** Только готовый промпт на английском, без пояснений.";
-							promptForCreateImage = await _generativeLanguageModel.GeminiRequest(promptVar);
-
-							imagesRes = await CreateImage(promptForCreateImage, msg);
-
-							if (imagesRes.Images.Count > 0)
-							{
-								images.Add(imagesRes.Images.First());
-							}
+							images.Add(image);
 						}
 					}
 
@@ -107,10 +106,10 @@ namespace AlinaKrossManager.Jobs
 				return;
 			}
 
-			if (images.Count > 1 && random.Next(2) == 1)
-			{
-				images.Reverse();
-			}
+			//if (images.Count > 1 && random.Next(2) == 1)
+			//{
+			//	images.Reverse();
+			//}
 
 			Message[] loadedPictureMessages = null;
 			try
@@ -209,16 +208,16 @@ namespace AlinaKrossManager.Jobs
 			catch { }
 
 			Console.WriteLine("Первая попытка сгенерировать изобюражение...");
-			List<string> images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage);
+			List<string> images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage, 2);
 			if (images.Count == 0)
 			{
 				Console.WriteLine("Вторая попытка сгенерировать изобюражение...");
-				images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage);
+				images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage, 2);
 			}
 			if (images.Count == 0)
 			{
 				Console.WriteLine("Третья попытка сгенерировать изобюражение...");
-				images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage);
+				images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage, 2);
 			}
 
 			if (images.Count == 0)
@@ -235,16 +234,16 @@ namespace AlinaKrossManager.Jobs
 				catch { }
 
 				Console.WriteLine("Четвёртая попытка сгенерировать изобюражение изменив промпт...");
-				images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage);
+				images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage, 2);
 				if (images.Count == 0)
 				{
 					Console.WriteLine("Пятая попытка сгенерировать изобюражение изменив промпт...");
-					images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage);
+					images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage, 2);
 				}
 				if (images.Count == 0)
 				{
 					Console.WriteLine("Шестая попытка сгенерировать изобюражение изменив промпт...");
-					images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage);
+					images = await _generativeLanguageModel.GeminiRequestGenerateImage(promptForCreateImage, 2);
 				}
 			}
 
