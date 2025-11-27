@@ -1,6 +1,7 @@
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
@@ -12,7 +13,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public TelegramService(ITelegramBotClient telegramBotClient)
 		{
 			_telegramBotClient = telegramBotClient;
-		}
+		}		
 
 		public async Task<ImagesTelegram> TryGetImagesPromTelegram(string? mediaGroupId, PhotoSize[]? photo)
 		{
@@ -38,6 +39,16 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 
 			return images;
+		}
+
+		public Task<Message> SendMessage(long senderId, string text, ReplyMarkup replyMarkup)
+		{
+			return _telegramBotClient.SendMessage(senderId, text, replyMarkup: replyMarkup);
+		}
+
+		public Task<Message> SendMessage(long senderId, string text)
+		{
+			return _telegramBotClient.SendMessage(senderId, text);
 		}
 
 		public Task<Message> SendMessage(string text, int? replayMsgId = null)
@@ -100,14 +111,19 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return true;
 		}
 
-		public async Task<Message> SendSinglePhotoAsync(string base64Image, int? msgId, string caption = "")
+		public async Task<Message> SendVideoAsync(long senderId, string text, Video video)
+		{
+			return await _telegramBotClient.SendVideo(senderId, video, text);
+		}
+
+		public async Task<Message> SendSinglePhotoAsync(string base64Image, int? msgId, string caption = "", long senderId = EVGENY_YUSHKO_TG_ID)
 		{
 			var imageBytes = Convert.FromBase64String(base64Image);
 			using var stream = new MemoryStream(imageBytes);
 
 			if (msgId is not null)
 			{
-				return await _telegramBotClient.SendPhoto(EVGENY_YUSHKO_TG_ID,
+				return await _telegramBotClient.SendPhoto(senderId,
 					InputFile.FromStream(stream, "image.jpg"),
 					caption,
 					replyParameters:
@@ -118,11 +134,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 			else
 			{
-				return await _telegramBotClient.SendPhoto(EVGENY_YUSHKO_TG_ID, InputFile.FromStream(stream, "image.jpg"), caption);
+				return await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"), caption);
 			}
 		}
 
-		public async Task<Message[]> SendPhotoAlbumAsync(List<string> base64Images, int? msgId, string caption = "")
+		public async Task<Message[]> SendPhotoAlbumAsync(List<string> base64Images, int? msgId, string caption = "", long senderId = EVGENY_YUSHKO_TG_ID)
 		{
 			var media = new List<IAlbumInputMedia>();
 			var streams = new List<MemoryStream>(); // храним ссылки на стримы
@@ -140,7 +156,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 					if (i == 0 && !string.IsNullOrEmpty(caption))
 					{
-						//inputMedia.Caption = caption;
+						inputMedia.Caption = caption;
 						inputMedia.ParseMode = ParseMode.Html;
 					}
 
@@ -149,7 +165,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				if (msgId is not null)
 				{
-					messages = await _telegramBotClient.SendMediaGroup(EVGENY_YUSHKO_TG_ID, media, new ReplyParameters { MessageId = msgId.Value });
+					messages = await _telegramBotClient.SendMediaGroup(senderId, media, new ReplyParameters { MessageId = msgId.Value });
 					try
 					{
 						Console.WriteLine("Пробуем сохранить MediaGroupId");
@@ -167,7 +183,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				}
 				else
 				{
-					messages = await _telegramBotClient.SendMediaGroup(EVGENY_YUSHKO_TG_ID, media);
+					messages = await _telegramBotClient.SendMediaGroup(senderId, media);
 
 					try
 					{
@@ -352,6 +368,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		{
 			rmsg.Caption = description;
 			HandleMediaGroup(rmsg);
-		}
+		}		
 	}
 }

@@ -12,7 +12,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Base
 		}
 
 		protected abstract string GetBaseDescriptionPrompt(string base64Img);
-		protected abstract string ServiceName { get; }
+		public abstract string ServiceName { get; }
 
 		public virtual async Task<string> TryCreateDescription(string replayText, List<string> images)
 		{
@@ -26,9 +26,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Base
 					Console.WriteLine("Начниаем генерировать описание...");
 					var promptForeDescriptionPost = GetBaseDescriptionPrompt(images.FirstOrDefault());
 					var res = string.IsNullOrEmpty(replayText) ? await _generativeLanguageModel.GeminiRequest(promptForeDescriptionPost) : replayText;
-					//Console.WriteLine("Начинаем задержку в 20 секунд...");					
-					//await Task.Delay(TimeSpan.FromSeconds(20));
-					//Console.WriteLine("Задржка окончена...");
 					Console.WriteLine("Сгенерированное описание: " + res);
 					return res;
 				}

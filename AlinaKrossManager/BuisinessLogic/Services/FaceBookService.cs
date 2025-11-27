@@ -10,7 +10,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private string _userId = "122108650443054121";
 		string _pageIdToPublish = "872506142593246";
 
-		protected override string ServiceName => "FaceBook";
+		public override string ServiceName => "FaceBook";
 
 		public FaceBookService(string longLivedUserToken, IGenerativeLanguageModel generativeLanguageModel)
 			: base(generativeLanguageModel)

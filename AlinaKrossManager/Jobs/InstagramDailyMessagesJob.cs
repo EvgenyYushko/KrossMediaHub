@@ -15,7 +15,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly IWebHostEnvironment _env;
 		private const string _evgenyYushkoId = "1307933750574022";
 
-		public static string Time => "0 0 22 * * ?";
+		public static string Time => "0 0 17 * * ?";
 
 		public InstagramDailyMessagesJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel

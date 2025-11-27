@@ -25,7 +25,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public string RefreshJwt { get; private set; } = string.Empty;
 		public string Did { get; private set; } = "did:plc:oqaj3ux2ixowx36aifbqcvjz";//string.Empty;
 		public string PdsUrl { get; private set; } = "https://auriporia.us-west.host.bsky.network";//string.Empty;
-		protected override string ServiceName => "BlueSky";
+		public override string ServiceName => "BlueSky";
 
 		public BlueSkyService(string identifire, string appPassword, IGenerativeLanguageModel generativeLanguageModel)
 			: base(generativeLanguageModel)

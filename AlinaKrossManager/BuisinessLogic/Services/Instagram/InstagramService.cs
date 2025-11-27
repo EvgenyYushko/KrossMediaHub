@@ -19,7 +19,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		private const string _alinaKrossId = "17841477563266256";
 		private const string _alinaKrossName = "alina.kross.ai";
 		private const string _evgenyYushkoId = "1307933750574022";
-		protected override string ServiceName => "Instagram";
+		public override string ServiceName => "Instagram";
 
 		public InstagramService(string accessToken
 			, IGenerativeLanguageModel generativeLanguage

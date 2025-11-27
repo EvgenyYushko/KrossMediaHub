@@ -3,6 +3,7 @@ using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
+using AlinaKrossManager.BuisinessLogic.Services.Telegram;
 using AlinaKrossManager.Controllers;
 using AlinaKrossManager.Helpers;
 using AlinaKrossManager.Jobs.Base;
@@ -67,6 +68,8 @@ builder.Services.AddSingleton(provider =>
 builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<TelegramManager>();
 builder.Services.AddSingleton<ConversationService>();
+builder.Services.AddSingleton<PublicTelegramChanel>();
+builder.Services.AddSingleton<PrivateTelegramChanel>();
 
 builder.Services.AddHostedService<HealthCheckBackgroundService>();
 
