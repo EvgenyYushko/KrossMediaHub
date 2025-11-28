@@ -1,6 +1,7 @@
 using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
+using AlinaKrossManager.Helpers;
 using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
 using Quartz;
@@ -203,7 +204,7 @@ namespace AlinaKrossManager.Jobs
 			int chatId = TelegramService.EVGENY_YUSHKO_TG_ID;
 			try
 			{
-				msg = await _telegramService.SendMessage(promptForCreateImage);
+				msg = await _telegramService.SendMessage(promptForCreateImage.ToBlockQuote());
 			}
 			catch { }
 
@@ -229,7 +230,7 @@ namespace AlinaKrossManager.Jobs
 
 				try
 				{
-					msg = await _telegramService.SendMessage(promptForCreateImage);
+					msg = await _telegramService.SendMessage(promptForCreateImage.ToBlockQuote());
 				}
 				catch { }
 

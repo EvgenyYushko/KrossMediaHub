@@ -55,10 +55,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		{
 			if (replayMsgId is null)
 			{
-				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text);
+				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, parseMode: ParseMode.Html);
 			}
 
-			return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, replyParameters: new ReplyParameters { MessageId = replayMsgId.Value });
+			return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, 
+				replyParameters: new ReplyParameters { MessageId = replayMsgId.Value }, 
+				parseMode: ParseMode.Html);
 		}
 
 		public async Task<(string? base64Video, string? mimeType)> TryGetVideoBase64FromTelegram(Message rmsg)

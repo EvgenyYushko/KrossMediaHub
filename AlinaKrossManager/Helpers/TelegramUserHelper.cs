@@ -32,5 +32,10 @@ namespace AlinaKrossManager.Helpers
 		{
 			return msg.Equals($"/{commandName}") /*|| msg.Equals($"/{commandName}@{BotSettings.BOT_USER_NAME}")*/;
 		}
+
+		public static string ToBlockQuote(this string text)
+		{
+			return "<blockquote expandable>" + text + "</blockquote>";
+		}
 	}
 }

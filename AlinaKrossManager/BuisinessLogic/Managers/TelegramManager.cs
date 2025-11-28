@@ -38,7 +38,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		}
 
 		public async Task HandleUpdateAsync(Update update, CancellationToken ct)
-		{
+		{	
 			//await _telegramService.SendMainButtonMessage();
 
 			if (update.Message?.Text is not { } text)
@@ -548,7 +548,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			switch (imagesList.Count)
 			{
 				case 0:
-					await _telegramService.SendMessage("📭 Изображения не сгенерированы.\nВозможно запрос не прошёл цензуру.");
+					await _telegramService.SendMessage("📭 Изображения не сгенерированы.\nВозможно запрос не прошёл цензуру.", msgId);
 					break;
 				case 1:
 					await _telegramService.SendSinglePhotoAsync(imagesList[0], msgId, caption);
