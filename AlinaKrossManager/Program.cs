@@ -42,7 +42,7 @@ builder.Services.AddSingleton(provider =>
 	//var telegramService = provider.GetService<TelegramService>();
 
 	//var PageAccessToken = "IGAALt2MgjsilBZAFNKQ040cWM4TTl1Mkt5dFF5WXloekRJbGdwU1hqTmNBVFkzQU9mV29NWVk0X2hPdXZALZA3Q2ZA09VYXFyUnhrY3QweElHNVBnaExaS0c5TDJxS2RjN3lydlFYS0JzRUhkaGVyaTJyOTJFaHpYMVh0S2p1ZAy1xMAZDZD";
-	var accessToken = "IGAAQEMxhZAfcFBZAFM0NHhuZAjRRcnpkWEZANNGtiZAkZA2ZA1NUME8yYXFHMndXU29GUEVpUDh0bmVSeV9WSEs3M3Q4Sk93TWUzb0RWcXNYOGktekhFQ2x3YVE1Y0ZAOWm9fTEpDTXRiQlBkNXpzc0Y5dndfcS0tcm1veHNNTUUzSmRydwZDZD";
+	var accessToken = "IGAAQEMxhZAfcFBZAFJYRUlNOVVwWTlFb3h1ZAnJ1cWZA5eFNUTlpIX1NHYkwyenp0a0NTNTN6WWlxR3BVVkV2aEJqSGpaNHlNQWg5ck5GQnlQajJwMC1VS3pEREJNb1Nxc19RclpGdURuaWl0TWVzMGtGUlVJYmNjNnR0SmxKcHZAyZAwZDZD";
 	return new InstagramService(accessToken, geminiModel, conversationService, hostedInvarment);
 });
 
