@@ -12,7 +12,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class DilyPostJob : SchedulerJob
 	{
-		public static string Time => "0 0 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 * * ?";
+		public static string Time => "0 0 6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly TelegramService _telegramService;
@@ -260,16 +260,126 @@ namespace AlinaKrossManager.Jobs
 		}
 
 		private string face => "A stunning young woman in her late 20s, with long glossy dark brown hair, radiant warm smile, and natural makeup, at golden hour. ";
+
+		private static List<string> usedDress = new List<string>();
+
 		private async Task<string> GetDress()
 		{
-			var prompt = "Измени это описание сексуальной девушки. " +
-				"Оно должно быть не менее откровенной и вызывающей чем эта, возьми его за основу. " +
-				"Но не используй в её одежде латекс и подобные блестящие элементы одежды. Возможно вообще не используй бикини: " +
-				"Attire: She is wearing a two-piece bikini in a light, neutral, possibly beige or pale peach color. " +
-				"Top: A classic triangle bikini top with thin straps, providing excellent support and emphasizing her ample cleavage. The fabric appears smooth and slightly reflective in the light. " +
-				" Bottom: Matching tie-side bikini bottoms, sitting low on her curvy hips, with adjustable strings tied at each side. The cut is moderately revealing but tasteful, accentuating her figure." +
-				$"\n\n**Формат ответа:** Строго только готовый промпт на английском, без пояснений и предодложений разных вариантов.";
-			return await _generativeLanguageModel.GeminiRequest(prompt);
+			// 1. БАЗА ПРОМПТА (стабильная часть, требования)
+			string promptBase =
+				"Create a very detailed, vivid, and sexually appealing description of a woman's attire. " +
+				"The description must be provocative, tasteful, and focus on texture, fit, and how it complements her figure. " +
+				"Rules: Do NOT use latex, shiny/PVC materials. " +
+				"Core idea for this generation: ";
+
+			// 2. СЛОВАРЬ ПЕРЕМЕННЫХ (случайная выборка)
+			// Каждый элемент массива - это "затравка" для ИИ, которую он разовьёт.
+			string[] clothingOptions = new string[]
+			{
+				// Повседневная / Кэжуал
+				"A casual yet revealing outfit: a tight, thin white tank top without a bra and very short, frayed denim cut-off shorts.",
+				"An off-duty model look: high-waisted, light-wash skinny jeans ripped at the knees and thighs, paired with a tiny, cropped black t-shirt that shows her midriff.",
+				"A cozy but sexy look: an oversized, soft knit sweater that falls off one shoulder, worn with tight leggings or very short shorts.",
+				"Weekend vibes: perfectly fitting, low-rise vintage Levi's jeans with a simple, tight white ribbed tank top tucked in just at the front.",
+				"A relaxed fit: baggy, slouchy cargo pants in olive green, paired with an extremely tight, thin-strapped camisole in black silk.",
+				"A streetwear look: oversized hoodie, unzipped to reveal a tight sports bra underneath, with biker shorts that hug every curve.",
+    
+				// Платья
+				"A summer dress: a flowing, knee-length sundress with a deep V-neckline and a slit on the thigh. The fabric is light and clings to her curves.",
+				"Night-out attire: a tight, bodycon mini dress made of matte fabric. The dress is backless and has a plunging neckline.",
+				"A little black dress reinterpreted: a sleeveless, mock-neck LBD made of stretch velvet, so short it barely covers her thighs, with a cut-out at the waist.",
+				"A slip dress: a simple, spaghetti-strap satin slip dress in champagne color, falling just above the knee, hugging her body like a second skin.",
+				"A wrap dress: a floral-print wrap dress that ties at the waist, deliberately tied loosely so it reveals significant cleavage and leg with every movement.",
+				"A corset dress: a dress with a built-in, structured fabric corset top that dramatically cinches her waist and pushes up her bust, with a flared skirt.",
+				"A halter-neck dress: a vibrant, solid-color dress with a high neck at the front that ties behind her neck, leaving her entire back bare down to the waist.",
+				"A cut-out dress: a simple, bodycon midi dress in a solid color with bold, geometric cut-outs at the sides and across the ribs.",
+    
+				// Офисный / Деловой стиль (сексуальный)
+				"A chic office look turned provocative: a crisp, white button-down shirt, unbuttoned dangerously low, paired with a tight, high-waisted pencil skirt.",
+				"A power suit, deconstructed: a sharply tailored, single-breasted blazer worn with nothing underneath, and matching, ultra-short tailored shorts instead of trousers.",
+				"A secretary fantasy: a tight, form-fitting turtleneck sweater in a light color, tucked into a very tight, knee-length pencil skirt with a back zip.",
+				"A sophisticated look: a silk, cowl-neck blouse in emerald green, tucked into wide-leg, high-waisted trousers that sit low on her hips.",
+				"A modern business look: a sleek, fitted waistcoat (with no shirt underneath) and tailored, straight-leg trousers with a sharp crease.",
+    
+				// Спортивный / Атлетический
+				"A sporty, athletic look: very tight, high-waisted yoga pants that emphasize her hips and butt, and a cropped, fitted sports top.",
+				"A runner's outfit: incredibly short, tight running shorts and a loose, sleeveless mesh top that reveals her sports bra underneath.",
+				"A gym-to-street look: tight, seamless leggings in a dark color with a subtle, flattering sheen, and an oversized athletic jacket left open.",
+				"A tennis outfit: a classic, pleated tennis skirt in white (extremely short), paired with a fitted, collared polo top.",
+				"A cyclist's look: skin-tight, padded cycling shorts in a bold color and a matching, zipped cycling jersey, unzipped quite far down.",
+    
+				// Вечерняя / Гламурная
+				"A glamorous evening look: a long, figure-hugging gown with a dramatic open back and a thigh-high slit. The fabric is luxurious and matte.",
+				"A cocktail dress: a sequined, mini dress with a deep V-neck that goes down to the navel, held together with a thin chain.",
+				"A mermaid silhouette gown: a tight, beaded dress that flares out at the knees, with thin, delicate straps and a low-cut back.",
+				"A metallic dress: a minimalist, sleeveless dress in hammered, matte gold or silver fabric that moves liquidly over her body.",
+    
+				// Бохо / Этнический
+				"A bohemian style: a loose, off-the-shoulder peasant blouse with embroidery, combined with a tight, wraparound skirt with a high slit.",
+				"A festival look: high-waisted, denim shorts with intricate embroidery, paired with a crochet top that reveals glimpses of skin beneath.",
+				"A beach cover-up as an outfit: a sheer, patterned kaftan worn over a simple bandeau top and micro shorts, the sheer fabric hinting at what's underneath.",
+				"A gypsy-inspired look: a ruffled, tiered skirt in a bright print, worn with a tight, lace-up corset top.",
+    
+				// Альтернативная / Рок
+				"A rocker/grunge style: a ripped, faded black band t-shirt tied in a knot at the waist, and tight, black leather (not shiny latex) pants or shorts.",
+				"A punk look: skin-tight, ripped black skinny jeans, combat boots, and a tight, black mesh long-sleeve top worn over a lace bra.",
+				"A gothic romance style: a dramatic, black lace Victorian-style blouse with a high neck and leg-of-mutton sleeves, paired with a tight, modern leather skirt.",
+				"A rockabilly/pin-up look: a tight, short-sleeved sweater with a geometric pattern, paired with a full, circle skirt that has a playful, provocative print.",
+    
+				// Ретро / Винтаж
+				"A 1950s pin-up style: a tight, striped boat-neck top and high-waisted, denim capri pants that hug her curves.",
+				"A 1970s disco look: flared, high-waisted trousers in a velvety fabric and a shimmering, halter-neck top with a deep plunge.",
+				"A 1980s inspired outfit: acid-wash, high-waisted denim shorts and an oversized, off-the-shoulder sweatshirt in a bright color.",
+				"A 1990s minimalist look: a simple, spaghetti-strap slip dress in black, worn with a chunky, contrasting sports jacket.",
+    
+				// Игривая / Кокетливая
+				"A preppy style turned sexy: a tight, fitted polo shirt and an extremely short pleated tennis skirt.",
+				"A schoolgirl uniform fantasy: a classic, white button-up blouse with the top buttons undone, paired with a drastically shortened plaid skirt.",
+				"A librarian fantasy: a sleek, knee-length pencil skirt in a dark color, a sheer, black blouse buttoned up high, and glasses.",
+				"A cowgirl aesthetic: ultra-tight, light-blue denim jeans with a ornate belt, and a checked, gingham shirt tied in a knot above her navel.",
+    
+				// Искусственно откровенная / Вечерняя (не бикини/латтекс)
+				"A lingerie-as-outerwear look: a delicate, lace bodysuit in a nude or black color, worn under a sheer, silk robe that is left completely open.",
+				"A beach look (not bikini): a very thin, loose-knit crochet cover-up dress that is completely see-through, worn over a simple, solid-color bandeau and boy shorts.",
+				"A resort look: a long, flowing, sheer chiffon maxi skirt in a pastel color, paired with a tiny, embellished crop top.",
+				"A poolside outfit: a luxurious, Turkish-style towel wrap dress, tied tightly around her body to emphasize her waist and chest, with a deep V-neck.",
+    
+				// Специфические материалы / Фасоны
+				"An outfit focusing on knitwear: a tight, ribbed, long-sleeved turtleneck dress that stretches and clings to every single curve of her body.",
+				"A velvet outfit: wide-leg, high-waisted velvet trousers and a matching, backless halter top.",
+				"A silk outfit: a set of loose, wide-leg silk trousers and a matching, draped silk camisole that slips off one shoulder.",
+				"A lace overlay look: a simple, slim-fit black dress with sheer, long lace sleeves and a lace panel running down the entire torso.",
+				"A sheer moment: a maxi skirt made of multiple layers of sheer, black tulle over a silk slip, paired with a simple, tight black tank top.",
+    
+				// Зимняя / Сезонная
+				"A cozy winter look: tight, light-gray cashmere leggings and an oversized, chunky knit sweater with a wide neck that keeps slipping down one arm.",
+				"A ski lodge aesthetic: skin-tight, thermal leggings in a pattern, with thick, woolen socks pulled up high, and a snug, fitted turtleneck sweater.",
+				"A New Year's Eve party look: a sequined, sleeveless pantsuit with a deep, plunging V-neck that goes all the way to the waist, and wide-leg trousers.",
+    
+				// Фетиш-эстетика (без латекса)
+				"A dominant aesthetic: tailored, high-waisted black trousers, a crisp white shirt with the sleeves rolled up, and sharp, stiletto heels. Authority is sexy.",
+				"A harness look: a complex, woven leather harness worn over a simple, elegant silk slip dress, creating a striking contrast.",
+				"A vinyl (not latex) look: a matte, non-shiny vinyl pencil skirt and a simple cotton t-shirt, playing with textures.",
+				"A corset over clothes: a structured, black underbust corset worn laced tightly over a flowing, white poet's blouse."
+			};
+
+			var available = clothingOptions.Except(usedDress).ToArray();
+
+			if (available.Length == 0)
+			{
+				// Все локации использованы, сбрасываем
+				usedDress.Clear();
+				available = clothingOptions;
+			}
+
+			string dress = available[random.Next(available.Length)];
+			usedDress.Add(dress);
+
+			// 4. ФИНАЛЬНЫЙ ПРОМПТ
+			string finalPrompt = promptBase + dress +
+				"\n\n**Response Format:** Strictly ONLY the final, detailed attire description in English, ready for use. No introductions, explanations, or multiple options.";
+
+			return await _generativeLanguageModel.GeminiRequest(finalPrompt);
 		}
 		private string bodyType = "Body Type: She has a very fit, athletic, and notably curvaceous physique. She possesses a remarkably slim waist that contrasts beautifully with her fuller, shapely hips and noticeably plump, rounded breasts. Her body shows clear muscle definition, particularly in her toned arms and a flat, defined abdomen, indicating a very well-exercised and strong yet feminine physique.";
 
