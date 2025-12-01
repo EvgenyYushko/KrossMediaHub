@@ -168,7 +168,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				case UpdateType.Message when msgText.IsCommand("post_to_tg_private") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
-						bool? flowControl = await TgPrivateHandler(update, rmsg, ct);
+						bool? flowControl = await TgPrivateHandler(update, rmsg, ct, true);
 						if (flowControl == false)
 						{
 							break;
@@ -188,7 +188,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						bool flowControl3 = await FaceBookHandler(update, rmsg, ct);
 						bool flowControl4 = await FaceBookStoryHandler(update, rmsg, ct);
 						bool? flowControl5 = await BlueSkyHandler(update, rmsg, ct);
-						bool? flowControl6 = await TgFreeHandler(update, rmsg, ct);
+						bool? flowControl6 = await TgFreeHandler(update, rmsg, ct, true);
 
 						Console.WriteLine("Конце операции публикации во все сети");
 					}
@@ -456,17 +456,17 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			return null;
 		}
 
-		private Task<bool> TgFreeHandler(Update update, Message rmsg, CancellationToken ct)
+		private Task<bool> TgFreeHandler(Update update, Message rmsg, CancellationToken ct, bool force = false)
 		{
-			return TgHandler(update, rmsg, ct, PublicTelegramChanel.CHANEL_ID, _publicTelegramChanel);
+			return TgHandler(update, rmsg, ct, PublicTelegramChanel.CHANEL_ID, _publicTelegramChanel, force);
 		}
 
-		private Task<bool> TgPrivateHandler(Update update, Message rmsg, CancellationToken ct)
+		private Task<bool> TgPrivateHandler(Update update, Message rmsg, CancellationToken ct, bool force = false)
 		{
-			return TgHandler(update, rmsg, ct, PrivateTelegramChanel.CHANEL_ID, _privateTelegramChanel);
+			return TgHandler(update, rmsg, ct, PrivateTelegramChanel.CHANEL_ID, _privateTelegramChanel, force);
 		}
 
-		public async Task<bool> TgHandler(Update update, Message rmsg, CancellationToken ct, long chanelId, SocialBaseService socialBaseService)
+		public async Task<bool> TgHandler(Update update, Message rmsg, CancellationToken ct, long chanelId, SocialBaseService socialBaseService, bool force = false)
 		{
 			var serviceName  = socialBaseService.ServiceName;
 			var startMsg = await _telegramService.SendMessage($"Начинаем процесс публикации в {serviceName}...");
@@ -480,12 +480,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					return true;
 				}
 
-				if (images.Existst)
-				{
-					replayText = "";
-				}
-
-				var description = await GetDescription(rmsg, images, replayText, socialBaseService);
+				var description = await GetDescription(rmsg, images, replayText, socialBaseService, force);
 
 				if (resVideos is not null)
 				{
@@ -527,10 +522,11 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			return false;
 		}
 
-		private async Task<string> GetDescription(Message rmsg, TelegramService.ImagesTelegram images, string replayText, SocialBaseService socialBaseService)
+		private async Task<string> GetDescription(Message rmsg, TelegramService.ImagesTelegram images, string replayText, SocialBaseService socialBaseService, bool force = false)
 		{
 			string description = string.IsNullOrEmpty(replayText) ? images.Caption : replayText;
-			if (string.IsNullOrEmpty(description))
+
+			if (string.IsNullOrEmpty(description) || force)
 			{
 				description = await socialBaseService.TryCreateDescription(replayText, images.Images);
 				_telegramService.UpdateCaptionMediaGrup(rmsg, description);
