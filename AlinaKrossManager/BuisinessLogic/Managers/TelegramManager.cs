@@ -1,10 +1,13 @@
+using System.Collections.Concurrent;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Telegram;
 using AlinaKrossManager.Services;
+using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 using static AlinaKrossManager.Helpers.TelegramUserHelper;
 
 namespace AlinaKrossManager.BuisinessLogic.Managers
@@ -18,6 +21,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private readonly TelegramService _telegramService;
 		private readonly PublicTelegramChanel _publicTelegramChanel;
 		private readonly PrivateTelegramChanel _privateTelegramChanel;
+		private readonly ITelegramBotClient bot;
 
 		public TelegramManager(InstagramService instagramService
 			, IGenerativeLanguageModel generativeLanguageModel
@@ -26,6 +30,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			, TelegramService telegramService
 			, PublicTelegramChanel publicTelegramChanel
 			, PrivateTelegramChanel privateTelegramChanel
+			, ITelegramBotClient bot
 		)
 		{
 			_instagramService = instagramService;
@@ -35,10 +40,334 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			_telegramService = telegramService;
 			_publicTelegramChanel = publicTelegramChanel;
 			_privateTelegramChanel = privateTelegramChanel;
+			this.bot = bot;
+			_posts.Add(new BlogPost { Caption = "Первый пост: Привет мир! Как дела пидорасы! ААААА ААААААА", PhotoFileId = "dummy", CreatedAt = DateTime.Now.AddDays(-1) });
+			_posts.Add(new BlogPost { Caption = "Второй пост: Обзор кода", PhotoFileId = "dummy", CreatedAt = DateTime.Now, VkStatus = SocialStatus.Published });
+			// Добавим еще постов для теста пагинации
+			for (int i = 3; i <= 12; i++)
+				_posts.Add(new BlogPost { Caption = $"Пост #{i}: Тестовая запись Как дела Как дела", PhotoFileId = "dummy", CreatedAt = DateTime.Now.AddMinutes(i) });
 		}
 
+		private static List<BlogPost> _posts = new();
+		private static ConcurrentDictionary<long, UserState> _userStates = new();
+
+		public class BlogPost
+		{
+			public Guid Id { get; set; } = Guid.NewGuid();
+			public string PhotoFileId { get; set; } // ID файла в Telegram
+			public string Caption { get; set; }
+			public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+			// Статусы для разных соцсетей
+			public SocialStatus TelegramStatus { get; set; } = SocialStatus.Published;
+			public SocialStatus VkStatus { get; set; } = SocialStatus.Pending;
+			public SocialStatus InstaStatus { get; set; } = SocialStatus.Error;
+		}
+
+		public enum SocialStatus { Pending, Published, Error }
+		public enum UserState { None, WaitingForPhoto }
+
+		//static async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
+		//{
+		//	try
+		//	{
+		//		// 1. Обработка нажатий кнопок (CallbackQuery)
+		//		if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery != null)
+		//		{
+		//			await HandleCallbackQuery(bot, update.CallbackQuery, ct);
+		//			return;
+		//		}
+
+		//		// 2. Обработка сообщений (Message)
+		//		if (update.Type == UpdateType.Message && update.Message != null)
+		//		{
+		//			await HandleMessage(bot, update.Message, ct);
+		//			return;
+		//		}
+		//	}
+		//	catch (Exception ex)
+		//	{
+		//		Console.WriteLine($"Error: {ex.Message}");
+		//	}
+		//}
+
+		//static async Task HandleMessage(ITelegramBotClient bot, Message message, CancellationToken ct)
+		//{
+		//	var chatId = message.Chat.Id;
+		//	var text = message.Text;
+
+		//	// Проверяем состояние пользователя
+		//	if (_userStates.TryGetValue(chatId, out var state) && state == UserState.WaitingForPhoto)
+		//	{
+		//		if (message.Photo != null)
+		//		{
+		//			// Пользователь прислал фото
+		//			var photo = message.Photo.Last(); // Берем самое лучшее качество
+		//			var caption = message.Caption ?? "Без описания";
+
+		//			var newPost = new BlogPost
+		//			{
+		//				PhotoFileId = photo.FileId,
+		//				Caption = caption,
+		//				TelegramStatus = SocialStatus.Pending,
+		//				VkStatus = SocialStatus.Pending,
+		//				InstaStatus = SocialStatus.Pending
+		//			};
+
+		//			_posts.Add(newPost); // Добавляем в начало списка
+		//			_userStates[chatId] = UserState.None; // Сбрасываем состояние
+
+		//			await bot.SendMessage(chatId, "✅ Фото успешно добавлено в очередь!");
+		//			await ShowMainMenu(bot, chatId, ct); // Возвращаем меню
+		//		}
+		//		else if (text == "/cancel")
+		//		{
+		//			_userStates[chatId] = UserState.None;
+		//			await bot.SendMessage(chatId, "Отмена загрузки.");
+		//			await ShowMainMenu(bot, chatId, ct);
+		//		}
+		//		else
+		//		{
+		//			await bot.SendMessage(chatId, "⚠️ Пожалуйста, пришлите фотографию (как картинку, не файл) или нажмите /cancel.");
+		//		}
+		//		return;
+		//	}
+
+		//	// Стандартная команда старт
+		//	if (text == "/start")
+		//	{
+		//		await ShowMainMenu(bot, chatId, ct);
+		//	}
+		//}
+
+		//static async Task HandleCallbackQuery(ITelegramBotClient bot, CallbackQuery callback, CancellationToken ct)
+		//{
+		//	var chatId = callback.Message!.Chat.Id;
+		//	var messageId = callback.Message.MessageId;
+		//	var data = callback.Data;
+
+		//	// data format: "action:param"
+		//	var parts = data!.Split(':');
+		//	var action = parts[0];
+
+		//	switch (action)
+		//	{
+		//		case "main_menu":
+		//			// Если мы были в просмотре фото (сообщение с фото), мы не можем его редактировать в текст меню.
+		//			// Поэтому проверяем: если текущее сообщение фото - удаляем и шлем новое. Если текст - редактируем.
+		//			if (callback.Message.Type == MessageType.Photo)
+		//			{
+		//				await bot.DeleteMessage(chatId, messageId, ct);
+		//				await ShowMainMenu(bot, chatId, ct);
+		//			}
+		//			else
+		//			{
+		//				await ShowMainMenu(bot, chatId, ct, messageId);
+		//			}
+		//			break;
+
+		//		case "upload_start":
+		//			_userStates[chatId] = UserState.WaitingForPhoto;
+		//			await bot.EditMessageText(chatId, messageId,
+		//				"📸 **Режим загрузки**\n\nПришлите фотографию (можно с описанием). Она автоматически попадет в очередь.\n\nДля отмены введите /cancel",
+		//				parseMode: ParseMode.Markdown, cancellationToken: ct);
+		//			break;
+
+		//		case "queue_list":
+		//			int page = parts.Length > 1 ? int.Parse(parts[1]) : 0;
+		//			await ShowQueueList(bot, chatId, messageId, page, ct);
+		//			break;
+
+		//		case "post_view":
+		//			Guid postId = Guid.Parse(parts[1]);
+		//			await ShowPostDetails(bot, chatId, messageId, postId, ct);
+		//			break;
+
+		//		case "post_delete":
+		//			// Логика удаления (упрощено)
+		//			Guid idToDelete = Guid.Parse(parts[1]);
+		//			var postToDelete = _posts.FirstOrDefault(p => p.Id == idToDelete);
+		//			if (postToDelete != null) _posts.Remove(postToDelete);
+
+		//			// Возвращаемся в список (удаляем фото, шлем список)
+		//			await bot.DeleteMessage(chatId, messageId, ct);
+		//			await ShowQueueList(bot, chatId, null, 0, ct); // null ID - значит отправить новое
+		//			await bot.AnswerCallbackQuery(callback.Id, "Пост удален");
+		//			break;
+		//	}
+		//}
+
+		//// --- 4. МЕТОДЫ ОТРИСОВКИ UI ---
+
+		//// Главное меню
+		//static async Task ShowMainMenu(ITelegramBotClient bot, long chatId, CancellationToken ct, int? messageIdToEdit = null)
+		//{
+		//	var text = $"👋 **Панель управления SMM**\n\n" +
+		//			   $"В очереди: **{_posts.Count}** постов.\n" +
+		//			   $"Система работает исправно.";
+
+		//	var keyboard = new InlineKeyboardMarkup(new[]
+		//	{
+		//	new [] { InlineKeyboardButton.WithCallbackData("📤 Загрузить новое фото", "upload_start") },
+		//	new [] { InlineKeyboardButton.WithCallbackData("🗂 Просмотр очереди", "queue_list:0") },
+		//});
+
+		//	if (messageIdToEdit.HasValue)
+		//	{
+		//		await bot.EditMessageText(chatId, messageIdToEdit.Value, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+		//	}
+		//	else
+		//	{
+		//		await bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+		//	}
+		//}
+
+		//// Список очереди (Пагинация)
+		//static async Task ShowQueueList(ITelegramBotClient bot, long chatId, int? messageIdToEdit, int page, CancellationToken ct)
+		//{
+		//	const int pageSize = 5;
+		//	var totalPosts = _posts.Count;
+		//	var totalPages = (int)Math.Ceiling((double)totalPosts / pageSize);
+
+		//	// Берем посты для текущей страницы
+		//	var pagePosts = _posts.Skip(page * pageSize).Take(pageSize).ToList();
+
+		//	var text = $"🗂 **Очередь публикаций**\nСтраница {page + 1} из {Math.Max(1, totalPages)}";
+
+		//	// Создаем список строк (каждая строка - это список кнопок)
+		//	var rows = new List<IEnumerable<InlineKeyboardButton>>();
+
+		//	// 1. Генерируем кнопки для постов (ВЕРТИКАЛЬНО, НА ВСЮ ШИРИНУ)
+		//	foreach (var post in pagePosts)
+		//	{
+		//		string statusIcon = post.VkStatus == SocialStatus.Published ? "✅" : (post.VkStatus == SocialStatus.Error ? "❌" : "⏳");
+
+		//		// Обрезаем текст, чтобы кнопка не была гигантской
+		//		string shortCaption = string.IsNullOrWhiteSpace(post.Caption) ? "Без описания" : post.Caption;
+		//		if (shortCaption.Length > 40) shortCaption = shortCaption.Substring(0, 40) + "...";
+
+		//		// ВАЖНО: Мы создаем новый массив [] { button } для КАЖДОГО поста.
+		//		// Это гарантирует, что кнопка займет всю строку (Full Width).
+		//		rows.Add(new[]
+		//		{
+		//	InlineKeyboardButton.WithCallbackData($"{statusIcon} {shortCaption}", $"post_view:{post.Id}")
+		//});
+		//	}
+
+		//	// 2. Кнопки навигации (ГОРИЗОНТАЛЬНО, В ОДНУ СТРОКУ)
+		//	var navButtons = new List<InlineKeyboardButton>();
+
+		//	if (page > 0)
+		//		navButtons.Add(InlineKeyboardButton.WithCallbackData("« Назад", $"queue_list:{page - 1}"));
+
+		//	navButtons.Add(InlineKeyboardButton.WithCallbackData("🏠 Домой", "main_menu"));
+
+		//	if (page < totalPages - 1)
+		//		navButtons.Add(InlineKeyboardButton.WithCallbackData("Вперед »", $"queue_list:{page + 1}"));
+
+		//	// Добавляем строку навигации в общий список строк
+		//	if (navButtons.Any())
+		//	{
+		//		rows.Add(navButtons);
+		//	}
+
+		//	// Собираем клавиатуру
+		//	var keyboard = new InlineKeyboardMarkup(rows);
+
+		//	// Логика отправки/редактирования
+		//	if (messageIdToEdit.HasValue)
+		//	{
+		//		try
+		//		{
+		//			await bot.EditMessageText(chatId, messageIdToEdit.Value, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+		//		}
+		//		catch
+		//		{
+		//			await bot.DeleteMessage(chatId, messageIdToEdit.Value, cancellationToken: ct);
+		//			await bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+		//		}
+		//	}
+		//	else
+		//	{
+		//		await bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+		//	}
+		//}
+
+		//// Детальный просмотр поста (ФОТО + Описание + Кнопки)
+		//static async Task ShowPostDetails(ITelegramBotClient bot, long chatId, int messageIdToDelete, Guid postId, CancellationToken ct)
+		//{
+		//	var post = _posts.FirstOrDefault(p => p.Id == postId);
+		//	if (post == null) return;
+
+		//	// 1. Формируем красивый текст статусов
+		//	var statusText =
+		//		$"📄 **Детали поста**\n\n" +
+		//		$"📝 **Текст:** {post.Caption}\n" +
+		//		$"📅 **Дата:** {post.CreatedAt:dd.MM.yyyy HH:mm}\n\n" +
+		//		$"📊 **Статусы:**\n" +
+		//		$"{(post.TelegramStatus == SocialStatus.Published ? "✅" : "⏳")} Telegram\n" +
+		//		$"{(post.VkStatus == SocialStatus.Published ? "✅" : "⏳")} ВКонтакте\n" +
+		//		$"{(post.InstaStatus == SocialStatus.Error ? "❌ Ошибка (Image Ratio)" : "⏳")} Instagram";
+
+		//	// 2. Кнопки управления
+		//	var keyboard = new InlineKeyboardMarkup(new[]
+		//	{
+		//	new [] { InlineKeyboardButton.WithCallbackData("🗑 Удалить", $"post_delete:{post.Id}") },
+		//	new [] { InlineKeyboardButton.WithCallbackData("🔙 Назад к списку", "queue_list:0") } // Возврат на 1ю страницу
+  //      });
+
+		//	// 3. UI Трюк: Мы не можем превратить Текстовое сообщение (Список) в Фото.
+		//	// Поэтому мы удаляем старое сообщение-меню и шлем новое сообщение с фото.
+
+		//	await bot.DeleteMessage(chatId, messageIdToDelete, ct);
+
+		//	// Если у нас заглушка (нет реального FileId), шлем просто текст, иначе упадет
+		//	if (post.PhotoFileId == "dummy")
+		//	{
+		//		await bot.SendMessage(chatId, "🖼 [Здесь должно быть фото, но это тестовая заглушка]\n\n" + statusText,
+		//			parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+		//	}
+		//	else
+		//	{
+		//		await bot.SendPhoto(chatId, InputFile.FromFileId(post.PhotoFileId),
+		//			caption: statusText,
+		//			parseMode: ParseMode.Markdown,
+		//			replyMarkup: keyboard,
+		//			cancellationToken: ct);
+		//	}
+		//}
+
+		//static Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+		//{
+		//	Console.WriteLine(exception.ToString());
+		//	return Task.CompletedTask;
+		//}
+
 		public async Task HandleUpdateAsync(Update update, CancellationToken ct)
-		{	
+		{
+			//try
+			//{
+			//	// 1. Обработка нажатий кнопок (CallbackQuery)
+			//	if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery != null)
+			//	{
+			//		await HandleCallbackQuery(bot, update.CallbackQuery, ct);
+			//		return;
+			//	}
+
+			//	// 2. Обработка сообщений (Message)
+			//	if (update.Type == UpdateType.Message && update.Message != null)
+			//	{
+			//		await HandleMessage(bot, update.Message, ct);
+			//		return;
+			//	}
+			//}
+			//catch (Exception ex)
+			//{
+			//	Console.WriteLine($"Error: {ex.Message}");
+			//}
+
+			//return;
+
 			//await _telegramService.SendMainButtonMessage();
 
 			if (update.Message?.Text is not { } text)
@@ -468,7 +797,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 		public async Task<bool> TgHandler(Update update, Message rmsg, CancellationToken ct, long chanelId, SocialBaseService socialBaseService, bool force = false)
 		{
-			var serviceName  = socialBaseService.ServiceName;
+			var serviceName = socialBaseService.ServiceName;
 			var startMsg = await _telegramService.SendMessage($"Начинаем процесс публикации в {serviceName}...");
 			try
 			{

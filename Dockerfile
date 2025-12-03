@@ -20,11 +20,6 @@ ARG GITHUB_USER
 ARG GITHUB_TOKEN
 
 WORKDIR /src
-
-# ВАЖНО: Замените токен на новый, если старый был аннулирован GitHub'ом
-ENV GITHUB_USER="EvgenyYushko"
-ENV GITHUB_TOKEN="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"
-
 COPY ["AlinaKrossManager/AlinaKrossManager.csproj", "AlinaKrossManager/"]
 RUN dotnet nuget add source "https://nuget.pkg.github.com/EvgenyYushko/index.json" --name "github" --username "${GITHUB_USER}" --password "${GITHUB_TOKEN}" --store-password-in-clear-text
 
