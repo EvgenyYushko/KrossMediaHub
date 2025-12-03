@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using AlinaKrossManager.BuisinessLogic.Services.Base;
-using AlinaKrossManager.Helpers;
+using static AlinaKrossManager.Constants.AppConstants;
 using static AlinaKrossManager.Helpers.Logger;
 
 namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
@@ -324,8 +323,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			await File.WriteAllBytesAsync(filePath, audioBytes);
 
 			// 4. Публичная ссылка
-			var serverBaseUrl = "https://krossmediahub-783314764029.europe-west1.run.app";
-			var publicUrl = $"{serverBaseUrl}/temp_audio/{fileName}";
+			var publicUrl = $"{APP_URL}/temp_audio/{fileName}";
 
 			Console.WriteLine($"File saved: {filePath}");
 			Console.WriteLine($"Link: {publicUrl}");
@@ -1130,6 +1128,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			await Task.Delay(delay);
 		}
 		#endregion
-		
+
 	}
 }

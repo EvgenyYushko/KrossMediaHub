@@ -156,8 +156,6 @@ using (var scope = app.Services.CreateScope())
 	}
 }
 app.UseStaticFiles();
-// ВНИМАНИЕ: Закомментировать или удалить в Cloud Run/Kubernetes
-// app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
@@ -184,7 +182,7 @@ app.Run();
 
 //			// Определяем целевой URL для Cloud Run
 //			// (Предполагаем, что AppOptions:Domain установлен через переменные окружения Cloud Build)
-//			var urlSite = "https://krossmediahub-783314764029.europe-west1.run.app";//config?[$"AppOptions:Domain"];
+//			var urlSite = APP_URL;//config?[$"AppOptions:Domain"];
 //			var webhookUrl = $"{urlSite}/api/update"; // Используйте ваш маршрут!
 
 //			if (wh.Url != webhookUrl)

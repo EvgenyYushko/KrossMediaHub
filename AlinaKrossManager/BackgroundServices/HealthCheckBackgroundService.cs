@@ -1,5 +1,4 @@
-using Microsoft.AspNetCore.Builder.Extensions;
-using Microsoft.Extensions.Options;
+using static AlinaKrossManager.Constants.AppConstants;
 using static AlinaKrossManager.Helpers.Logger;
 
 namespace AlinaKrossManager.BackgroundServices
@@ -13,7 +12,7 @@ namespace AlinaKrossManager.BackgroundServices
 
 		private void InitUrsl()
 		{
-			URLS.Add("https://krossmediahub-783314764029.europe-west1.run.app" + HEALTH_URL);
+			URLS.Add(APP_URL + HEALTH_URL);
 			//URLS.Add("https://mail-service-eu04.onrender.com" + HEALTH_URL);
 			//URLS.Add("https://speech-service-7600.onrender.com" + HEALTH_URL);
 			//URLS.Add("https://google-services-kdg8.onrender.com" + HEALTH_URL);
