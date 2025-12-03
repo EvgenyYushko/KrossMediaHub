@@ -39,29 +39,24 @@ builder.Services.AddSingleton(provider =>
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
 	var conversationService = provider.GetService<ConversationService>();
 	var hostedInvarment = provider.GetService<IWebHostEnvironment>();
-	//var telegramService = provider.GetService<TelegramService>();
 
-	//var PageAccessToken = "IGAALt2MgjsilBZAFNKQ040cWM4TTl1Mkt5dFF5WXloekRJbGdwU1hqTmNBVFkzQU9mV29NWVk0X2hPdXZALZA3Q2ZA09VYXFyUnhrY3QweElHNVBnaExaS0c5TDJxS2RjN3lydlFYS0JzRUhkaGVyaTJyOTJFaHpYMVh0S2p1ZAy1xMAZDZD";
-	var accessToken = "IGAAQEMxhZAfcFBZAFJYRUlNOVVwWTlFb3h1ZAnJ1cWZA5eFNUTlpIX1NHYkwyenp0a0NTNTN6WWlxR3BVVkV2aEJqSGpaNHlNQWg5ck5GQnlQajJwMC1VS3pEREJNb1Nxc19RclpGdURuaWl0TWVzMGtGUlVJYmNjNnR0SmxKcHZAyZAwZDZD";
-	return new InstagramService(accessToken, geminiModel, conversationService, hostedInvarment);
+	var token = builder.Configuration.GetValue<string>(INSTAGRAM_BOT_TOKEN) ?? Environment.GetEnvironmentVariable(INSTAGRAM_BOT_TOKEN);
+	return new InstagramService(token, geminiModel, conversationService, hostedInvarment);
 });
 
 builder.Services.AddSingleton(provider =>
 {
-	const string IDENTIFIER_CLUE_SKY = "alinakross.bsky.social";
-	const string APP_PASSWORD_BLUE_SKY = "d4an-bvic-ssrd-r663";
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
-	//var telegramService = provider.GetService<TelegramService>();
 
-	return new BlueSkyService(IDENTIFIER_CLUE_SKY, APP_PASSWORD_BLUE_SKY, geminiModel);
+	var id = builder.Configuration.GetValue<string>(IDENTIFIER_BLUE_SKY) ?? Environment.GetEnvironmentVariable(IDENTIFIER_BLUE_SKY);
+	var pass = builder.Configuration.GetValue<string>(APP_PASSWORD_BLUE_SKY) ?? Environment.GetEnvironmentVariable(APP_PASSWORD_BLUE_SKY);
+	return new BlueSkyService(id, pass, geminiModel);
 });
 
 builder.Services.AddSingleton(provider =>
 {
-	var longLiveToken = "EAAY5A6MrJHgBPZBQrANTL62IRrEdPNAFCTMBBRg1PraciiqfarhG98YZCdGO9wxEhza3uk7BE56KEDGtWHagB8hgaUsQUFiQ3x3uhPZBbZBDZC6BtGsmoQURUAO7aVSEktmGeer6TtQZC9PWA6ZAM0EEgInZAFtWmjkz7ow4IDsCl7B55O80n2VW9wsNil3Nh8F5lkRfbIpj";
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
-	//var telegramService = provider.GetService<TelegramService>();
-
+	var longLiveToken = builder.Configuration.GetValue<string>(FACE_BOOK_LONG_TOKEN) ?? Environment.GetEnvironmentVariable(FACE_BOOK_LONG_TOKEN);
 	return new FaceBookService(longLiveToken, geminiModel);
 });
 
