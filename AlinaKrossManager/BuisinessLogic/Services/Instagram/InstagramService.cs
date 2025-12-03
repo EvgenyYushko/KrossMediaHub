@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Base;
-using AlinaKrossManager.Helpers;
 using AlinaKrossManager.Services;
 using static AlinaKrossManager.Helpers.Logger;
 
@@ -652,9 +651,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				$"теме изображения, а так же всегда включать пару обязательных хештегов для указания что это AI контент, например #aigirls. " +
 				$"Вот само изображение: {base64Img}" +
 				$"\n\n Формат ответа: Ответь строго только готовое описание с хештегами, " +
-				$"без всякого рода ковычек и экранирования. " +
-				$"Пример ответа: ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence " +
-				$"#neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
+				$"без всякого рода ковычек и экранирования.";
 		}
 
 		#region OldMethods
@@ -732,7 +729,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				throw;
 			}
 		}
-		
+
 		#endregion
 		#region Models
 		public class ContainerResult

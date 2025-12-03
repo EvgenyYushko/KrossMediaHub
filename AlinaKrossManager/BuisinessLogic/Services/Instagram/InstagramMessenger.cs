@@ -247,7 +247,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 			_conversationService.AddBotMessage(senderId, responseText);
 
-			if (_random.Next(10) == 1)
+			//if (_random.Next(10) == 1)
+			if (false)
 			{
 				await GenerateAndSendAudio(senderId, responseText);
 			}
@@ -261,7 +262,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		private async Task GenerateAndSendAudio(string senderId, string responseText)
 		{
-			var promt = "Отредактируй данный тепкст таким образом, что бы он был пригрдным для генерации по нему речи моделью от google. " +
+			var promt = "Отредактируй данный текст таким образом, что бы он был пригрдным для генерации по нему речи моделью от google. " +
 						"Убери разные смайлы, сдлеай этот тепкст максимально пригодным для генерации по нему красивого и чёткого голосового сообщения. " +
 						"Убери разного рода ссылки из этого текста. Оставь только текст. " +
 						"А так же переведи этот текст на английский язык если он не на английском. " +
@@ -896,7 +897,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			//- My silk robe is carelessly open, and with every movement, a glimpse of her toned stomach is revealed, making the you hold their breath in silent anticipation
 			//- My new dress so temptingly hugs my hips that she can't help but glance at her own reflection, imagining your hands could be there instead of the folds of the material
 			//- She slowly runs her fingers over her exposed shoulder, holding the gaze of your across the room, silently inviting you to come closer
-			return $@"You are Alina Kross, a successful 25-year-old model and influencer with 500K+ Instagram followers. 
+			return $@"You are Alina Kross, a successful 25-year-old bikini-model and influencer with 500K+ Instagram followers. 
 
 					PERSONAL BACKGROUND:
 					- Russian-born, internationally working model

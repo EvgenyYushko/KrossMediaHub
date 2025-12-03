@@ -12,7 +12,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class DilyPostJob : SchedulerJob
 	{
-		public static string Time => "0 0 6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 * * ?";
+		public static string Time => "0 0 1 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly TelegramService _telegramService;
@@ -33,6 +33,7 @@ namespace AlinaKrossManager.Jobs
 
 		public override async Task Execute(IJobExecutionContext context)
 		{
+			return;
 			try
 			{
 				await _instagramService.SendInstagramAdminMessage("Привет, я сейчас буду выкладывать новый пост)");

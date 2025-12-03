@@ -213,7 +213,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var result = await _instagramService.CreateMediaAsync(images.Images, description);
 				if (result.Success)
 				{
-					var msgRes = $"✅ Пост в инсте успешно создан! ID: {result.Id}";
+					var msgRes = $"✅ Post insta success!";
 					Console.WriteLine(msgRes);
 					try
 					{
@@ -248,7 +248,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var storyId = await _instagramService.PublishStoryFromBase64(images.Images.FirstOrDefault());
 				if (storyId is not null)
 				{
-					var msgRes = $"✅ История в инсте успешно опуликованна! ID: {storyId}";
+					var msgRes = $"✅ Story insta success!";
 					Console.WriteLine(msgRes);
 					try
 					{
@@ -296,7 +296,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 				if (success)
 				{
-					var msgRes = $"✅ Пост в facebook успешно создан!";
+					var msgRes = $"✅ Post facebook success!";
 					Console.WriteLine(msgRes);
 					try
 					{
@@ -331,7 +331,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var res = await _faceBookService.PublishStoryAsync(images.Images.FirstOrDefault());
 				if (res)
 				{
-					var msgRes = $"✅ История в Facebook успешно опуликованна!";
+					var msgRes = $"✅ Story Facebook success";
 					Console.WriteLine(msgRes);
 					try
 					{
@@ -424,7 +424,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 					if (success)
 					{
-						var msgRes = $"✅ Пост в bluesky успешно создан!";
+						var msgRes = $"✅ Post bluesky success!";
 						Console.WriteLine(msgRes);
 						try
 						{
@@ -502,7 +502,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					await _telegramService.SendMessage(chanelId, description);
 				}
 
-				var msgRes = $"✅ Пост в {serviceName} успешно создан!";
+				var msgRes = $"✅ Post {serviceName} success!";
 				Console.WriteLine(msgRes);
 				try
 				{
@@ -525,6 +525,11 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private async Task<string> GetDescription(Message rmsg, TelegramService.ImagesTelegram images, string replayText, SocialBaseService socialBaseService, bool force = false)
 		{
 			string description = string.IsNullOrEmpty(replayText) ? images.Caption : replayText;
+
+			if (force)
+			{
+				replayText = description = null;
+			}
 
 			if (string.IsNullOrEmpty(description) || force)
 			{
