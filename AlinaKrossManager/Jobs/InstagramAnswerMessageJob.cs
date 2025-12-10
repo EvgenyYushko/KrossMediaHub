@@ -149,7 +149,7 @@ namespace AlinaKrossManager.Jobs
 							_processedUsers.Add(userId);
 							SaveProcessedUsers();
 							Console.WriteLine($"User {userId} doesn't need response - marked as processed");
-							break;
+							continue;
 						}
 					}
 				}
