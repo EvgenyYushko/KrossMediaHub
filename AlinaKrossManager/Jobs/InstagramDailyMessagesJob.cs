@@ -15,7 +15,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly IWebHostEnvironment _env;
 		private const string _evgenyYushkoId = "1307933750574022";
 
-		public static string Time => "0 0 7,17 * * ?";
+		public static string Time => "0 0 17 * * ?";
 
 		public InstagramDailyMessagesJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel
@@ -32,6 +32,7 @@ namespace AlinaKrossManager.Jobs
 
 		public override async Task Execute(IJobExecutionContext context)
 		{
+			return;
 			try
 			{
 				var random = new Random();

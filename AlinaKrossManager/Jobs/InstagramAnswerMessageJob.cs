@@ -9,7 +9,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class InstagramAnswerMessageJob : SchedulerJob
 	{
-		public static string Time => "0 10,30,50 * * * ?";
+		public static string Time => "0 1,10,20,30,40,50 * * * ?";
 		private const string _evgenyYushkoId = "1307933750574022";
 		private readonly IWebHostEnvironment _env;
 		private readonly ConversationService _conversationService;
@@ -27,6 +27,9 @@ namespace AlinaKrossManager.Jobs
 			_instagramService = instagramService;
 			_conversationService = conversationService;
 		}
+
+		private readonly HashSet<string> _processedUsers = new();
+		private bool _allProcessed = false;
 
 		public override async Task Execute(IJobExecutionContext context)
 		{
@@ -102,22 +105,50 @@ namespace AlinaKrossManager.Jobs
 				var allUsers = _conversationService.GetAllUserConversations();
 				Console.WriteLine("start - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
 				Console.WriteLine(" Count All Users: " + allUsers.Count);
+
+				// Если все пользователи были обработаны в прошлый раз, начинаем заново
+				if (_allProcessed)
+				{
+					_processedUsers.Clear();
+					_allProcessed = false;
+					Console.WriteLine("Starting new cycle - processed users cleared");
+				}
+
 				foreach (var userId in allUsers)
 				{
-					Console.WriteLine("UsersId: " + userId);
+					// Пропускаем уже обработанных пользователей
+					if (_processedUsers.Contains(userId))
+					{
+						continue;
+					}
+
+					Console.WriteLine("Processing UserId: " + userId);
 
 					var userHistory = _conversationService.GetHistory(userId);
 					if (userHistory != null)
 					{
 						var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
-						Console.WriteLine($"Last msg Sender: {lastMsg.Sender}, Text: {lastMsg.Text}");
+						Console.WriteLine($"Last msg Sender: {lastMsg?.Sender}, Text: {lastMsg?.Text}");
 
 						if (lastMsg != null && lastMsg.Sender == "User")
 						{
 							await _instagramService.SendDellayMessageWithHistory(userId);
-							//await Task.Delay(TimeSpan.FromSeconds(5));
 						}
+
+						// Помечаем пользователя как обработанного
+						_processedUsers.Add(userId);
+						Console.WriteLine($"User {userId} marked as processed");
+
+						// Прерываем после одного пользователя
+						break;
 					}
+				}
+
+				// Проверяем, все ли пользователи обработаны
+				if (_processedUsers.Count >= allUsers.Count)
+				{
+					_allProcessed = true;
+					Console.WriteLine("All users have been processed!");
 				}
 				Console.WriteLine("end - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
 
