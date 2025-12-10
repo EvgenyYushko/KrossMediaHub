@@ -29,7 +29,7 @@ namespace AlinaKrossManager.Jobs
 		}
 
 		private readonly HashSet<string> _processedUsers = new();
-		private bool _allProcessed = false;
+		private const string ProcessedUsersFile = "processed_users.txt";
 
 		public override async Task Execute(IJobExecutionContext context)
 		{
@@ -102,26 +102,26 @@ namespace AlinaKrossManager.Jobs
 			//}
 			try
 			{
+				// Загружаем обработанных пользователей из файла
+				LoadProcessedUsers();
+
 				var allUsers = _conversationService.GetAllUserConversations();
 				Console.WriteLine("start - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
 				Console.WriteLine(" Count All Users: " + allUsers.Count);
+				Console.WriteLine(" Count _processedUsers: " + _processedUsers.Count);
 
-				// Если все пользователи были обработаны в прошлый раз, начинаем заново
-				if (_allProcessed)
-				{
-					_processedUsers.Clear();
-					_allProcessed = false;
-					Console.WriteLine("Starting new cycle - processed users cleared");
-				}
+				bool allUsersProcessed = true;
 
 				foreach (var userId in allUsers)
 				{
 					// Пропускаем уже обработанных пользователей
 					if (_processedUsers.Contains(userId))
 					{
+						Console.WriteLine($"User {userId} already processed - skipping");
 						continue;
 					}
 
+					allUsersProcessed = false;
 					Console.WriteLine("Processing UserId: " + userId);
 
 					var userHistory = _conversationService.GetHistory(userId);
@@ -133,22 +133,34 @@ namespace AlinaKrossManager.Jobs
 						if (lastMsg != null && lastMsg.Sender == "User")
 						{
 							await _instagramService.SendDellayMessageWithHistory(userId);
+
+							// Добавляем пользователя в обработанные
+							_processedUsers.Add(userId);
+							SaveProcessedUsers();
+
+							Console.WriteLine($"Sent message to {userId} and marked as processed");
+
+							// Прерываем цикл после отправки одному пользователю
+							break;
 						}
-
-						// Помечаем пользователя как обработанного
-						_processedUsers.Add(userId);
-						Console.WriteLine($"User {userId} marked as processed");
-
-						// Прерываем после одного пользователя
-						break;
+						else
+						{
+							// Если последнее сообщение не от пользователя, тоже помечаем как обработанного
+							_processedUsers.Add(userId);
+							SaveProcessedUsers();
+							Console.WriteLine($"User {userId} doesn't need response - marked as processed");
+							break;
+						}
 					}
 				}
 
-				// Проверяем, все ли пользователи обработаны
-				if (_processedUsers.Count >= allUsers.Count)
+				// Если все пользователи обработаны, очищаем список
+				if (allUsersProcessed || _processedUsers.Count >= allUsers.Count)
 				{
-					_allProcessed = true;
-					Console.WriteLine("All users have been processed!");
+					Console.WriteLine("All users processed! Clearing processed users list...");
+					_processedUsers.Clear();
+					SaveProcessedUsers();
+					Console.WriteLine("Ready to start new cycle!");
 				}
 				Console.WriteLine("end - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
 
@@ -168,6 +180,26 @@ namespace AlinaKrossManager.Jobs
 			{
 				Console.WriteLine(ex.ToString());
 			}
+		}
+
+		private void LoadProcessedUsers()
+		{
+			if (File.Exists(ProcessedUsersFile))
+			{
+				var lines = File.ReadAllLines(ProcessedUsersFile);
+				_processedUsers.Clear();
+				foreach (var line in lines)
+				{
+					if (!string.IsNullOrWhiteSpace(line))
+						_processedUsers.Add(line.Trim());
+				}
+				Console.WriteLine($"Loaded {_processedUsers.Count} processed users from file");
+			}
+		}
+
+		private void SaveProcessedUsers()
+		{
+			File.WriteAllLines(ProcessedUsersFile, _processedUsers);
 		}
 	}
 }
