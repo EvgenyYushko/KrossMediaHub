@@ -1,0 +1,280 @@
+using System.Collections.Concurrent;
+using AlinaKrossManager.DataAccess;
+using AlinaKrossManager.DataAccess.Models;
+using Microsoft.EntityFrameworkCore;
+using static AlinaKrossManager.BuisinessLogic.Managers.TelegramManager;
+
+namespace AlinaKrossManager.BuisinessLogic.Managers
+{
+	public class PostService
+	{
+		// БУФЕР (КЕШ) - аналог вашего старого списка _posts
+		// Храним уже готовые Domain-модели, чтобы не мапить каждый раз
+		private readonly ConcurrentDictionary<Guid, BlogPost> _cache = new();
+		private readonly AppDbContext _appDbContext;
+
+		// Флаг, загружали ли мы уже начальные данные (опционально)
+		private bool _isInitialized = false;
+
+		public PostService(AppDbContext appDbContext)
+		{
+			_appDbContext = appDbContext;
+		}
+
+		// --- МЕТОДЫ ЧТЕНИЯ ---
+
+		// 1. Получить список (с пагинацией). 
+		// Тут хитрость: список лучше всегда брать актуальный или частично кешировать ID.
+		// Для упрощения: мы подгружаем заголовки из БД, а детали берем из кеша.
+		public async Task<List<BlogPost>> GetPostsAsync(NetworkType filterNet, AccessFilter accessFilter, int page, int pageSize)
+		{
+			// Строим запрос
+			IQueryable<PostEntity> query = _appDbContext.Posts
+				.Include(p => p.NetworkStates); // Нам нужны статусы для фильтрации
+
+			// Фильтр по Приватности
+			if (accessFilter == AccessFilter.Public)
+				query = query.Where(p => p.AccessLevel == (int)AccessLevel.Public);
+			else if (accessFilter == AccessFilter.Private)
+				query = query.Where(p => p.AccessLevel == (int)AccessLevel.Private);
+
+			// Фильтр по Наличию в соцсети (если это не All)
+			if (filterNet != NetworkType.All)
+			{
+				int netTypeId = (int)filterNet;
+				query = query.Where(p => p.NetworkStates.Any(ns => ns.NetworkType == netTypeId && ns.Status != (int)SocialStatus.None));
+			}
+
+			// Пагинация (Сортируем новые сверху)
+			var entities = await query
+				.OrderBy(p => p.CreatedAt)
+				//.Skip(page * pageSize)
+				.Take(pageSize)
+				.ToListAsync();
+
+			// Превращаем в Domain модели и кладем в кеш (если их там нет)
+			var result = new List<BlogPost>();
+			foreach (var entity in entities)
+			{
+				// Если пост уже есть в кеше и он "свежий" - берем его. 
+				// Но для списка нам нужны только заголовки, так что можно и смапить.
+				// Для надежности берем полную версию.
+				if (!_cache.ContainsKey(entity.Id))
+				{
+					// Если в кеше нет, надо подгрузить картинки (мы их не инклюдили выше для скорости)
+					// Но так как вы просили "доставай из буфера", давайте сделаем полную загрузку.
+					var fullEntity = await _appDbContext.Posts
+						.Include(p => p.Images)
+						.Include(p => p.NetworkStates)
+						.FirstOrDefaultAsync(p => p.Id == entity.Id);
+
+					var model = MapToDomain(fullEntity);
+					_cache[fullEntity.Id] = model;
+				}
+				result.Add(_cache[entity.Id]);
+			}
+
+			return result;
+		}
+
+		public async Task<int> GetTotalCountAsync(NetworkType filterNet, AccessFilter accessFilter)
+		{
+			IQueryable<PostEntity> query = _appDbContext.Posts; // ... повторить фильтры query ...
+
+			// (Сокращенно для примера, фильтры те же, что и выше)
+			if (accessFilter == AccessFilter.Public) query = query.Where(p => p.AccessLevel == (int)AccessLevel.Public);
+			else if (accessFilter == AccessFilter.Private) query = query.Where(p => p.AccessLevel == (int)AccessLevel.Private);
+
+			if (filterNet != NetworkType.All)
+			{
+				int nId = (int)filterNet;
+				query = query.Where(p => p.NetworkStates.Any(ns => ns.NetworkType == nId && ns.Status != (int)SocialStatus.None));
+			}
+
+			return await query.CountAsync();
+		}
+
+		// 2. Получить один пост
+		public async Task<BlogPost?> GetPostByIdAsync(Guid id)
+		{
+			// 1. Сначала ищем в БУФЕРЕ
+			if (_cache.TryGetValue(id, out var cachedPost))
+			{
+				return cachedPost;
+			}
+
+			// 2. Если нет - идем в БД
+			var entity = await _appDbContext.Posts
+				.Include(p => p.Images)
+				.Include(p => p.NetworkStates)
+				.FirstOrDefaultAsync(p => p.Id == id);
+
+			if (entity == null) return null;
+
+			var model = MapToDomain(entity);
+			_cache[id] = model; // Сохраняем в буфер
+			return model;
+		}
+
+		// --- МЕТОДЫ ЗАПИСИ (Create, Update, Delete) ---
+
+		// 3. Создать пост
+		public async Task AddPostAsync(BlogPost post)
+		{
+			// 1. Сохраняем в БД
+			var entity = MapToEntity(post);
+			_appDbContext.Posts.Add(entity);
+			await _appDbContext.SaveChangesAsync();
+
+			// 2. Кладем в кеш (обновляем ID если база сгенерила, но у нас GUID создается в C#)
+			_cache[post.Id] = post;
+		}
+
+		// 4. Обновить пост (Описание, Статусы)
+		public async Task UpdatePostAsync(BlogPost post)
+		{
+			// 1. Обновляем в БД
+
+			// Загружаем пост вместе с состояниями
+			var entity = await _appDbContext.Posts
+				.Include(p => p.NetworkStates)
+				.FirstOrDefaultAsync(p => p.Id == post.Id);
+
+			if (entity != null)
+			{
+				entity.AccessLevel = (int)post.Access;
+
+				// Проходимся по словарю из нашей модели (где есть ВСЕ ключи)
+				foreach (var kvp in post.Networks)
+				{
+					var netType = (int)kvp.Key;
+					var newStatus = (int)kvp.Value.Status;
+					var newCaption = kvp.Value.Caption;
+
+					// Ищем, есть ли запись в БД для этой сети
+					var dbState = entity.NetworkStates.FirstOrDefault(ns => ns.NetworkType == netType);
+
+					if (dbState != null)
+					{
+						// СЦЕНАРИЙ: Запись в БД есть
+
+						if (kvp.Value.Status == SocialStatus.None)
+						{
+							// 1. Если новый статус None -> УДАЛЯЕМ строку из БД
+							// EF Core поймет, что нужно сделать DELETE
+							_appDbContext.NetworkStates.Remove(dbState);
+						}
+						else
+						{
+							// 2. Если статус активный -> ОБНОВЛЯЕМ поля
+							dbState.Status = newStatus;
+							dbState.Caption = newCaption;
+						}
+					}
+					else
+					{
+						// СЦЕНАРИЙ: Записи в БД нет
+
+						if (kvp.Value.Status != SocialStatus.None)
+						{
+							// 3. Если статус стал активным -> СОЗДАЕМ новую строку
+							entity.NetworkStates.Add(new NetworkStateEntity
+							{
+								NetworkType = netType,
+								Status = newStatus,
+								Caption = newCaption
+							});
+						}
+						// Если записи нет и статус None - ничего делать не надо
+					}
+				}
+
+				await _appDbContext.SaveChangesAsync();
+			}
+
+			// Обновляем кеш
+			_cache[post.Id] = post;
+		}
+
+		// 5. Удалить пост целиком
+		public async Task DeletePostAsync(Guid id)
+		{
+			var entity = await _appDbContext.Posts.FindAsync(id);
+			if (entity != null)
+			{
+				_appDbContext.Posts.Remove(entity);
+				await _appDbContext.SaveChangesAsync();
+			}
+
+			// Удаляем из кеша
+			_cache.TryRemove(id, out _);
+		}
+
+		// --- MAPPERS (Преобразование типов) ---
+
+		private BlogPost MapToDomain(PostEntity entity)
+		{
+			var post = new BlogPost
+			{
+				Id = entity.Id,
+				CreatedAt = entity.CreatedAt,
+				Access = (AccessLevel)entity.AccessLevel,
+				// Превращаем Base64 обратно в ID (в вашем случае заглушки)
+				// Примечание: тут вы должны решить, хранить строки Base64 или ID.
+				// Если вы храните Base64 в БД, то в BlogPost нужно поле Base64, а не FileId.
+				// Но для совместимости с кодом бота оставим FileIds как ключи, 
+				// хотя по-хорошему их надо загружать заново в телеграм, чтобы получить FileId.
+				// *Для упрощения пока считаем, что Images хранит Base64 или ссылку.*
+				Images = entity.Images.Select(img => img.Base64Data).ToList()
+			};
+
+			foreach (var ns in entity.NetworkStates)
+			{
+				var type = (NetworkType)ns.NetworkType;
+				if (post.Networks.ContainsKey(type))
+				{
+					post.Networks[type].Status = (SocialStatus)ns.Status;
+					post.Networks[type].Caption = ns.Caption;
+				}
+			}
+			return post;
+		}
+
+		private PostEntity MapToEntity(BlogPost post)
+		{
+			var entity = new PostEntity
+			{
+				Id = post.Id,
+				CreatedAt = post.CreatedAt.Kind == DateTimeKind.Utc ? post.CreatedAt : post.CreatedAt.ToUniversalTime(),
+				AccessLevel = (int)post.Access,
+				Images = new List<PostImageEntity>(),
+				NetworkStates = new List<NetworkStateEntity>()
+			};
+
+			// Картинки
+			foreach (var fileData in post.Images)
+			{
+				entity.Images.Add(new PostImageEntity
+				{
+					Base64Data = fileData // ВАЖНО: Тут должна быть реальная Base64 строка
+				});
+			}
+
+			// Состояния
+			foreach (var kvp in post.Networks)
+			{
+				if (kvp.Value.Status == SocialStatus.None)
+					continue;
+
+				entity.NetworkStates.Add(new NetworkStateEntity
+				{
+					NetworkType = (int)kvp.Key,
+					Status = (int)kvp.Value.Status,
+					Caption = kvp.Value.Caption ?? ""
+				});
+			}
+
+			return entity;
+		}
+	}
+}

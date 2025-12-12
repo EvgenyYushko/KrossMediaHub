@@ -7,6 +7,7 @@ namespace AlinaKrossManager.Constants
 		public static string FACE_BOOK_LONG_TOKEN = "FACE_BOOK_LONG_TOKEN";
 		public static string IDENTIFIER_BLUE_SKY = "IDENTIFIER_BLUE_SKY";
 		public static string APP_PASSWORD_BLUE_SKY = "APP_PASSWORD_BLUE_SKY";
+		public static string DB_URL_POSTGRESQL = "DB_URL_POSTGRESQL";
 		public static string APP_URL = "https://krossmediahub.onrender.com";
 	}
 }

@@ -118,7 +118,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return await _telegramBotClient.SendVideo(senderId, video, text);
 		}
 
-		public async Task<Message> SendSinglePhotoAsync(string base64Image, int? msgId, string caption = "", long senderId = EVGENY_YUSHKO_TG_ID)
+		public async Task<Message> SendSinglePhotoAsync(string base64Image, int? msgId, string caption = "", ParseMode parseMode = ParseMode.None, ReplyMarkup replyMarkup = null, long senderId = EVGENY_YUSHKO_TG_ID)
 		{
 			var imageBytes = Convert.FromBase64String(base64Image);
 			using var stream = new MemoryStream(imageBytes);
@@ -128,7 +128,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				return await _telegramBotClient.SendPhoto(senderId,
 					InputFile.FromStream(stream, "image.jpg"),
 					caption,
-					replyParameters:
+					replyMarkup:replyMarkup,
+					parseMode: parseMode,
+					replyParameters: 
 						new ReplyParameters
 						{
 							MessageId = msgId.Value
@@ -136,7 +138,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 			else
 			{
-				return await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"), caption);
+				return await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"), caption, replyMarkup:replyMarkup, parseMode: parseMode);
 			}
 		}
 

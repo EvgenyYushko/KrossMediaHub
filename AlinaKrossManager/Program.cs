@@ -5,11 +5,13 @@ using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Telegram;
 using AlinaKrossManager.Controllers;
+using AlinaKrossManager.DataAccess;
 using AlinaKrossManager.Helpers;
 using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Web;
+using Microsoft.EntityFrameworkCore;
 using Protos.GoogleGeminiService;
 using Quartz;
 using Telegram.Bot;
@@ -61,10 +63,11 @@ builder.Services.AddSingleton(provider =>
 });
 
 builder.Services.AddSingleton<TelegramService>();
-builder.Services.AddSingleton<TelegramManager>();
+builder.Services.AddScoped<TelegramManager>();
 builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<PublicTelegramChanel>();
 builder.Services.AddSingleton<PrivateTelegramChanel>();
+builder.Services.AddScoped<PostService>();
 
 builder.Services.AddHostedService<HealthCheckBackgroundService>();
 
@@ -115,11 +118,35 @@ builder.Services.AddTransient(provider =>
 });
 builder.Services.AddTransient<ScheduleInspectorService>();
 
+var connectionString = builder.Configuration.GetValue<string>(DB_URL_POSTGRESQL) ?? Environment.GetEnvironmentVariable(DB_URL_POSTGRESQL);
+if (string.IsNullOrEmpty(connectionString))
+{
+	throw new Exception("Отсутствует строка подключения!");
+}
+
+// Разрешает сохранять даты в любом формате без ошибок
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+options.UseNpgsql(connectionString, npgsqlOptions =>
+{
+	npgsqlOptions.MigrationsAssembly("AlinaKrossManager");
+	npgsqlOptions.EnableRetryOnFailure(
+		maxRetryCount: 5,
+		maxRetryDelay: TimeSpan.FromSeconds(30),
+		errorCodesToAdd: null);
+}));
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
 	app.MapOpenApi();
+}
+else
+{
+	var dbContext = app.Services.GetRequiredService<AppDbContext>();
+	dbContext.Database.Migrate();
 }
 
 using (var scope = app.Services.CreateScope())
@@ -137,7 +164,7 @@ using (var scope = app.Services.CreateScope())
 		Console.WriteLine($"Планировщик запущен: {scheduler.IsStarted}, Режим ожидания: {scheduler.InStandbyMode}");
 	}
 
-	var inspector = scope.ServiceProvider.GetRequiredService<ScheduleInspectorService>();
+	var inspector = serviceProvider.GetRequiredService<ScheduleInspectorService>();
 	Task.Run(async () => await inspector.PrintScheduleInfo()).Wait();
 
 	var config = serviceProvider.GetRequiredService<IConfiguration>();
