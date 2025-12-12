@@ -63,11 +63,20 @@ builder.Services.AddSingleton(provider =>
 });
 
 builder.Services.AddSingleton<TelegramService>();
-builder.Services.AddScoped<TelegramManager>();
 builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<PublicTelegramChanel>();
 builder.Services.AddSingleton<PrivateTelegramChanel>();
-builder.Services.AddScoped<PostService>();
+
+if (builder.Environment.IsDevelopment())
+{
+	builder.Services.AddScoped<TelegramManager>();
+	builder.Services.AddScoped<PostService>();
+}
+else
+{
+	builder.Services.AddSingleton<TelegramManager>();
+	builder.Services.AddSingleton<PostService>();
+}
 
 builder.Services.AddHostedService<HealthCheckBackgroundService>();
 
