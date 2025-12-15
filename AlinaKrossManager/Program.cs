@@ -66,17 +66,9 @@ builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<PublicTelegramChanel>();
 builder.Services.AddSingleton<PrivateTelegramChanel>();
-
-if (builder.Environment.IsDevelopment())
-{
-	builder.Services.AddScoped<TelegramManager>();
-	builder.Services.AddScoped<PostService>();
-}
-else
-{
-	builder.Services.AddSingleton<TelegramManager>();
-	builder.Services.AddSingleton<PostService>();
-}
+// сервисы зависящие от БД
+builder.Services.AddScoped<PostService>();
+builder.Services.AddScoped<TelegramManager>();
 
 builder.Services.AddHostedService<HealthCheckBackgroundService>();
 
@@ -176,13 +168,13 @@ using (var scope = app.Services.CreateScope())
 	var inspector = serviceProvider.GetRequiredService<ScheduleInspectorService>();
 	Task.Run(async () => await inspector.PrintScheduleInfo()).Wait();
 
-	var config = serviceProvider.GetRequiredService<IConfiguration>();
-	var telegramClient = serviceProvider.GetRequiredService<ITelegramBotClient>();
 
 	if (app.Environment.IsDevelopment())
 	{
-		var telegramService = serviceProvider.GetRequiredService<TelegramManager>();
-		var bot = new TelegramBotController(telegramClient, telegramService);
+		//var config = serviceProvider.GetRequiredService<IConfiguration>();
+		var telegramClient = serviceProvider.GetRequiredService<ITelegramBotClient>();
+		var serviceScopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
+		var bot = new TelegramBotController(telegramClient, serviceScopeFactory);
 		await bot.RunLocalTest();
 	}
 }

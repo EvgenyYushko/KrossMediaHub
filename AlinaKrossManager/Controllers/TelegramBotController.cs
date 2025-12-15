@@ -14,12 +14,14 @@ namespace AlinaKrossManager.Controllers
 	public class TelegramBotController : ControllerBase
 	{
 		private readonly ITelegramBotClient _telegramBotClient;
-		private readonly TelegramManager _telegramManager;
+		private readonly IServiceScopeFactory _scopeFactory;
 
-		public TelegramBotController(ITelegramBotClient telegramBotClient, TelegramManager telegramService)
+		public TelegramBotController(ITelegramBotClient telegramBotClient
+			, IServiceScopeFactory scopeFactory
+			)
 		{
 			_telegramBotClient = telegramBotClient;
-			_telegramManager = telegramService;
+			_scopeFactory = scopeFactory;
 		}
 
 		[HttpPost]
@@ -28,15 +30,34 @@ namespace AlinaKrossManager.Controllers
 			try
 			{
 				Log($"{update.Message?.Text}");
-				 _ = Task.Run(() => _telegramManager.HandleUpdateAsync(update, CancellationToken.None));
+
+				// Запускаем задачу, и уже ВНУТРИ неё создаем Scope
+				_ = Task.Run(async () =>
+				{
+					try
+					{
+						// Создаем Scope здесь, чтобы он жил пока работает этот поток
+						using (var scope = _scopeFactory.CreateScope())
+						{
+							var telegramManager = scope.ServiceProvider.GetRequiredService<TelegramManager>();
+							await telegramManager.HandleUpdateAsync(update, CancellationToken.None);
+						}
+					}
+					catch (Exception ex)
+					{
+						Log($"Ошибка в фоновой обработке: {ex}");
+					}
+				});
 			}
 			catch (Exception ex)
 			{
 				Log(ex.ToString());
 			}
 
-			Console.WriteLine("Поцесс завершён!");
-			return Ok(); // Важно: всегда возвращайте 200 OK быстро
+			Log($"Метод Post запущен в фоне");
+
+			// Возвращаем ответ Телеграму мгновенно, не дожидаясь окончания обработки
+			return Ok();
 		}
 
 		public async Task RunLocalTest()
@@ -78,7 +99,17 @@ namespace AlinaKrossManager.Controllers
 
 		private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
 		{
-			await _telegramManager.HandleUpdateAsync(update, ct);
+			// Создаем Scope (область видимости) для КАЖДОГО сообщения
+			using (var scope = _scopeFactory.CreateScope())
+			{
+				// Теперь мы можем безопасно получить TelegramManager
+				// Он будет создан заново для этого сообщения и уничтожен в конце блока using
+				var telegramManager = scope.ServiceProvider.GetRequiredService<TelegramManager>();
+
+				// Вызываем ваш метод обработки
+				// (Вам нужно будет немного адаптировать TelegramManager, чтобы метод был public)
+				await telegramManager.HandleUpdateAsync(update, ct);
+			}
 		}
 
 		private Task HandleErrorAsync(ITelegramBotClient botClient, Exception error, CancellationToken ct)
