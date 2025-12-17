@@ -13,12 +13,36 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private readonly ConcurrentDictionary<Guid, BlogPost> _cache = new();
 		private readonly AppDbContext _appDbContext;
 
-		// Флаг, загружали ли мы уже начальные данные (опционально)
-		private bool _isInitialized = false;
-
 		public PostService(AppDbContext appDbContext)
 		{
 			_appDbContext = appDbContext;
+		}
+
+		public async Task<List<BlogPost>> GetPendingPostsAsync(AccessLevel accessLevel, int count)
+		{
+			// 1. Ищем посты:
+			// - У которых нужный уровень доступа (Public/Private)
+			// - У которых ЕСТЬ хоть одна запись в NetworkStates со статусом Pending (1)
+			var entities = await _appDbContext.Posts
+				.Include(p => p.Images)       // Сразу грузим картинки
+				.Include(p => p.NetworkStates)// И статусы
+				.Where(p => p.AccessLevel == (int)accessLevel)
+				.Where(p => p.NetworkStates.Any(ns => ns.Status == (int)SocialStatus.Pending))
+				.OrderBy(p => p.CreatedAt)    // Сначала старые (очередь)
+				.Take(count)
+				.ToListAsync();
+
+			// 2. Маппим в Domain модели
+			var result = new List<BlogPost>();
+			foreach (var entity in entities)
+			{
+				// Можно обновить кэш, чтобы UI сразу увидел, что посты взяты в работу
+				var model = MapToDomain(entity);
+				_cache[entity.Id] = model;
+				result.Add(model);
+			}
+
+			return result;
 		}
 
 		// --- МЕТОДЫ ЧТЕНИЯ ---

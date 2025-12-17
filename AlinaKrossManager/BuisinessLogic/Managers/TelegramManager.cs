@@ -9,6 +9,7 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using static AlinaKrossManager.BuisinessLogic.Services.TelegramService;
 using static AlinaKrossManager.Helpers.TelegramUserHelper;
 
 namespace AlinaKrossManager.BuisinessLogic.Managers
@@ -24,6 +25,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private readonly PrivateTelegramChanel _privateTelegramChanel;
 		private readonly ITelegramBotClient bot;
 		private readonly PostService _postService;
+		private readonly IServiceScopeFactory _scopeFactory;
 
 		public TelegramManager(InstagramService instagramService
 			, IGenerativeLanguageModel generativeLanguageModel
@@ -34,6 +36,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			, PrivateTelegramChanel privateTelegramChanel
 			, ITelegramBotClient bot
 			, PostService postService
+			, IServiceScopeFactory scopeFactory
 		)
 		{
 			_instagramService = instagramService;
@@ -44,6 +47,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			_publicTelegramChanel = publicTelegramChanel;
 			_privateTelegramChanel = privateTelegramChanel;
 			_postService = postService;
+			_scopeFactory = scopeFactory;
 			this.bot = bot;
 		}
 
@@ -109,6 +113,25 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			public string Caption { get; set; }
 			public CancellationTokenSource TokenSource { get; set; } // Чтобы сбрасывать таймер
 			public long ChatId { get; set; }
+		}
+
+		private async Task<string> GenerateCaptionForNetworkAsync(NetworkType network, ImagesTelegram images)
+		{
+			switch (network)
+			{
+				case NetworkType.Instagram:
+					return await GetDescription(null, images, null, _instagramService);
+				case NetworkType.Facebook:
+					return await GetDescription(null, images, null, _faceBookService);
+				case NetworkType.BlueSky:
+					return await GetDescription(null, images, null, _blueSkyService);
+				case NetworkType.TelegramPublic:
+					return await GetDescription(null, images, null, _publicTelegramChanel);
+					case NetworkType.TelegramPrivate:
+					return await GetDescription(null, images, null, _privateTelegramChanel);
+				default:
+					return "Автоматическое описание"; // Заглушка, если генератора нет
+			}
 		}
 
 		public class BlogPost
@@ -254,12 +277,25 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 							try
 							{
 								await Task.Delay(2000, buffer.TokenSource.Token);
-								// Если мы тут, значит 2 секунды прошло и новых фото не было -> Финализируем
-								await FinalizeAlbumAsync(bot, groupId, ct);
+
+								// Создаем НОВЫЙ Scope, так как старый уже давно умер
+								using (var scope = _scopeFactory.CreateScope())
+								{
+									// Получаем НОВЫЙ экземпляр менеджера с ЖИВОЙ базой данных
+									// Если мы тут, значит 2 секунды прошло и новых фото не было -> Финализируем
+									var freshManager = scope.ServiceProvider.GetRequiredService<TelegramManager>();
+
+									// Вызываем финализацию через свежий менеджер
+									await freshManager.FinalizeAlbumAsync(bot, groupId, ct);
+								}
 							}
 							catch (TaskCanceledException)
 							{
 								// Пришло новое фото, таймер сброшен, ничего не делаем
+							}
+							catch (Exception ex)
+							{
+								Console.WriteLine($"Ошибка в таймере альбома: {ex}");
 							}
 						}, buffer.TokenSource.Token);
 
@@ -269,7 +305,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					// Сценарий 2: ОДИНОЧНОЕ ФОТО (нет GroupId)
 					// Действуем как раньше, но сразу создаем пост
 					var images = await _telegramService.TryGetImagesPromTelegram(null, message.Photo);
-					var newPost = CreatePostFromData(session, images.Images, caption ?? "");
+					var newPost = await CreatePostFromDataAsync(session, images, caption ?? "");
 					await _postService.AddPostAsync(newPost);
 
 					session.State = UserState.None;
@@ -316,50 +352,73 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			if (text == "/start") await ShowMainMenu(bot, chatId, ct);
 		}
 
-		static BlogPost CreatePostFromData(UserSession session, List<string> fileIds, string caption)
+		private async Task<BlogPost> CreatePostFromDataAsync(UserSession session, ImagesTelegram images, string manualCaption)
 		{
-			// 1. Определяем реальный уровень доступа
+			// 1. Определяем реальный уровень доступа (как и было)
 			AccessLevel finalAccess;
 
 			if (session.SelectedNetwork == NetworkType.All)
 			{
-				// Если "Все сети", берем настройку из сессии (зависит от того, какую кнопку "Все ..." нажал юзер)
 				finalAccess = session.UploadAccess;
 			}
 			else
 			{
-				// Если выбрана КОНКРЕТНАЯ сеть, проверяем, входит ли она в список Приватных
 				if (NetworkMetadata.PrivateSet.Contains(session.SelectedNetwork))
-				{
 					finalAccess = AccessLevel.Private;
-				}
 				else
-				{
-					// Если не входит в приватные — считаем публичной
 					finalAccess = AccessLevel.Public;
-				}
 			}
 
-			// 2. Создаем пост с правильным уровнем доступа
+			// 2. Создаем заготовку поста
 			var post = new BlogPost
 			{
-				Images = fileIds,
-				Access = finalAccess // <--- Используем вычисленное значение
+				Images = images.Images,
+				Access = finalAccess
 			};
 
-			// 3. Активируем нужные сети
+			// 3. Определяем список сетей, в которые нужно постить
+			List<NetworkType> networksToActivate = new();
+
 			if (session.SelectedNetwork == NetworkType.All)
 			{
-				var targetSet = (finalAccess == AccessLevel.Private)
+				// Берем список из метаданных в зависимости от Public/Private
+				var set = (finalAccess == AccessLevel.Private)
 					? NetworkMetadata.PrivateSet
 					: NetworkMetadata.PublicSet;
 
-				post.ActivateSet(targetSet, caption ?? "");
+				networksToActivate.AddRange(set);
 			}
 			else
 			{
 				// Одиночная сеть
-				post.ActivateNetwork(session.SelectedNetwork, caption ?? "");
+				networksToActivate.Add(session.SelectedNetwork);
+			}
+
+			// 4. Проходим по сетям и устанавливаем тексты
+			bool hasManualCaption = !string.IsNullOrWhiteSpace(manualCaption);
+
+			foreach (var net in networksToActivate)
+			{
+				// Пропускаем, если такой сети нет в словаре поста (защита)
+				if (!post.Networks.ContainsKey(net)) continue;
+
+				string finalCaptionForNetwork;
+
+				if (hasManualCaption)
+				{
+					// Если юзер прислал текст — используем его везде
+					finalCaptionForNetwork = manualCaption;
+				}
+				else
+				{
+					// Если текста нет — генерируем СВОЙ для каждой сети
+					// (Можно отправить уведомление в чат "Генерирую для Instagram...", если долго)
+					finalCaptionForNetwork = await GenerateCaptionForNetworkAsync(net, images);
+				}
+
+				// Активируем сеть
+				post.Networks[net].Status = SocialStatus.Pending;
+				post.Networks[net].Caption = finalCaptionForNetwork;
 			}
 
 			return post;
@@ -375,8 +434,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				// Создаем пост из накопленных данных
 
 				var images = await _telegramService.TryGetImagesPromTelegram(groupId, null);
-
-				var newPost = CreatePostFromData(session, images.Images, buffer.Caption ?? "");
+				var newPost = await CreatePostFromDataAsync(session, images, buffer.Caption ?? "");
 				await _postService.AddPostAsync(newPost);
 
 				// Сбрасываем состояние
@@ -981,7 +1039,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			if (update.Message != null && update.Message?.Text is not { } text)
 			{
 				_telegramService.HandleMediaGroup(update.Message);
-			}			
+			}
 
 			//await _telegramService.SendMainButtonMessage();
 

@@ -13,7 +13,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public TelegramService(ITelegramBotClient telegramBotClient)
 		{
 			_telegramBotClient = telegramBotClient;
-		}		
+		}
 
 		public async Task<ImagesTelegram> TryGetImagesPromTelegram(string? mediaGroupId, PhotoSize[]? photo)
 		{
@@ -58,8 +58,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, parseMode: ParseMode.Html);
 			}
 
-			return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, 
-				replyParameters: new ReplyParameters { MessageId = replayMsgId.Value }, 
+			return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text,
+				replyParameters: new ReplyParameters { MessageId = replayMsgId.Value },
 				parseMode: ParseMode.Html);
 		}
 
@@ -128,9 +128,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				return await _telegramBotClient.SendPhoto(senderId,
 					InputFile.FromStream(stream, "image.jpg"),
 					caption,
-					replyMarkup:replyMarkup,
+					replyMarkup: replyMarkup,
 					parseMode: parseMode,
-					replyParameters: 
+					replyParameters:
 						new ReplyParameters
 						{
 							MessageId = msgId.Value
@@ -138,7 +138,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 			else
 			{
-				return await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"), caption, replyMarkup:replyMarkup, parseMode: parseMode);
+				return await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"), caption, replyMarkup: replyMarkup, parseMode: parseMode);
 			}
 		}
 
@@ -370,8 +370,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public void UpdateCaptionMediaGrup(Message rmsg, string description)
 		{
-			rmsg.Caption = description;
-			HandleMediaGroup(rmsg);
-		}		
+			if (rmsg is not null)
+			{
+				rmsg.Caption = description;
+				HandleMediaGroup(rmsg);
+			}
+		}
 	}
 }
