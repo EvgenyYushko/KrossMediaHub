@@ -127,6 +127,19 @@ namespace AlinaKrossManager.Jobs
 						throw new Exception($"Instagram API Error: {instaResult.ErrorMessage ?? "Unknown error"}");
 					}
 					Console.WriteLine($"✅ Post insta success!");
+
+					try
+					{
+						var storyId = await _instagramService.PublishStoryFromBase64(files.FirstOrDefault());
+						if (storyId is not null)
+						{
+							Console.WriteLine("✅ Story insta success!");
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine(ex);
+					}
 					break;
 				case NetworkType.Facebook:
 					if (files.Count > 0)
@@ -137,6 +150,19 @@ namespace AlinaKrossManager.Jobs
 							throw new Exception("Facebook API вернул false (ошибка публикации)");
 						}
 						Console.WriteLine($"✅ Post facebook success!");
+
+						try
+						{
+							var res = await _faceBookService.PublishStoryAsync(files.FirstOrDefault());
+							if (res)
+							{
+								Console.WriteLine("✅ Story Facebook success");
+							}
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine(ex);
+						}
 					}
 					else
 					{
@@ -162,8 +188,12 @@ namespace AlinaKrossManager.Jobs
 							List<ImageAttachment> attachments = null;
 							if (files.Count() > 0)
 							{
+								if (files.Count() > 4)
+								{
+									Console.WriteLine("в BlueSky нельза загрузить более 4 фото! Пост будет уменьшен до 4 фото.");
+								}
 								attachments = new();
-								foreach (var image in files)
+								foreach (var image in files.Take(4))
 								{
 									attachments.Add(new ImageAttachment
 									{
