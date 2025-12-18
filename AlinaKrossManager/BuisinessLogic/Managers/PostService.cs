@@ -72,7 +72,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			// Пагинация (Сортируем новые сверху)
 			var entities = await query
 				.OrderBy(p => p.CreatedAt)
-				//.Skip(page * pageSize)
+				.Skip(page * pageSize)
 				.Take(pageSize)
 				.ToListAsync();
 

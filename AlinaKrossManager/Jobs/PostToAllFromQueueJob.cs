@@ -121,42 +121,40 @@ namespace AlinaKrossManager.Jobs
 			switch (network)
 			{
 				case NetworkType.Instagram:
-					var result = await _instagramService.CreateMediaAsync(files, caption);
-					if (result.Success)
+					var instaResult = await _instagramService.CreateMediaAsync(files, caption);
+					if (!instaResult.Success)
 					{
-						var msgRes = $"✅ Post insta success!";
-						Console.WriteLine(msgRes);
+						throw new Exception($"Instagram API Error: {instaResult.ErrorMessage ?? "Unknown error"}");
 					}
+					Console.WriteLine($"✅ Post insta success!");
 					break;
 				case NetworkType.Facebook:
+					if (files.Count > 0)
 					{
-						bool success = false;
-						if (files.Count() > 0)
+						bool fbSuccess = await _faceBookService.PublishToPageAsync(caption, files);
+						if (!fbSuccess)
 						{
-							success = await _faceBookService.PublishToPageAsync(caption, files);
+							throw new Exception("Facebook API вернул false (ошибка публикации)");
 						}
-
-						if (success)
-						{
-							var msgRes = $"✅ Post facebook success!";
-							Console.WriteLine(msgRes);
-						}
+						Console.WriteLine($"✅ Post facebook success!");
+					}
+					else
+					{
+						// Если нет файлов, считаем это ошибкой или пропускаем? 
+						// Для FB нужны фото, так что скорее ошибка.
+						throw new Exception("Нет файлов для публикации в Facebook");
 					}
 					break;
 				case NetworkType.BlueSky:
 					{
 						// 1. Первичный вход при запуске
-						if (!_blueSkyService.BlueSkyLogin)
+						if (!_blueSkyService.BlueSkyLogin && !await _blueSkyService.LoginAsync())
 						{
-							if (!await _blueSkyService.LoginAsync())
-							{
-								Console.WriteLine("Критическая ошибка bluesky: не удалось войти в аккаунт.");
-								break;
-							}
-
-							Console.WriteLine("Успешно удалось войти в аккаунт bluesky. ✅");
-							_blueSkyService.BlueSkyLogin = true;
+							throw new Exception("BlueSky: не удалось войти в аккаунт.");
 						}
+
+						Console.WriteLine("Успешно удалось войти в аккаунт bluesky. ✅");
+						_blueSkyService.BlueSkyLogin = true;
 
 						if (await _blueSkyService.UpdateSessionAsync())
 						{
@@ -174,34 +172,28 @@ namespace AlinaKrossManager.Jobs
 								}
 							}
 
-							bool success = false;
+							bool bsSuccess = false;
 
 							var description = await _blueSkyService.TruncateTextToMaxLength(caption);
 
 							if (attachments is not null)
 							{
-								success = await _blueSkyService.CreatePostWithImagesAsync(description, attachments);
+								bsSuccess = await _blueSkyService.CreatePostWithImagesAsync(description, attachments);
 							}
 							else
 							{
-								success = await _blueSkyService.CreatePostAsync(description);
+								bsSuccess = await _blueSkyService.CreatePostAsync(description);
 							}
 
-							if (success)
+							if (!bsSuccess)
 							{
-								var msgRes = $"✅ Post bluesky success!";
-								Console.WriteLine(msgRes);
+								throw new Exception("BlueSky: CreatePost вернул false");
 							}
+							Console.WriteLine($"✅ Post bluesky success!");
 						}
 						else
 						{
-							Console.WriteLine("bluesky Не удалось обновить токен. Попытка повторного входа...");
-							// Можно попробовать LoginAsync еще раз, если Refresh Token истек.
-							if (!await _blueSkyService.LoginAsync())
-							{
-								Console.WriteLine("bluesky Не удалось выполнить повторный вход. Завершение работы.");
-								break;
-							}
+							throw new Exception("BlueSky: Не удалось обновить сессию");
 						}
 					}
 					break;
@@ -221,7 +213,7 @@ namespace AlinaKrossManager.Jobs
 			}
 		}
 
-		public async Task<bool> TgHandler(CancellationToken ct, long chanelId, SocialBaseService socialBaseService, List<string> files, string caption)
+		public async Task TgHandler(CancellationToken ct, long chanelId, SocialBaseService socialBaseService, List<string> files, string caption)
 		{
 			var serviceName = socialBaseService.ServiceName;
 			try
@@ -247,10 +239,8 @@ namespace AlinaKrossManager.Jobs
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Ошибка {serviceName}: {ex.Message}");
+				throw new Exception($"Ошибка {serviceName}: {ex.Message}");
 			}
-
-			return false;
 		}
 	}
 }

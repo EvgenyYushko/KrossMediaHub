@@ -115,20 +115,35 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			public long ChatId { get; set; }
 		}
 
+		private string _tempCaption = null;
+
 		private async Task<string> GenerateCaptionForNetworkAsync(NetworkType network, ImagesTelegram images)
 		{
 			switch (network)
 			{
 				case NetworkType.Instagram:
-					return await GetDescription(null, images, null, _instagramService);
+					{
+						_tempCaption = await GetDescription(null, images, _tempCaption, _instagramService);
+						return _tempCaption;
+					}
 				case NetworkType.Facebook:
-					return await GetDescription(null, images, null, _faceBookService);
+					{
+						_tempCaption = await GetDescription(null, images, _tempCaption, _faceBookService);
+						return _tempCaption;
+					}
 				case NetworkType.BlueSky:
-					return await GetDescription(null, images, null, _blueSkyService);
+					{
+						_tempCaption = await GetDescription(null, images, _tempCaption, _blueSkyService);
+						return _tempCaption;
+					}
 				case NetworkType.TelegramPublic:
-					return await GetDescription(null, images, null, _publicTelegramChanel);
-					case NetworkType.TelegramPrivate:
-					return await GetDescription(null, images, null, _privateTelegramChanel);
+					{
+						return await GetDescription(null, images, null, _publicTelegramChanel);
+					}
+				case NetworkType.TelegramPrivate:
+					{
+						return await GetDescription(null, images, null, _privateTelegramChanel);
+					}
 				default:
 					return "Автоматическое описание"; // Заглушка, если генератора нет
 			}
@@ -238,6 +253,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			var chatId = message.Chat.Id;
 			var text = message.Text;
 			var session = _sessions.GetOrAdd(chatId, new UserSession());
+			_tempCaption = null;
 
 			// --- ЗАГРУЗКА ФОТО (С Поддержкой Альбомов) ---
 			if (session.State == UserState.WaitingForPhoto)
