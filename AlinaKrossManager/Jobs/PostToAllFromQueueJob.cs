@@ -13,7 +13,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class PostToAllFromQueueJob : SchedulerJob
 	{
-		public static string Time => "0 46 17 * * ?";
+		public static string Time => "0 05 13 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly FaceBookService _faceBookService;
