@@ -106,14 +106,14 @@ upload_to_gdrive() {
 # =============================================
 
 # Получение информации о существующей БД
-log_info "Поиск существующей базы данных TelergamDB..."
+log_info "Поиск существующей базы данных krosshub..."
 DB_ID=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}?includeReplicas=true&limit=20" "" | \
-         jq -r '.[] | select(.postgres.name=="TelergamDB") | .postgres.id')
+         jq -r '.[] | select(.postgres.name=="krosshub") | .postgres.id')
 
 if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
-    log_success "Найдена база данных TelergamDB (ID: $DB_ID)"
+    log_success "Найдена база данных krosshub (ID: $DB_ID)"
 else
-    log_error "База данных TelergamDB не найдена"
+    log_error "База данных krosshub не найдена"
     exit 1
 fi
 
@@ -122,7 +122,7 @@ log_info "Остановка веб-сервиса..."
 render_api_request "POST" "services/$RENDER_SERVICE_ID/suspend" "" > /dev/null
 
 # Создание бэкапа
-log_info "Создание бэкапа базы данных TelergamDB..."
+log_info "Создание бэкапа базы данных krosshub..."
 
 DB_INFO=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}/$DB_ID" "")
 CONNECTION_INFO=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}/$DB_ID/connection-info" "")
