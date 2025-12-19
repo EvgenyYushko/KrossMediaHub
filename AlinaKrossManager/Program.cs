@@ -1,4 +1,5 @@
 using AlinaKrossManager.BackgroundServices;
+using AlinaKrossManager.BuisinessLogic.Facades;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Services;
@@ -69,6 +70,7 @@ builder.Services.AddSingleton<PrivateTelegramChanel>();
 // сервисы зависящие от БД
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<TelegramManager>();
+builder.Services.AddScoped<SocialPublicationFacade>();
 
 builder.Services.AddHostedService<HealthCheckBackgroundService>();
 

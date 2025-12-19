@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using AlinaKrossManager.BuisinessLogic.Managers.Enums;
+using AlinaKrossManager.BuisinessLogic.Managers.Models;
 using AlinaKrossManager.DataAccess;
 using AlinaKrossManager.DataAccess.Models;
 using Microsoft.EntityFrameworkCore;

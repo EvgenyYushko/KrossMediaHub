@@ -177,7 +177,7 @@ namespace AlinaKrossManager.Jobs
 					try
 					{
 						await Task.Delay(TimeSpan.FromSeconds(15));
-						await _telegramManager.InstagramStoryHandler(null, loadedPictureMessages?.FirstOrDefault(), new());
+						//await _telegramManager.InstagramStoryHandler(null, loadedPictureMessages?.FirstOrDefault(), new());
 					}
 					catch (Exception ex)
 					{
