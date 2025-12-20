@@ -148,8 +148,15 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-	var dbContext = app.Services.GetRequiredService<AppDbContext>();
-	dbContext.Database.Migrate();
+	try
+	{
+		var dbContext = app.Services.GetRequiredService<AppDbContext>();
+		dbContext.Database.Migrate();
+	}
+	catch (Exception ex)
+	{
+		Console.WriteLine($"❌ КРИТИЧЕСКАЯ ОШИБКА БД: Не удалось применить миграции. Приложение продолжит работу, но функции БД будут недоступны.\nОшибка: {ex.Message}");
+	}
 }
 
 using (var scope = app.Services.CreateScope())

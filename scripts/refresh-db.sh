@@ -161,11 +161,10 @@ log_info "Cоздание новой базы данных..."
 render_api_request "POST" "$RENDER_SERVICE_TYPE" "{
     \"databaseName\": \"$NEW_DB_NAME\",
     \"databaseUser\": \"$NEW_DB_USER\",
-    \"enableHighAvailability\": false,
     \"plan\": \"free\",
-    \"version\": \"16\",
-    \"name\": \"TelergamDB\",
-    \"ownerId\": \"tea-ct84bie8ii6s73ccgf1g\",
+    \"version\": \"18\",
+    \"name\": \"krosshub\",
+    \"ownerId\": \"tea-d4nvg1v5r7bs73cae19g\",
     \"ipAllowList\": [{\"cidrBlock\": \"0.0.0.0/0\", \"description\": \"everywhere\"}]
 }" | jq '.' > response.json
 
