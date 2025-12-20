@@ -13,11 +13,14 @@
 # Конфигурация
 # =============================================
 RENDER_API="https://api.render.com/v1"
-BACKUP_FILE_NAME="backup.dump"
+SEARCH_DB_NAME="krosshub"
 NEW_DB_NAME="krosshub"
 NEW_DB_USER="krosshub_user"
-SITE_URL="https://krossmediahub.onrender.com/"
+OWNER_ID="tea-d4nvg1v5r7bs73cae19g"
+VERSION_DB="18"
 RENDER_SERVICE_TYPE="postgres"  # Тип сервиса для API Render
+BACKUP_FILE_NAME="backup.dump"
+SITE_URL="https://krossmediahub.onrender.com/"
 MAX_RETRIES=30                  # Максимальное количество попыток проверки доступности сайта
 RETRY_INTERVAL=45               # Интервал между проверками сайта (сек)
 
@@ -106,14 +109,14 @@ upload_to_gdrive() {
 # =============================================
 
 # Получение информации о существующей БД
-log_info "Поиск существующей базы данных krosshub..."
+log_info "Поиск существующей базы данных $SEARCH_DB_NAME..."
 DB_ID=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}?includeReplicas=true&limit=20" "" | \
-         jq -r '.[] | select(.postgres.name=="krosshub") | .postgres.id')
+         jq -r --arg dbname "$SEARCH_DB_NAME" '.[] | select(.postgres.name==$dbname) | .postgres.id')
 
 if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
-    log_success "Найдена база данных krosshub (ID: $DB_ID)"
+    log_success "Найдена база данных $SEARCH_DB_NAME (ID: $DB_ID)"
 else
-    log_error "База данных krosshub не найдена"
+    log_error "База данных $SEARCH_DB_NAME не найдена"
     exit 1
 fi
 
@@ -122,7 +125,7 @@ log_info "Остановка веб-сервиса..."
 render_api_request "POST" "services/$RENDER_SERVICE_ID/suspend" "" > /dev/null
 
 # Создание бэкапа
-log_info "Создание бэкапа базы данных krosshub..."
+log_info "Создание бэкапа базы данных $SEARCH_DB_NAME..."
 
 DB_INFO=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}/$DB_ID" "")
 CONNECTION_INFO=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}/$DB_ID/connection-info" "")
@@ -154,7 +157,9 @@ log_success "Бэкап успешно создан: $BACKUP_FILE_NAME"
 upload_to_gdrive || true
 
 render_api_request "POST" "${RENDER_SERVICE_TYPE}/$DB_ID/suspend" ""
+log_success "База данных $DB_ID остановлена"
 render_api_request "DELETE" "${RENDER_SERVICE_TYPE}/$DB_ID" ""
+log_success "База данных $DB_ID удалена"
 
 # Пересоздание базы данных
 log_info "Cоздание новой базы данных..."
@@ -162,9 +167,9 @@ render_api_request "POST" "$RENDER_SERVICE_TYPE" "{
     \"databaseName\": \"$NEW_DB_NAME\",
     \"databaseUser\": \"$NEW_DB_USER\",
     \"plan\": \"free\",
-    \"version\": \"18\",
-    \"name\": \"krosshub\",
-    \"ownerId\": \"tea-d4nvg1v5r7bs73cae19g\",
+    \"version\": \"$VERSION_DB\",
+    \"name\": \"$SEARCH_DB_NAME\",
+    \"ownerId\": \"$OWNER_ID\",
     \"ipAllowList\": [{\"cidrBlock\": \"0.0.0.0/0\", \"description\": \"everywhere\"}]
 }" | jq '.' > response.json
 
@@ -193,7 +198,7 @@ log_info "Восстановление данных из бэкапа $BACKUP_FI
 NEW_DB_PASSWORD=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}/$NEW_DB_ID/connection-info" "" | jq -r '.password')
 export PGPASSWORD=$NEW_DB_PASSWORD
 
-log_info "⏳ ЖДём 20 секунд..."
+log_info "⏳ Ждём 20 секунд..."
 sleep 20
 
 #echo "NEW_DB_USER="$NEW_DB_USER "NEW_DB_NAME=" $NEW_DB_NAME "NEW_DB_PASSWORD="$NEW_DB_PASSWORD

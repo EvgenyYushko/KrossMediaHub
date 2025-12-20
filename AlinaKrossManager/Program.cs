@@ -190,6 +190,7 @@ using (var scope = app.Services.CreateScope())
 app.UseStaticFiles();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/", () => "Service is running! 🚀");
 app.Run();
 
 //async Task ConfigureWebhookAsync(ITelegramBotClient telegramClient, IConfiguration config, bool local)
