@@ -20,6 +20,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private readonly TelegramService _telegramService;
 		private readonly PublicTelegramChanel _publicTelegramChanel;
 		private readonly PrivateTelegramChanel _privateTelegramChanel;
+		private readonly XService _xService;
 		private readonly ITelegramBotClient bot;
 		private readonly PostService _postService;
 		private readonly IServiceScopeFactory _scopeFactory;
@@ -31,6 +32,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			, TelegramService telegramService
 			, PublicTelegramChanel publicTelegramChanel
 			, PrivateTelegramChanel privateTelegramChanel
+			, XService xService
 			, ITelegramBotClient bot
 			, PostService postService
 			, IServiceScopeFactory scopeFactory
@@ -43,6 +45,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			_telegramService = telegramService;
 			_publicTelegramChanel = publicTelegramChanel;
 			_privateTelegramChanel = privateTelegramChanel;
+			_xService = xService;
 			_postService = postService;
 			_scopeFactory = scopeFactory;
 			this.bot = bot;
@@ -217,6 +220,24 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						}
 					}
 					break;
+				case UpdateType.Message when msgText.IsCommand("post_to_x") && update.Message.ReplyToMessage is Message rmsg:
+					{
+						if (!await _telegramService.CanUseBot(update, ct)) return;
+						using (var scope = _scopeFactory.CreateScope())
+						{
+							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
+							bool? flowControl = await XPostHandler(update, rmsg, ct, publisher);
+							if (flowControl == false)
+							{
+								break;
+							}
+							else if (flowControl == true)
+							{
+								return;
+							}
+						}
+					}
+					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_all") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
@@ -231,6 +252,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 							bool flowControl4 = await FaceBookStoryHandler(update, rmsg, ct, publisher);
 							bool? flowControl5 = await BlueSkyHandler(update, rmsg, ct, publisher);
 							bool? flowControl6 = await TgFreeHandler(update, rmsg, ct, publisher, true);
+							bool? flowControl7 = await XPostHandler(update, rmsg, ct, publisher);
 						}
 						Console.WriteLine("Конце операции публикации во все сети");
 					}
@@ -394,6 +416,45 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			catch (Exception ex)
 			{
 				Console.WriteLine($"❌ Ошибка в публикации сториз для Facebook: {ex.Message}");
+			}
+			finally
+			{
+				try { await _telegramService.DeleteMessage(startMsg.MessageId, ct); } catch { }
+			}
+
+			return true;
+		}
+
+		private async Task<bool> XPostHandler(Update update, Message rmsg, CancellationToken ct, SocialPublicationFacade publisher)
+		{
+			var startMsg = await _telegramService.SendMessage("Начинаем процесс публикации в X...");
+			try
+			{
+				var replayText = rmsg.GetMsgText() ?? "";
+				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
+				if (!images.Existst && string.IsNullOrEmpty(replayText))
+				{
+					return false;
+				}
+
+				var description = await GetDescription(rmsg, images, replayText, _xService);
+
+				if (images.Existst)
+				{
+					var success = await publisher.XPost(description, images.Images);
+					if (success)
+					{
+						try
+						{
+							await _telegramService.SendMessage("✅ Post X success!", rmsg.MessageId);
+						}
+						catch { }
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка X: {ex.Message}");
 			}
 			finally
 			{

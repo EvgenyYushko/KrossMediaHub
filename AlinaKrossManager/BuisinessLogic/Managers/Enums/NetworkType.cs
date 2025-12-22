@@ -34,6 +34,11 @@ namespace AlinaKrossManager.BuisinessLogic.Managers.Enums
 		/// <summary>
 		/// Приватный (закрытый) канал Telegram.
 		/// </summary>
-		TelegramPrivate
+		TelegramPrivate,
+
+		/// <summary>
+		/// X (Twiter)
+		/// </summary>
+		X
 	}
 }

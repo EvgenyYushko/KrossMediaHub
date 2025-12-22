@@ -867,7 +867,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 			InstagramMedia randomItem = GetRandomMedia(_mediaList);
 
-			var photoLink = _random.Next(2) == 1 ? randomItem.Permalink : "www.patreon.com/AlinaKross";
+			var links = new[]
+			{
+				randomItem.Permalink,
+				"www.patreon.com/AlinaKross",
+				"https://linktr.ee/AlinaKross"
+			};
+
+			var photoLink = links[_random.Next(links.Length)];
 
 			_intimatePrompt = _intimatePrompt ??= await GenerateIntimatePrompt();
 			_todaysSpecifics = _todaysSpecifics ??= await GenerateTodaysSpecifics();

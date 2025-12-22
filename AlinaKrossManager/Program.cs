@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Protos.GoogleGeminiService;
 using Quartz;
 using Telegram.Bot;
+using Tweetinvi;
 using static AlinaKrossManager.Constants.AppConstants;
 using static AlinaKrossManager.Jobs.Helpers.JobHelper;
 
@@ -25,9 +26,21 @@ builder.Configuration.AddJsonFile("appsettings.json", optional: false);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
+string GetConfigOrThrow(string key)
+{
+	var value = builder.Configuration.GetValue<string>(key) ?? Environment.GetEnvironmentVariable(key);
+	
+	if (string.IsNullOrWhiteSpace(value))
+	{
+		// Громко падаем, если нет критически важной настройки
+		throw new InvalidOperationException($"❌ ОШИБКА КОНФИГУРАЦИИ: Не найдена обязательная переменная '{key}'. Проверьте appsettings.json или переменные окружения на хостинге.");
+	}
+	return value;
+}
+
 builder.Services.AddSingleton<ITelegramBotClient>(provider =>
 {
-	var token = builder.Configuration.GetValue<string>(TELEGRAM_BOT_TOKEN) ?? Environment.GetEnvironmentVariable(TELEGRAM_BOT_TOKEN);
+	var token = GetConfigOrThrow(TELEGRAM_BOT_TOKEN);
 	return new TelegramBotClient(token);
 });
 
@@ -43,7 +56,7 @@ builder.Services.AddSingleton(provider =>
 	var conversationService = provider.GetService<ConversationService>();
 	var hostedInvarment = provider.GetService<IWebHostEnvironment>();
 
-	var token = builder.Configuration.GetValue<string>(INSTAGRAM_BOT_TOKEN) ?? Environment.GetEnvironmentVariable(INSTAGRAM_BOT_TOKEN);
+	var token = GetConfigOrThrow(INSTAGRAM_BOT_TOKEN);
 	return new InstagramService(token, geminiModel, conversationService, hostedInvarment);
 });
 
@@ -51,23 +64,37 @@ builder.Services.AddSingleton(provider =>
 {
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
 
-	var id = builder.Configuration.GetValue<string>(IDENTIFIER_BLUE_SKY) ?? Environment.GetEnvironmentVariable(IDENTIFIER_BLUE_SKY);
-	var pass = builder.Configuration.GetValue<string>(APP_PASSWORD_BLUE_SKY) ?? Environment.GetEnvironmentVariable(APP_PASSWORD_BLUE_SKY);
+	var id = GetConfigOrThrow(IDENTIFIER_BLUE_SKY);
+	var pass = GetConfigOrThrow(APP_PASSWORD_BLUE_SKY);
 	return new BlueSkyService(id, pass, geminiModel);
 });
 
 builder.Services.AddSingleton(provider =>
 {
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
-	var longLiveToken = builder.Configuration.GetValue<string>(FACE_BOOK_LONG_TOKEN) ?? Environment.GetEnvironmentVariable(FACE_BOOK_LONG_TOKEN);
+	var longLiveToken = GetConfigOrThrow(FACE_BOOK_LONG_TOKEN);
 	return new FaceBookService(longLiveToken, geminiModel);
+});
+
+builder.Services.AddSingleton(provider =>
+{
+	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
+	
+	var apiKey = GetConfigOrThrow(X_API_KEY);
+	var apiSecret = GetConfigOrThrow(X_API_SECRET);
+	var accessToken = GetConfigOrThrow(X_ACCESS_TOKEN);
+	var accessTokenSecret = GetConfigOrThrow(X_ACCESS_TOKEN_SECRET);
+
+	var client = new TwitterClient(apiKey, apiSecret, accessToken, accessTokenSecret);
+	return new XService(geminiModel, client);
 });
 
 builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<PublicTelegramChanel>();
 builder.Services.AddSingleton<PrivateTelegramChanel>();
-// сервисы зависящие от БД
+
+// Сервисы зависящие от БД
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<TelegramManager>();
 builder.Services.AddScoped<SocialPublicationFacade>();
@@ -121,11 +148,7 @@ builder.Services.AddTransient(provider =>
 });
 builder.Services.AddTransient<ScheduleInspectorService>();
 
-var connectionString = builder.Configuration.GetValue<string>(DB_URL_POSTGRESQL) ?? Environment.GetEnvironmentVariable(DB_URL_POSTGRESQL);
-if (string.IsNullOrEmpty(connectionString))
-{
-	throw new Exception("Отсутствует строка подключения!");
-}
+var connectionString = GetConfigOrThrow(DB_URL_POSTGRESQL);
 
 // Разрешает сохранять даты в любом формате без ошибок
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -150,8 +173,11 @@ else
 {
 	try
 	{
-		var dbContext = app.Services.GetRequiredService<AppDbContext>();
-		dbContext.Database.Migrate();
+		using (var scope = app.Services.CreateScope())
+		{
+			var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+			dbContext.Database.Migrate();
+		}
 	}
 	catch (Exception ex)
 	{
@@ -180,7 +206,6 @@ using (var scope = app.Services.CreateScope())
 
 	if (app.Environment.IsDevelopment())
 	{
-		//var config = serviceProvider.GetRequiredService<IConfiguration>();
 		var telegramClient = serviceProvider.GetRequiredService<ITelegramBotClient>();
 		var serviceScopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
 		var bot = new TelegramBotController(telegramClient, serviceScopeFactory);

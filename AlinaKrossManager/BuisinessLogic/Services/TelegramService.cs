@@ -121,24 +121,28 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public async Task<Message> SendSinglePhotoAsync(string base64Image, int? msgId, string caption = "", ParseMode parseMode = ParseMode.None, ReplyMarkup replyMarkup = null, long senderId = EVGENY_YUSHKO_TG_ID)
 		{
 			var imageBytes = Convert.FromBase64String(base64Image);
-			using var stream = new MemoryStream(imageBytes);
 
-			if (msgId is not null)
+			// Проверка длины ДО отправки (1024 - лимит Telegram для caption)
+			bool isCaptionTooLong = caption.Length > 1024;
+
+			using (var stream = new MemoryStream(imageBytes))
 			{
-				return await _telegramBotClient.SendPhoto(senderId,
-					InputFile.FromStream(stream, "image.jpg"),
-					caption,
-					replyMarkup: replyMarkup,
-					parseMode: parseMode,
-					replyParameters:
-						new ReplyParameters
-						{
-							MessageId = msgId.Value
-						});
-			}
-			else
-			{
-				return await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"), caption, replyMarkup: replyMarkup, parseMode: parseMode);
+				if (isCaptionTooLong)
+				{
+					// Сценарий: Длинное описание
+					// 1. Шлем фото пустным
+					var photoMsg =await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"));
+
+					// 2. Шлем текст отдельно
+					await _telegramBotClient.SendMessage(senderId, caption, replyMarkup: replyMarkup, parseMode: parseMode);
+
+					return photoMsg;
+				}
+				else
+				{
+					// Сценарий: Нормальное описание
+					return await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"), caption, replyMarkup: replyMarkup, parseMode: parseMode);
+				}
 			}
 		}
 

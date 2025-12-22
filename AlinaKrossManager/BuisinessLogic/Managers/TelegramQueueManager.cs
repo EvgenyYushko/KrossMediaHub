@@ -49,13 +49,14 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				NetworkType.Instagram => ((SocialBaseService)_instagramService, true),
 				NetworkType.Facebook => (_faceBookService, true),
 				NetworkType.BlueSky => (_blueSkyService, true),
+				NetworkType.X => (_xService, true),
 				NetworkType.TelegramPublic => (_publicTelegramChanel, false),
 				NetworkType.TelegramPrivate => (_privateTelegramChanel, false),
 				_ => (null, false)
 			};
 
 			// 2. Если сервис не найден (default case)
-			if (service == null) return "Автоматическое описание";
+			if (service == null) return "Hi 🥰";
 
 			// 3. Выполнение логики
 			string inputCaption = useCache ? _tempCaption : null;
@@ -926,7 +927,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			else if (post.Images.Count == 1)
 			{
 				// Ваш сервис
-				await _telegramService.SendSinglePhotoAsync(post.Images[0], null, infoText, ParseMode.Markdown, keyboard);
+				var sentMessages = await _telegramService.SendSinglePhotoAsync(post.Images[0], null, infoText, ParseMode.Markdown, keyboard);
+				session.ActiveAlbumMessageIds = new List<int>() { sentMessages.MessageId };
 			}
 			else
 			{

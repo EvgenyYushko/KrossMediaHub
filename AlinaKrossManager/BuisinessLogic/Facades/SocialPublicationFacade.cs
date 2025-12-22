@@ -2,12 +2,9 @@ using AlinaKrossManager.BuisinessLogic.Managers;
 using AlinaKrossManager.BuisinessLogic.Managers.Enums;
 using AlinaKrossManager.BuisinessLogic.Managers.Models;
 using AlinaKrossManager.BuisinessLogic.Services;
-using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Telegram;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Telegram.Bot.Types;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace AlinaKrossManager.BuisinessLogic.Facades
 {
@@ -20,6 +17,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 		private readonly TelegramService _telegramService;
 		private readonly PublicTelegramChanel _publicTelegramChanel;
 		private readonly PrivateTelegramChanel _privateTelegramChanel;
+		private readonly XService _xService;
 		private readonly ILogger<SocialPublicationFacade> _logger;
 
 		public SocialPublicationFacade(PostService postService
@@ -29,6 +27,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			, TelegramService telegramService
 			, PublicTelegramChanel publicTelegramChanel
 			, PrivateTelegramChanel privateTelegramChanel
+			, XService xService
 			, ILogger<SocialPublicationFacade> logger
 			)
 		{
@@ -39,6 +38,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			_telegramService = telegramService;
 			_publicTelegramChanel = publicTelegramChanel;
 			_privateTelegramChanel = privateTelegramChanel;
+			_xService = xService;
 			_logger = logger;
 		}
 
@@ -236,6 +236,12 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 						try { await _telegramService.SendMessage("✅ Post TelegrammPublic success"); } catch { }
 					}
 					break;
+				case NetworkType.X:
+					{
+						await XPost(caption, files);
+						try { await _telegramService.SendMessage("✅ Post X success"); } catch { }
+					}
+					break;
 				case NetworkType.TelegramPrivate:
 					{
 						await TelegramPrivatePost(caption, files, video);
@@ -363,13 +369,17 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					await _telegramService.SendMessage(chanelId, caption);
 				}
 
-				var msgRes = $"✅ Post {serviceName} success!";
-				Console.WriteLine(msgRes);
+				Console.WriteLine($"✅ Post {serviceName} success!");
 			}
 			catch (Exception ex)
 			{
 				throw new Exception($"Ошибка {serviceName}: {ex.Message}");
 			}
+		}
+
+		public Task<bool> XPost(string caption, List<string> files)
+		{
+			return _xService.CreatePostPost(caption, files);
 		}
 	}
 }
