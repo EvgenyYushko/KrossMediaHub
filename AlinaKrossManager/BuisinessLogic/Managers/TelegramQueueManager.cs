@@ -163,7 +163,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					await _postService.AddPostAsync(newPost);
 
 					session.State = UserState.None;
-					await _telegramService.SendMessage(chatId, $"✅ Одиночное фото добавлено!");
+					//await _telegramService.SendMessage(chatId, $"✅ Одиночное фото добавлено!");
 					try { await _telegramService.DeleteMessage(message.Id, ct); } catch { }
 					await ShowMainMenu(chatId, ct);
 				}
@@ -188,7 +188,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				{
 					session.State = UserState.None; // Сбрасываем состояние
 
-					await _telegramService.SendMessage(chatId, "❌ Редактирование отменено.");
+					//await _telegramService.SendMessage(chatId, "❌ Редактирование отменено.");
 
 					// Возвращаем пользователя обратно к карточке поста, который он редактировал
 					if (session.EditingPostId.HasValue)
@@ -217,7 +217,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						await _postService.UpdatePostAsync(post);
 
 						string target = session.SelectedNetwork == NetworkType.All ? "всех активных сетей" : session.SelectedNetwork.ToString();
-						await _telegramService.SendMessage(chatId, $"✅ Описание обновлено для {target}!");
+						//await _telegramService.SendMessage(chatId, $"✅ Описание обновлено для {target}!");
 
 						session.State = UserState.None;
 						session.EditingPostId = null; // Очищаем ID
@@ -328,7 +328,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				// Сбрасываем состояние
 				session.State = UserState.None;
 
-				await _telegramService.SendMessage(buffer.ChatId, $"✅ Альбом из {newPost.Images.Count} фото добавлен!");
+				//await _telegramService.SendMessage(buffer.ChatId, $"✅ Альбом из {newPost.Images.Count} фото добавлен!");
 
 				foreach (var msgId in buffer.MessageIds)
 				{
@@ -709,7 +709,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private async Task ShowQueueList(long chatId, int? messageIdToEdit, NetworkType filterNet,
 			 AccessFilter accessFilter, int page, CancellationToken ct)
 		{
-			const int pageSize = 5;
+			const int pageSize = 10;
 
 			// 1. БАЗОВАЯ ФИЛЬТРАЦИЯ (По наличию в сети)
 			// Нам нужно общее количество для пагинации
