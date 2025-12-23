@@ -110,6 +110,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 							// Ошибка
 							state.Status = SocialStatus.Error;
 							_logger.LogError(ex, $"❌ Ошибка публикации в {network}");
+							try { await _telegramService.SendMessage($"❌ Ошибка публикации в {network}"); } catch { }
 						}
 
 						postChanged = true;
@@ -179,14 +180,14 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					{
 						throw new Exception($"Instagram API Error");
 					}
-					try { await _telegramService.SendMessage("✅ Post Instagram success"); } catch { }
+					//try { await _telegramService.SendMessage("✅ Post Instagram success"); } catch { }
 
 					try
 					{
 						string? storyId = await InstagramStory(files);
 						if (storyId is not null)
 						{
-							try { await _telegramService.SendMessage("✅ Story Instagram success"); } catch { }
+							//try { await _telegramService.SendMessage("✅ Story Instagram success"); } catch { }
 						}
 					}
 					catch (Exception ex)
@@ -202,14 +203,14 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 						{
 							throw new Exception("Facebook API вернул false (ошибка публикации)");
 						}
-						try { await _telegramService.SendMessage("✅ Post facebook success"); } catch { }
+						//try { await _telegramService.SendMessage("✅ Post facebook success"); } catch { }
 
 						try
 						{
 							var res = await FaceBookStory(files);
 							if (res)
 							{
-								try { await _telegramService.SendMessage("✅ Story Facebook success"); } catch { }
+								//try { await _telegramService.SendMessage("✅ Story Facebook success"); } catch { }
 							}
 						}
 						catch (Exception ex)
@@ -227,25 +228,27 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 				case NetworkType.BlueSky:
 					{
 						await BlueSkyPost(caption, files, null);
-						try { await _telegramService.SendMessage("✅ Post bluesky success!"); } catch { }
+						//try { await _telegramService.SendMessage("✅ Post bluesky success!"); } catch { }
 					}
 					break;
 				case NetworkType.TelegramPublic:
 					{
 						await TelegrammPublicPost(caption, files, video);
-						try { await _telegramService.SendMessage("✅ Post TelegrammPublic success"); } catch { }
+						//try { await _telegramService.SendMessage("✅ Post TelegrammPublic success"); } catch { }
 					}
 					break;
 				case NetworkType.X:
 					{
 						await XPost(caption, files);
-						try { await _telegramService.SendMessage("✅ Post X success"); } catch { }
+						//try { await _telegramService.SendMessage("✅ Post X success"); } catch { }
 					}
 					break;
 				case NetworkType.TelegramPrivate:
 					{
 						await TelegramPrivatePost(caption, files, video);
-						try { await _telegramService.SendMessage("✅ Post TelegramPrivate success"); } catch { }
+						await _telegramService.SendPaidPhotosAsync(files, 30, caption, senderId : PublicTelegramChanel.CHANEL_ID);
+						//await _telegramService.SendPaidVideosAsync(files, 30, caption, senderId : PublicTelegramChanel.CHANEL_ID);
+						//try { await _telegramService.SendMessage("✅ Post TelegramPrivate success"); } catch { }
 					}
 					break;
 

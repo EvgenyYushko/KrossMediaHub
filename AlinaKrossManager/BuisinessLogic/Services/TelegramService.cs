@@ -237,6 +237,127 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
+		public async Task<Message> SendPaidPhotosAsync(IEnumerable<string> base64Images, int starCount, string caption = "", ParseMode parseMode = ParseMode.None,
+			long senderId = EVGENY_YUSHKO_TG_ID)
+		{
+			if (base64Images == null || !base64Images.Any())
+			{
+				Console.WriteLine("Список изображений пуст.");
+				return null;
+			}
+
+			// Список для хранения потоков, чтобы закрыть их после отправки
+			var streams = new List<MemoryStream>();
+
+			// Список медиа-объектов для Телеграма
+			var paidMediaItems = new List<InputPaidMedia>();
+
+			try
+			{
+				int index = 1;
+				foreach (var base64 in base64Images)
+				{
+					// Конвертируем строку в байты
+					var imageBytes = Convert.FromBase64String(base64);
+
+					// Создаем поток
+					var stream = new MemoryStream(imageBytes);
+
+					// Добавляем поток в список очистки (чтобы он не потерялся и мы могли его закрыть)
+					streams.Add(stream);
+
+					// Добавляем фото в список медиа
+					paidMediaItems.Add(new InputPaidMediaPhoto
+					{
+						Media = InputFile.FromStream(stream, $"paid_image_{index}.jpg")
+					});
+
+					index++;
+				}
+
+				// Отправляем весь пакет
+				return await _telegramBotClient.SendPaidMedia(
+					chatId: senderId,
+					starCount: starCount,
+					media: paidMediaItems,
+					caption: caption,
+					parseMode: parseMode
+				);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка отправки платного альбома: {ex.Message}");
+				throw;
+			}
+			finally
+			{
+				// ВАЖНО: Очищаем все потоки после отправки (или ошибки)
+				foreach (var stream in streams)
+				{
+					stream.Dispose();
+				}
+			}
+		}
+
+		public async Task<Message> SendPaidVideosAsync(IEnumerable<string> base64Videos, int starCount,string caption = "",ParseMode parseMode = ParseMode.None,
+			long senderId = EVGENY_YUSHKO_TG_ID)
+		{
+			if (base64Videos == null || !base64Videos.Any())
+			{
+				Console.WriteLine("Список видео пуст.");
+				return null;
+			}
+
+			// Список потоков для последующей очистки памяти
+			var streams = new List<MemoryStream>();
+
+			// Список объектов медиа
+			var paidMediaItems = new List<InputPaidMedia>();
+
+			try
+			{
+				int index = 1;
+				foreach (var base64 in base64Videos)
+				{
+					var videoBytes = Convert.FromBase64String(base64);
+					var stream = new MemoryStream(videoBytes);
+
+					// Сохраняем ссылку на поток, чтобы закрыть его в finally
+					streams.Add(stream);
+
+					paidMediaItems.Add(new InputPaidMediaVideo
+					{
+						// Важно: указываем расширение .mp4
+						Media = InputFile.FromStream(stream, $"paid_video_{index}.mp4"),
+						SupportsStreaming = true // Оптимизация для просмотра
+					});
+
+					index++;
+				}
+
+				return await _telegramBotClient.SendPaidMedia(
+					chatId: senderId,
+					starCount: starCount,
+					media: paidMediaItems,
+					caption: caption,
+					parseMode: parseMode
+				);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка отправки платных видео: {ex.Message}");
+				throw;
+			}
+			finally
+			{
+				// Обязательно освобождаем память
+				foreach (var stream in streams)
+				{
+					stream.Dispose();
+				}
+			}
+		}
+
 		private async Task<string> TryGetFileBase64(Video? video)
 		{
 			// Проверка наличия объекта Video и FileId
