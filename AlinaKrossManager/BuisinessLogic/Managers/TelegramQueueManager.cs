@@ -7,7 +7,6 @@ using AlinaKrossManager.BuisinessLogic.Managers.Models;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Telegram;
-using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -117,6 +116,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						lock (buffer.FileIds)
 						{
 							buffer.FileIds.Add(photo.FileId);
+							buffer.MessageIds.Add(message.MessageId);
 							// Если у этого куска альбома есть описание, берем его (обычно оно у 1-го элемента)
 							if (!string.IsNullOrEmpty(caption)) buffer.Caption = caption;
 						}
@@ -164,6 +164,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 					session.State = UserState.None;
 					await _telegramService.SendMessage(chatId, $"✅ Одиночное фото добавлено!");
+					try { await _telegramService.DeleteMessage(message.Id, ct); } catch { }
 					await ShowMainMenu(chatId, ct);
 				}
 				else if (text == "/cancel")
@@ -328,6 +329,12 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				session.State = UserState.None;
 
 				await _telegramService.SendMessage(buffer.ChatId, $"✅ Альбом из {newPost.Images.Count} фото добавлен!");
+
+				foreach (var msgId in buffer.MessageIds)
+				{
+					try{await _telegramService.DeleteMessage(msgId, ct);}catch{}
+				}
+
 				await ShowMainMenu(buffer.ChatId, ct);
 			}
 		}
@@ -933,7 +940,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			// -----------------------------------------------------------
 			// 4. ОТПРАВКА (ВАШ КОД)
 			// -----------------------------------------------------------
-				
+
 			if (messageIdToDelete.HasValue) try { await _telegramService.DeleteMessage(messageIdToDelete.Value, ct); } catch { }
 
 			if (post.Images.Count > 0 && post.Images[0] == "dummy")
