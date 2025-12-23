@@ -14,7 +14,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Telegram
 		{
 		}
 
-		protected override string GetBaseDescriptionPrompt(string base64Img)
+		public static string GetBaseDescriptionPrompt(string base64Img)
 		{
 			return "Придумай одно красивое, флиртующее, краткое описание на английском языке, возможно добавь эмодзи, к посту в приватном эротическом Telegram канале, под постом с фотографией. " +
 				"Без хештегов." +

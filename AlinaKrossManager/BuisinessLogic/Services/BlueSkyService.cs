@@ -492,7 +492,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				$"#neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty";
 		}
 
-		protected override string GetBaseDescriptionPrompt(string base64Img)
+		public static string GetBaseDescriptionPrompt(string base64Img)
 		{
 			return "Придумай красивое, краткое описание на английском языке, возможно добавь эмодзи, к посту в bluesky под постом с фотографией. " +
 				$"А так же придумай не более 15 хештогов, они должны соответствовать " +

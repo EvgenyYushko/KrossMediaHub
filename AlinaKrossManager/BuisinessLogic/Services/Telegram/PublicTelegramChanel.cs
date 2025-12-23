@@ -29,7 +29,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Telegram
 			return _telegramService.SendMessage(CHANEL_ID, text: "Exclusive content ❤️‍🔥", replyMarkup: inlineKeyboard);
 		}
 
-		protected override string GetBaseDescriptionPrompt(string base64Img)
+		public static string GetBaseDescriptionPrompt(string base64Img)
 		{
 			return "Придумай одно самое красивое, флиртующее, краткое описание на английском языке, возможно добавь эмодзи, " +
 				"к посту в публичном эротическом Telegram канале, под постом с фотографией. " +

@@ -51,25 +51,36 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return _telegramBotClient.SendMessage(senderId, text);
 		}
 
-		public Task<Message> SendMessage(string text, int? replayMsgId = null)
+		public Task AnswerCallbackQuery(string callbackQueryId, string text)
+		{
+			return _telegramBotClient.AnswerCallbackQuery(callbackQueryId, text);
+		}
+
+		public Task<Message> SendMessage(string text, int? replayMsgId = null, ParseMode parseMode = ParseMode.Html, ReplyMarkup replyMarkup = null, CancellationToken cancellationToken = default)
 		{
 			if (replayMsgId is null)
 			{
-				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, parseMode: ParseMode.Html);
+				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, parseMode: parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);
 			}
 
 			return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text,
 				replyParameters: new ReplyParameters { MessageId = replayMsgId.Value },
-				parseMode: ParseMode.Html);
+				parseMode: parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);
 		}
 
-		public async Task<(string? base64Video, string? mimeType)> TryGetVideoBase64FromTelegram(Message rmsg)
+		public class VideoModel
+		{
+			public string Base64Video { get; set; }
+			public string MimeType { get; set; }
+		}
+
+		public async Task<VideoModel> TryGetVideoBase64FromTelegram(Message rmsg)
 		{
 			// 1. Проверяем, есть ли видео в сообщении
 			if (rmsg.Video == null)
 			{
 				//await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "❌ В сообщении не найдено видео для публикации.");
-				return (null, null);
+				return null;
 			}
 
 			// 2. Получаем информацию о видео
@@ -79,7 +90,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			if (string.IsNullOrEmpty(video.FileId) || string.IsNullOrEmpty(video.MimeType))
 			{
 				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "❌ Видео найдено, но отсутствует FileId или MIME-тип.");
-				return (null, null);
+				return null;
 			}
 
 			// 4. Загружаем файл и конвертируем его в Base64
@@ -91,7 +102,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				if (!string.IsNullOrEmpty(base64Video))
 				{
 					Console.WriteLine($"✅ Видео успешно загружено. Размер байт: {video.FileSize}. MIME: {video.MimeType}");
-					return (base64Video, video.MimeType);
+					return new VideoModel { Base64Video = base64Video, MimeType = video.MimeType };
 				}
 			}
 			catch (Exception ex)
@@ -100,7 +111,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, $"❌ Критическая ошибка при загрузке видео: {ex.Message}");
 			}
 
-			return (null, null);
+			return null;
 		}
 
 		public async Task<bool> CanUseBot(Update update, CancellationToken ct)
@@ -131,7 +142,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				{
 					// Сценарий: Длинное описание
 					// 1. Шлем фото пустным
-					var photoMsg =await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"));
+					var photoMsg = await _telegramBotClient.SendPhoto(senderId, InputFile.FromStream(stream, "image.jpg"));
 
 					// 2. Шлем текст отдельно
 					await _telegramBotClient.SendMessage(senderId, caption, replyMarkup: replyMarkup, parseMode: parseMode);
@@ -268,6 +279,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 
 			return base64Video;
+		}
+
+		public Task EditMessageText(int messageId, string text, ParseMode parseMode, InlineKeyboardMarkup replyMarkup = null, CancellationToken cancellationToken = default)
+		{
+			return _telegramBotClient.EditMessageText(new ChatId(EVGENY_YUSHKO_TG_ID), messageId, text, parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);
 		}
 
 		public Task DeleteMessage(int messageId, CancellationToken ct)

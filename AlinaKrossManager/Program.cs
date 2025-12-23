@@ -93,6 +93,7 @@ builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<PublicTelegramChanel>();
 builder.Services.AddSingleton<PrivateTelegramChanel>();
+builder.Services.AddSingleton<AiFacade>();
 
 // Сервисы зависящие от БД
 builder.Services.AddScoped<PostService>();

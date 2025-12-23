@@ -5,6 +5,7 @@ using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Telegram;
 using Telegram.Bot.Types;
+using static AlinaKrossManager.BuisinessLogic.Services.TelegramService;
 
 namespace AlinaKrossManager.BuisinessLogic.Facades
 {
@@ -225,8 +226,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					break;
 				case NetworkType.BlueSky:
 					{
-						// 1. Первичный вход при запуске
-						await BlueSkyPost(caption, files);
+						await BlueSkyPost(caption, files, null);
 						try { await _telegramService.SendMessage("✅ Post bluesky success!"); } catch { }
 					}
 					break;
@@ -264,21 +264,26 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			await TgHandler(new CancellationToken(), PublicTelegramChanel.CHANEL_ID, _publicTelegramChanel.ServiceName, files, caption, video);
 		}
 
-		public async Task BlueSkyPost(string caption, List<string> files)
+		public async Task BlueSkyPost(string caption, List<string> files, VideoModel videoModel)
 		{
-			if (!_blueSkyService.BlueSkyLogin && !await _blueSkyService.LoginAsync())
+			// 1. Первичный вход при запуске
+			if (!_blueSkyService.BlueSkyLogin)
 			{
-				throw new Exception("BlueSky: не удалось войти в аккаунт.");
-			}
+				if (!await _blueSkyService.LoginAsync())
+				{
+					Console.WriteLine("Критическая ошибка bluesky: не удалось войти в аккаунт.");
+					throw new Exception("Критическая ошибка bluesky: не удалось войти в аккаунт.");
+				}
 
-			Console.WriteLine("Успешно удалось войти в аккаунт bluesky. ✅");
-			_blueSkyService.BlueSkyLogin = true;
+				Console.WriteLine("Успешно удалось войти в аккаунт bluesky. ✅");
+				_blueSkyService.BlueSkyLogin = true;
+			}
 
 			if (await _blueSkyService.UpdateSessionAsync())
 			{
 				// 3. Публикуем с новым токеном, который теперь хранится внутри service.AccessJwt
 				List<ImageAttachment> attachments = null;
-				if (files.Count() > 0)
+				if (files.Count > 0)
 				{
 					if (files.Count() > 4)
 					{
@@ -294,27 +299,45 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					}
 				}
 
-				bool bsSuccess = false;
+				bool success = false;
 
 				var description = await _blueSkyService.TruncateTextToMaxLength(caption);
 
-				if (attachments is not null)
+				if (videoModel is not null)
 				{
-					bsSuccess = await _blueSkyService.CreatePostWithImagesAsync(description, attachments);
+					var videoBlob = await _blueSkyService.UploadVideoFromBase64Async(videoModel.Base64Video, videoModel.MimeType);
+					if (videoBlob == null)
+					{
+						Console.WriteLine("Ошибка bluesky: не удалось загрузить видео.");
+						throw new Exception("Ошибка bluesky: не удалось загрузить видео.");
+					}
+					var ratio = new AspectRatio { Width = 9, Height = 16 };
+
+					success = await _blueSkyService.CreatePostWithVideoAsync(description, videoBlob, ratio);
+				}
+				else if (attachments is not null)
+				{
+					success = await _blueSkyService.CreatePostWithImagesAsync(description, attachments);
 				}
 				else
 				{
-					bsSuccess = await _blueSkyService.CreatePostAsync(description);
+					success = await _blueSkyService.CreatePostAsync(description);
 				}
 
-				if (!bsSuccess)
+				if (success)
 				{
-					throw new Exception("BlueSky: CreatePost вернул false");
+					Console.WriteLine("✅ Post bluesky success!");
 				}
 			}
 			else
 			{
-				throw new Exception("BlueSky: Не удалось обновить сессию");
+				Console.WriteLine("bluesky Не удалось обновить токен. Попытка повторного входа...");
+				// Можно попробовать LoginAsync еще раз, если Refresh Token истек.
+				if (!await _blueSkyService.LoginAsync())
+				{
+					Console.WriteLine("bluesky Не удалось выполнить повторный вход. Завершение работы.");
+					throw new Exception("bluesky Не удалось выполнить повторный вход. Завершение работы.");
+				}
 			}
 		}
 

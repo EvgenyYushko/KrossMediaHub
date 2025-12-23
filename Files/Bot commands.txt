@@ -8,5 +8,5 @@ story_to_facebook - история в FaceBook
 post_to_bluesky - пост в BlueSky
 post_to_tg_free - пост в TelegramFree
 post_to_tg_private - пост в TelegramPrivate
-post_to_x = пост в X
+post_to_x - пост в X
 post_to_all - пост все публичные

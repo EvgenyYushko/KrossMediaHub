@@ -1,10 +1,7 @@
 using AlinaKrossManager.BuisinessLogic.Facades;
 using AlinaKrossManager.BuisinessLogic.Services;
-using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Telegram;
-using AlinaKrossManager.Services;
-using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using static AlinaKrossManager.Helpers.TelegramUserHelper;
@@ -13,42 +10,21 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 {
 	public partial class TelegramManager
 	{
-		private readonly InstagramService _instagramService;
-		private readonly IGenerativeLanguageModel _generativeLanguageModel;
-		private readonly BlueSkyService _blueSkyService;
-		private readonly FaceBookService _faceBookService;
 		private readonly TelegramService _telegramService;
-		private readonly PublicTelegramChanel _publicTelegramChanel;
-		private readonly PrivateTelegramChanel _privateTelegramChanel;
-		private readonly XService _xService;
-		private readonly ITelegramBotClient bot;
 		private readonly PostService _postService;
 		private readonly IServiceScopeFactory _scopeFactory;
+		private readonly AiFacade _aiFacade;
 
-		public TelegramManager(InstagramService instagramService
-			, IGenerativeLanguageModel generativeLanguageModel
-			, BlueSkyService blueSkyService
-			, FaceBookService faceBookService
+		public TelegramManager(IServiceScopeFactory scopeFactory
 			, TelegramService telegramService
-			, PublicTelegramChanel publicTelegramChanel
-			, PrivateTelegramChanel privateTelegramChanel
-			, XService xService
-			, ITelegramBotClient bot
 			, PostService postService
-			, IServiceScopeFactory scopeFactory
+			, AiFacade aiFacade
 		)
 		{
-			_instagramService = instagramService;
-			_generativeLanguageModel = generativeLanguageModel;
-			_blueSkyService = blueSkyService;
-			_faceBookService = faceBookService;
 			_telegramService = telegramService;
-			_publicTelegramChanel = publicTelegramChanel;
-			_privateTelegramChanel = privateTelegramChanel;
-			_xService = xService;
 			_postService = postService;
 			_scopeFactory = scopeFactory;
-			this.bot = bot;
+			_aiFacade = aiFacade;
 		}
 
 		public async Task HandleUpdateAsync(Update update, CancellationToken ct)
@@ -264,14 +240,14 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				// 1. Обработка нажатий кнопок (CallbackQuery)
 				if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery != null)
 				{
-					await HandleCallbackQuery(bot, update.CallbackQuery, ct);
+					await HandleCallbackQuery(update.CallbackQuery, ct);
 					return;
 				}
 
 				// 2. Обработка сообщений (Message)
 				if (update.Type == UpdateType.Message && update.Message != null)
 				{
-					await HandleMessage(bot, update.Message, ct);
+					await HandleMessage(update.Message, ct);
 					return;
 				}
 			}
@@ -293,7 +269,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					return false;
 				}
 
-				var description = await GetDescription(rmsg, images, replayText, _instagramService);
+				var description = await GetDescription(rmsg, images, replayText, false, InstagramService.GetBaseDescriptionPrompt(images.Existst ? images.Images.First() : null));
 
 				var result = await publisher.InstagramPost(description, images.Images);
 				if (result)
@@ -358,21 +334,21 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var replayText = rmsg.GetMsgText() ?? "";
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
-				if (!images.Existst && string.IsNullOrEmpty(replayText) && resVideos.base64Video is null)
+				if (!images.Existst && string.IsNullOrEmpty(replayText) && resVideos is null)
 				{
 					return false;
 				}
 
-				var description = await GetDescription(rmsg, images, replayText, _faceBookService);
+				var description = await GetDescription(rmsg, images, replayText, false, FaceBookService.GetBaseDescriptionPrompt(images.Existst ? images.Images.First() : null));
 
 				bool success = false;
 				if (images.Existst)
 				{
 					success = await publisher.FaceBookPostImages(description, images.Images);
 				}
-				else if (resVideos.base64Video is not null)
+				else if (resVideos is not null)
 				{
-					success = await publisher.FaceBookPostReels(description, resVideos.base64Video);
+					success = await publisher.FaceBookPostReels(description, resVideos.Base64Video);
 				}
 
 				if (success)
@@ -437,7 +413,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					return false;
 				}
 
-				var description = await GetDescription(rmsg, images, replayText, _xService);
+				var description = await GetDescription(rmsg, images, replayText, false, XService.GetBaseDescriptionPrompt(images.Existst ? images.Images.First() : null));
 
 				if (images.Existst)
 				{
@@ -472,91 +448,14 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
 				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var replayText = rmsg.GetMsgText() ?? "";
-				if (!images.Existst && string.IsNullOrWhiteSpace(replayText) && resVideos.base64Video is null)
+				if (!images.Existst && string.IsNullOrWhiteSpace(replayText) && resVideos is null)
 				{
 					return true;
 				}
 
-				var description = await GetDescription(rmsg, images, replayText, _blueSkyService);
+				var description = await GetDescription(rmsg, images, replayText, false, BlueSkyService.GetBaseDescriptionPrompt(images.Existst ? images.Images.First() : null));
 
-				//await publisher.BlueSkyPost(description, images.Images);
-
-				// 1. Первичный вход при запуске
-				if (!_blueSkyService.BlueSkyLogin)
-				{
-					if (!await _blueSkyService.LoginAsync())
-					{
-						Console.WriteLine("Критическая ошибка bluesky: не удалось войти в аккаунт.");
-						return true;
-					}
-
-					Console.WriteLine("Успешно удалось войти в аккаунт bluesky. ✅");
-					_blueSkyService.BlueSkyLogin = true;
-				}
-
-				if (await _blueSkyService.UpdateSessionAsync())
-				{
-					// 3. Публикуем с новым токеном, который теперь хранится внутри service.AccessJwt
-					List<ImageAttachment> attachments = null;
-					if (images.Existst)
-					{
-						attachments = new();
-						foreach (var image in images.Images)
-						{
-							attachments.Add(new ImageAttachment
-							{
-								Image = await _blueSkyService.UploadImageFromBase64Async(image, "image/png")
-							});
-						}
-					}
-
-					bool success = false;
-
-					description = await _blueSkyService.TruncateTextToMaxLength(description);
-
-					if (resVideos.base64Video is not null)
-					{
-						var videoBlob = await _blueSkyService.UploadVideoFromBase64Async(resVideos.base64Video, resVideos.mimeType);
-						if (videoBlob == null)
-						{
-							Console.WriteLine("Ошибка bluesky: не удалось загрузить видео.");
-							return true;
-						}
-						var ratio = new AspectRatio { Width = 9, Height = 16 };
-
-						// 3. Постинг
-						success = await _blueSkyService.CreatePostWithVideoAsync(description, videoBlob, ratio);
-					}
-					else if (attachments is not null)
-					{
-						success = await _blueSkyService.CreatePostWithImagesAsync(description, attachments);
-					}
-					else
-					{
-						success = await _blueSkyService.CreatePostAsync(description);
-					}
-
-					if (success)
-					{
-						var msgRes = $"✅ Post bluesky success!";
-						Console.WriteLine(msgRes);
-						try
-						{
-							await _telegramService.SendMessage(msgRes, rmsg.MessageId);
-						}
-						catch { }
-					}
-				}
-				else
-				{
-					Console.WriteLine("bluesky Не удалось обновить токен. Попытка повторного входа...");
-					// Можно попробовать LoginAsync еще раз, если Refresh Token истек.
-					if (!await _blueSkyService.LoginAsync())
-					{
-						Console.WriteLine("bluesky Не удалось выполнить повторный вход. Завершение работы.");
-						return false;
-					}
-				}
+				await publisher.BlueSkyPost(description, images.Images, resVideos);
 			}
 			catch (Exception ex)
 			{
@@ -572,30 +471,45 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 		private Task<bool> TgFreeHandler(Update update, Message rmsg, CancellationToken ct, SocialPublicationFacade publisher, bool force = false)
 		{
-			return TgHandler(update, rmsg, ct, PublicTelegramChanel.CHANEL_ID, _publicTelegramChanel, publisher, force);
+			return TgHandler(update, rmsg, ct, PublicTelegramChanel.CHANEL_ID, typeof(PublicTelegramChanel), publisher, force);
 		}
 
 		private Task<bool> TgPrivateHandler(Update update, Message rmsg, CancellationToken ct, SocialPublicationFacade publisher, bool force = false)
 		{
-			return TgHandler(update, rmsg, ct, PrivateTelegramChanel.CHANEL_ID, _privateTelegramChanel, publisher, force);
+			return TgHandler(update, rmsg, ct, PrivateTelegramChanel.CHANEL_ID, typeof(PrivateTelegramChanel), publisher, force);
 		}
 
 		public async Task<bool> TgHandler(Update update, Message rmsg, CancellationToken ct, long chanelId
-			, SocialBaseService socialBaseService, SocialPublicationFacade publisher, bool force = false)
+			, Type socialBaseService, SocialPublicationFacade publisher, bool force = false)
 		{
-			var serviceName = socialBaseService.ServiceName;
+			var serviceName = socialBaseService.Name;
+
 			var startMsg = await _telegramService.SendMessage($"Начинаем процесс публикации в {serviceName}...");
 			try
 			{
 				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
 				var resVideos = rmsg.Video;
 				var replayText = rmsg.GetMsgText() ?? "";
+
 				if (!images.Existst && string.IsNullOrWhiteSpace(replayText) && resVideos is null)
 				{
 					return true;
 				}
 
-				var description = await GetDescription(rmsg, images, replayText, socialBaseService, force);
+				string basePrompt = "";
+				var firstImage = images.Existst ? images.Images.First() : null;
+
+				// Сравниваем переданный тип с конкретными типами классов
+				if (socialBaseService == typeof(PublicTelegramChanel))
+				{
+					basePrompt = PublicTelegramChanel.GetBaseDescriptionPrompt(firstImage);
+				}
+				else if (socialBaseService == typeof(PrivateTelegramChanel))
+				{
+					basePrompt = PrivateTelegramChanel.GetBaseDescriptionPrompt(firstImage);
+				}
+
+				var description = await GetDescription(rmsg, images, replayText, false, basePrompt);
 
 				await publisher.TgHandler(ct, chanelId, serviceName, images.Images, description, resVideos);
 
@@ -617,7 +531,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			return false;
 		}
 
-		private async Task<string> GetDescription(Message rmsg, TelegramService.ImagesTelegram images, string replayText, SocialBaseService socialBaseService, bool force = false)
+		private async Task<string> GetDescription(Message rmsg, TelegramService.ImagesTelegram images, string replayText
+			, bool force = false, string prompt = null)
 		{
 			string description = string.IsNullOrEmpty(replayText) ? images.Caption : replayText;
 
@@ -628,7 +543,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 			if (string.IsNullOrEmpty(description) || force)
 			{
-				description = await socialBaseService.TryCreateDescription(replayText, images.Images);
+				description = await _aiFacade.TryCreateDescription(replayText, images.Images, prompt);
 				_telegramService.UpdateCaptionMediaGrup(rmsg, description);
 			}
 
@@ -637,7 +552,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 		public async Task GenerateImageByText(Update update, CancellationToken ct)
 		{
-			var imagesList = await _generativeLanguageModel.GeminiRequestGenerateImage(update.Message.ReplyToMessage.Text, 2);
+			var imagesList = await _aiFacade.GenerateImage(update.Message.ReplyToMessage.Text, 2);
 			var chatId = update.Message.Chat.Id;
 			var msgId = update.Message.ReplyToMessage.MessageId;
 			string caption = "";

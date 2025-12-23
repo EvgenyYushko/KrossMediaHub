@@ -4,7 +4,9 @@ using AlinaKrossManager.BuisinessLogic.Facades;
 using AlinaKrossManager.BuisinessLogic.Managers.Configurations;
 using AlinaKrossManager.BuisinessLogic.Managers.Enums;
 using AlinaKrossManager.BuisinessLogic.Managers.Models;
-using AlinaKrossManager.BuisinessLogic.Services.Base;
+using AlinaKrossManager.BuisinessLogic.Services;
+using AlinaKrossManager.BuisinessLogic.Services.Instagram;
+using AlinaKrossManager.BuisinessLogic.Services.Telegram;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -43,25 +45,39 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		private string _tempCaption = null;
 		private async Task<string> GenerateCaptionForNetworkAsync(NetworkType network, ImagesTelegram images)
 		{
-			// 1. Конфигурация: определяем сервис и стратегию кеширования
-			var (service, useCache) = network switch
+			var firstImage = images.Images.FirstOrDefault();
+
+			// 1. Получаем Промпт (текст запроса) и Флаг кеширования через статические методы
+			(string promptFromStatic, bool useCache) = network switch
 			{
-				NetworkType.Instagram => ((SocialBaseService)_instagramService, true),
-				NetworkType.Facebook => (_faceBookService, true),
-				NetworkType.BlueSky => (_blueSkyService, true),
-				NetworkType.X => (_xService, true),
-				NetworkType.TelegramPublic => (_publicTelegramChanel, false),
-				NetworkType.TelegramPrivate => (_privateTelegramChanel, false),
-				_ => (null, false)
+				// Группа "Соцсети" (Общий стиль, можно кешировать)
+				NetworkType.Instagram => (InstagramService.GetBaseDescriptionPrompt(firstImage), true),
+				NetworkType.Facebook => (FaceBookService.GetBaseDescriptionPrompt(firstImage), true),
+				NetworkType.BlueSky => (BlueSkyService.GetBaseDescriptionPrompt(firstImage), true),
+				NetworkType.X => (XService.GetBaseDescriptionPrompt(firstImage), true),
+
+				// Группа "Телеграм" (Уникальный стиль, не кешируем)
+				NetworkType.TelegramPublic => (PublicTelegramChanel.GetBaseDescriptionPrompt(firstImage), false),
+				NetworkType.TelegramPrivate => (PrivateTelegramChanel.GetBaseDescriptionPrompt(firstImage), false),
+
+				_ => ("Hi", false)
 			};
 
-			// 2. Если сервис не найден (default case)
-			if (service == null) return "Hi 🥰";
+			// 2. Логика выбора входных данных для AI
+			// Если кеширование включено И у нас уже есть готовое описание (_tempCaption)
+			// -> мы используем ЕГО (чтобы AI его перефразировал или вернул как есть).
+			// Иначе -> берем чистый промпт из статического метода.
+			string promptToSend = (useCache && !string.IsNullOrEmpty(_tempCaption))
+				? _tempCaption
+				: promptFromStatic;
 
-			// 3. Выполнение логики
-			string inputCaption = useCache ? _tempCaption : null;
-			string result = await GetDescription(null, images, inputCaption, service);
+			// 3. Вызов генерации
+			// Т.к. у нас нет ссылки на конкретный сервис (InstagramService и т.д.),
+			// мы вызываем общий метод генерации (например, через _generativeLanguageModel или ваш фасад),
+			// передавая туда СТРОКУ промпта.
+			string result = await _aiFacade.TryCreateDescription(null, images.Images, promptToSend);
 
+			// 4. Обновляем кеш
 			if (useCache)
 			{
 				_tempCaption = result;
@@ -70,7 +86,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			return result;
 		}
 
-		private async Task HandleMessage(ITelegramBotClient bot, Message message, CancellationToken ct)
+		private async Task HandleMessage(Message message, CancellationToken ct)
 		{
 			_tempCaption = null;
 			var chatId = message.Chat.Id;
@@ -124,7 +140,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 									var freshManager = scope.ServiceProvider.GetRequiredService<TelegramManager>();
 
 									// Вызываем финализацию через свежий менеджер
-									await freshManager.FinalizeAlbumAsync(bot, groupId, ct);
+									await freshManager.FinalizeAlbumAsync(groupId, ct);
 								}
 							}
 							catch (TaskCanceledException)
@@ -147,18 +163,18 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					await _postService.AddPostAsync(newPost);
 
 					session.State = UserState.None;
-					await bot.SendMessage(chatId, $"✅ Одиночное фото добавлено!");
-					await ShowMainMenu(bot, chatId, ct);
+					await _telegramService.SendMessage(chatId, $"✅ Одиночное фото добавлено!");
+					await ShowMainMenu(chatId, ct);
 				}
 				else if (text == "/cancel")
 				{
 					session.State = UserState.None;
-					await bot.SendMessage(chatId, "Отмена.");
-					await ShowMainMenu(bot, chatId, ct);
+					await _telegramService.SendMessage(chatId, "Отмена.");
+					await ShowMainMenu(chatId, ct);
 				}
 				else if (session.State == UserState.WaitingForPhoto) // Игнорируем текст если ждем фото
 				{
-					await bot.SendMessage(chatId, "⚠️ Пришлите фото (или альбом)!");
+					await _telegramService.SendMessage(chatId, "⚠️ Пришлите фото (или альбом)!\n/cancel - отмена)");
 				}
 				return;
 			}
@@ -171,17 +187,17 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				{
 					session.State = UserState.None; // Сбрасываем состояние
 
-					await bot.SendMessage(chatId, "❌ Редактирование отменено.");
+					await _telegramService.SendMessage(chatId, "❌ Редактирование отменено.");
 
 					// Возвращаем пользователя обратно к карточке поста, который он редактировал
 					if (session.EditingPostId.HasValue)
 					{
-						await ShowPostDetails(bot, chatId, null, session.EditingPostId.Value, ct);
+						await ShowPostDetails(chatId, null, session.EditingPostId.Value, ct);
 					}
 					else
 					{
 						// Если ID потерялся (маловероятно), возвращаем в главное меню
-						await ShowMainMenu(bot, chatId, ct);
+						await ShowMainMenu(chatId, ct);
 					}
 
 					// Очищаем временный ID
@@ -200,27 +216,27 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						await _postService.UpdatePostAsync(post);
 
 						string target = session.SelectedNetwork == NetworkType.All ? "всех активных сетей" : session.SelectedNetwork.ToString();
-						await bot.SendMessage(chatId, $"✅ Описание обновлено для {target}!");
+						await _telegramService.SendMessage(chatId, $"✅ Описание обновлено для {target}!");
 
 						session.State = UserState.None;
 						session.EditingPostId = null; // Очищаем ID
 
 						// Возвращаем обновленную карточку поста
-						await ShowPostDetails(bot, chatId, null, post.Id, ct);
+						await ShowPostDetails(chatId, null, post.Id, ct);
 					}
 					else
 					{
 						// Если пост вдруг удалили, пока мы его редактировали
 						session.State = UserState.None;
-						await bot.SendMessage(chatId, "⚠️ Пост не найден.");
-						await ShowMainMenu(bot, chatId, ct);
+						await _telegramService.SendMessage(chatId, "⚠️ Пост не найден.");
+						await ShowMainMenu(chatId, ct);
 					}
 				}
 
 				return;
 			}
 
-			if (text == "/start") await ShowMainMenu(bot, chatId, ct);
+			if (text == "/start") await ShowMainMenu(chatId, ct);
 		}
 
 		private async Task<BlogPost> CreatePostFromDataAsync(UserSession session, ImagesTelegram images, string manualCaption)
@@ -296,7 +312,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		}
 
 		// Метод, который вызывается, когда альбом "собрался" целиком
-		private async Task FinalizeAlbumAsync(ITelegramBotClient bot, string groupId, CancellationToken ct)
+		private async Task FinalizeAlbumAsync(string groupId, CancellationToken ct)
 		{
 			if (_albumBuffers.TryRemove(groupId, out var buffer))
 			{
@@ -311,13 +327,13 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				// Сбрасываем состояние
 				session.State = UserState.None;
 
-				await bot.SendMessage(buffer.ChatId, $"✅ Альбом из {newPost.Images.Count} фото добавлен!");
-				await ShowMainMenu(bot, buffer.ChatId, ct);
+				await _telegramService.SendMessage(buffer.ChatId, $"✅ Альбом из {newPost.Images.Count} фото добавлен!");
+				await ShowMainMenu(buffer.ChatId, ct);
 			}
 		}
 
 		// --- 3. ОБРАБОТЧИК КНОПОК ---
-		private async Task HandleCallbackQuery(ITelegramBotClient bot, CallbackQuery callback, CancellationToken ct)
+		private async Task HandleCallbackQuery(CallbackQuery callback, CancellationToken ct)
 		{
 			var chatId = callback.Message!.Chat.Id;
 			var messageId = callback.Message.MessageId;
@@ -334,7 +350,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				{
 					foreach (var id in session.ActiveAlbumMessageIds)
 					{
-						try { await bot.DeleteMessage(chatId, id, ct); } catch { /* игнорируем, если уже удалено */ }
+						try { await _telegramService.DeleteMessage(id, ct); } catch { /* игнорируем, если уже удалено */ }
 					}
 					session.ActiveAlbumMessageIds.Clear();
 				}
@@ -346,18 +362,18 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					// Возврат из режима просмотра фото
 					if (callback.Message.Type == MessageType.Photo)
 					{
-						await bot.DeleteMessage(chatId, messageId, ct);
-						await ShowMainMenu(bot, chatId, ct);
+						await _telegramService.DeleteMessage(messageId, ct);
+						await ShowMainMenu(chatId, ct);
 					}
 					else
 					{
-						await ShowMainMenu(bot, chatId, ct, messageId);
+						await ShowMainMenu(chatId, ct, messageId);
 					}
 					break;
 
 				// --- МЕНЮ ВЫБОРА ЗАГРУЗКИ ---
 				case "upload_menu":
-					await ShowNetworkSelection(bot, chatId, messageId, "upload_start", "Куда будем загружать?", ct);
+					await ShowNetworkSelection(chatId, messageId, "upload_start", "Куда будем загружать?", ct);
 					break;
 
 				case "upload_start":
@@ -369,8 +385,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						session.UploadAccess = AccessLevel.Public; // <--- Ставим флаг
 						session.State = UserState.WaitingForPhoto;
 
-						await bot.EditMessageText(chatId, messageId,
-							"📢 **Загрузка: ВСЕ ПУБЛИЧНЫЕ**\n\nПришлите фото.", parseMode: ParseMode.Markdown, cancellationToken: ct);
+						await _telegramService.EditMessageText(messageId,
+							"📢 **Загрузка: ВСЕ ПУБЛИЧНЫЕ**\n\nПришлите фото.\n/cancel - отмена", parseMode: ParseMode.Markdown, cancellationToken: ct);
 					}
 
 					// Сценарий "Во все ПРИВАТНЫЕ"
@@ -380,8 +396,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						session.UploadAccess = AccessLevel.Private; // <--- Ставим флаг
 						session.State = UserState.WaitingForPhoto;
 
-						await bot.EditMessageText(chatId, messageId,
-							"🔒 **Загрузка: ВСЕ ПРИВАТНЫЕ**\n\nПришлите фото.", parseMode: ParseMode.Markdown, cancellationToken: ct);
+						await _telegramService.EditMessageText(messageId,
+							"🔒 **Загрузка: ВСЕ ПРИВАТНЫЕ**\n\nПришлите фото.\n/cancel - отмена", parseMode: ParseMode.Markdown, cancellationToken: ct);
 					}
 
 					if (Enum.TryParse<NetworkType>(parts[1], out var netType))
@@ -392,7 +408,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 						string dest = netType == NetworkType.All ? "во ВСЕ сети" : $"в {netType}";
 
-						await bot.EditMessageText(chatId, messageId,
+						await _telegramService.EditMessageText(messageId,
 							$"📸 **Загрузка {dest}**\n\nПришлите фотографию. Она попадет в очередь только для выбранных сетей.\n/cancel - отмена",
 							parseMode: ParseMode.Markdown, cancellationToken: ct);
 					}
@@ -400,7 +416,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 				// --- МЕНЮ ВЫБОРА ОЧЕРЕДИ ---
 				case "browse_menu":
-					await ShowNetworkSelection(bot, chatId, messageId, "queue_list", "Какую очередь посмотреть?", ct);
+					await ShowNetworkSelection(chatId, messageId, "queue_list", "Какую очередь посмотреть?", ct);
 					break;
 
 				case "queue_list":
@@ -421,14 +437,14 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					{
 						// Сценарий 1: Вернулись из поста (были фотки).
 						// Нужно удалить старое меню (которое было под фотками) и прислать чистое новое.
-						try { await bot.DeleteMessage(chatId, messageId, ct); } catch { }
-						await ShowQueueList(bot, chatId, null, filterNet, accessFilter, page, ct);
+						try { await _telegramService.DeleteMessage(messageId, ct); } catch { }
+						await ShowQueueList(chatId, null, filterNet, accessFilter, page, ct);
 					}
 					else
 					{
 						// Сценарий 2: Просто листаем страницы списка.
 						// Сообщение удалять НЕ НАДО, его можно просто отредактировать. Это плавнее.
-						await ShowQueueList(bot, chatId, messageId, filterNet, accessFilter, page, ct);
+						await ShowQueueList(chatId, messageId, filterNet, accessFilter, page, ct);
 					}
 					break;
 
@@ -437,7 +453,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					await CleanupAlbumAsync();
 
 					Guid postId = Guid.Parse(parts[1]);
-					await ShowPostDetails(bot, chatId, messageId, postId, ct);
+					await ShowPostDetails(chatId, messageId, postId, ct);
 					break;
 
 				case "post_edit_start":
@@ -449,8 +465,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					session.State = UserState.WaitingForEditCaption;
 
 					// Удаляем фото (карточку), просим текст
-					await bot.DeleteMessage(chatId, messageId, ct);
-					await bot.SendMessage(chatId, "✏️ **Режим редактирования**\n\nПришлите новый текст описания для этого поста.\n/cancel - отмена", parseMode: ParseMode.Markdown);
+					await _telegramService.DeleteMessage(messageId, ct);
+					await _telegramService.SendMessage("✏️ **Режим редактирования**\n\nПришлите новый текст описания для этого поста.\n/cancel - отмена", parseMode: ParseMode.Markdown);
 					break;
 
 				case "post_delete":
@@ -467,7 +483,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						{
 							// Удаляем целиком
 							await _postService.DeletePostAsync(postToDelete.Id);
-							await bot.AnswerCallbackQuery(callback.Id, "Пост удален полностью.");
+							await _telegramService.AnswerCallbackQuery(callback.Id, "Пост удален полностью.");
 						}
 						// СЦЕНАРИЙ Б: Мы в конкретной сети -> Ставим статус None только для нее
 						else
@@ -486,22 +502,22 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 							if (!isActiveAnywhere)
 							{
 								await _postService.DeletePostAsync(postToDelete.Id);
-								await bot.AnswerCallbackQuery(callback.Id, "Пост удален (не осталось активных сетей).");
+								await _telegramService.AnswerCallbackQuery(callback.Id, "Пост удален (не осталось активных сетей).");
 							}
 							else
 							{
 								await _postService.UpdatePostAsync(postToDelete); // Просто обновляем
 								string netName = NetworkMetadata.Info[session.SelectedNetwork].Name;
-								await bot.AnswerCallbackQuery(callback.Id, $"Пост исключен из {netName}.");
+								await _telegramService.AnswerCallbackQuery(callback.Id, $"Пост исключен из {netName}.");
 							}
 						}
 					}
 
 					// Удаляем меню с кнопками
-					try { await bot.DeleteMessage(chatId, messageId, ct); } catch { }
+					try { await _telegramService.DeleteMessage(messageId, ct); } catch { }
 
 					// Возвращаемся в список (текущий пост исчезнет из него, так как сработает фильтр по статусу)
-					await ShowQueueList(bot, chatId, null, session.SelectedNetwork, session.LastFilter, 0, ct);
+					await ShowQueueList(chatId, null, session.SelectedNetwork, session.LastFilter, 0, ct);
 					break;
 				case "post_retry":
 					// 1. Очищаем старые фото из чата (если вдруг они висят)
@@ -548,8 +564,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						if (countRetried > 0)
 						{
 							await _postService.UpdatePostAsync(postToRetry);
-							await bot.AnswerCallbackQuery(callback.Id, $"✅ {countRetried} сетей отправлено на повтор. Запускаю...");
-							await ShowPostDetails(bot, chatId, messageId, retryId, ct);
+							await _telegramService.AnswerCallbackQuery(callback.Id, $"✅ {countRetried} сетей отправлено на повтор. Запускаю...");
+							await ShowPostDetails(chatId, messageId, retryId, ct);
 
 							_ = Task.Run(async () =>
 							{
@@ -580,7 +596,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						}
 						else
 						{
-							await bot.AnswerCallbackQuery(callback.Id, "⚠️ Нет ошибок для повторения.");
+							await _telegramService.AnswerCallbackQuery(callback.Id, "⚠️ Нет ошибок для повторения.");
 						}
 					}
 					break;
@@ -588,7 +604,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 		}
 
 		// --- 4. МЕТОДЫ UI ---
-		private async Task ShowMainMenu(ITelegramBotClient bot, long chatId, CancellationToken ct, int? messageIdToEdit = null)
+		private async Task ShowMainMenu(long chatId, CancellationToken ct, int? messageIdToEdit = null)
 		{
 			var allCount = await _postService.GetTotalCountAsync(NetworkType.All, AccessFilter.All);
 			var text = $"👋 **Панель управления SMM**\n\n" +
@@ -603,14 +619,14 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			});
 
 			if (messageIdToEdit.HasValue)
-				try { await bot.EditMessageText(chatId, messageIdToEdit.Value, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct); }
+				try { await _telegramService.EditMessageText(messageIdToEdit.Value, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct); }
 				catch { /* ignore edit errors */ }
 			else
-				await bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+				await _telegramService.SendMessage(text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
 		}
 
 		// Вспомогательное меню для выбора соцсети (универсальное)
-		static async Task ShowNetworkSelection(ITelegramBotClient bot, long chatId, int messageId, string actionPrefix, string title, CancellationToken ct)
+		private async Task ShowNetworkSelection(long chatId, int messageId, string actionPrefix, string title, CancellationToken ct)
 		{
 			var rows = new List<IEnumerable<InlineKeyboardButton>>();
 
@@ -680,10 +696,10 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			rows.Add(new[] { InlineKeyboardButton.WithCallbackData("🔙 Назад", "main_menu") });
 
 			var keyboard = new InlineKeyboardMarkup(rows);
-			await bot.EditMessageText(chatId, messageId, $"🤔 **{title}**\nВыберите режим:", parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+			await _telegramService.EditMessageText(messageId, $"🤔 **{title}**\nВыберите режим:", parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
 		}
 
-		private async Task ShowQueueList(ITelegramBotClient bot, long chatId, int? messageIdToEdit, NetworkType filterNet,
+		private async Task ShowQueueList(long chatId, int? messageIdToEdit, NetworkType filterNet,
 			 AccessFilter accessFilter, int page, CancellationToken ct)
 		{
 			const int pageSize = 5;
@@ -787,12 +803,12 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			var keyboard = new InlineKeyboardMarkup(rows);
 
 			if (messageIdToEdit.HasValue)
-				try { await bot.EditMessageText(chatId, messageIdToEdit.Value, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct); }
-				catch { await bot.DeleteMessage(chatId, messageIdToEdit.Value, ct); await bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct); }
-			else await bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+				try { await _telegramService.EditMessageText(messageIdToEdit.Value, text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct); }
+				catch { await _telegramService.DeleteMessage(messageIdToEdit.Value, ct); await _telegramService.SendMessage(text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct); }
+			else await _telegramService.SendMessage(text, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
 		}
 
-		private async Task ShowPostDetails(ITelegramBotClient bot, long chatId, int? messageIdToDelete, Guid postId, CancellationToken ct)
+		private async Task ShowPostDetails(long chatId, int? messageIdToDelete, Guid postId, CancellationToken ct)
 		{
 			var session = _sessions.GetOrAdd(chatId, new UserSession());
 			var post = await _postService.GetPostByIdAsync(postId);
@@ -917,12 +933,12 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			// -----------------------------------------------------------
 			// 4. ОТПРАВКА (ВАШ КОД)
 			// -----------------------------------------------------------
-
-			if (messageIdToDelete.HasValue) try { await bot.DeleteMessage(chatId, messageIdToDelete.Value, ct); } catch { }
+				
+			if (messageIdToDelete.HasValue) try { await _telegramService.DeleteMessage(messageIdToDelete.Value, ct); } catch { }
 
 			if (post.Images.Count > 0 && post.Images[0] == "dummy")
 			{
-				await bot.SendMessage(chatId, "🖼 [Альбом заглушек]\n\n" + infoText, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+				await _telegramService.SendMessage("🖼 [Альбом заглушек]\n\n" + infoText, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
 			}
 			else if (post.Images.Count == 1)
 			{
@@ -935,7 +951,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var sentMessages = await _telegramService.SendPhotoAlbumAsync(post.Images, null, "");
 				session.ActiveAlbumMessageIds = sentMessages.Select(m => m.MessageId).ToList();
 
-				await bot.SendMessage(chatId, infoText, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
+				await _telegramService.SendMessage(infoText, parseMode: ParseMode.Markdown, replyMarkup: keyboard, cancellationToken: ct);
 			}
 		}
 	}
