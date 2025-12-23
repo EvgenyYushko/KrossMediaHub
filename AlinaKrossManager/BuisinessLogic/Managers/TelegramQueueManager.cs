@@ -716,7 +716,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			int totalPosts = await _postService.GetTotalCountAsync(filterNet, accessFilter);
 
 			// И сами посты
-			var pagePosts = await _postService.GetPostsAsync(filterNet, accessFilter, page, 5); // pageSize = 5
+			var pagePosts = await _postService.GetPostsAsync(filterNet, accessFilter, page, pageSize);
 
 			var totalPages = (int)Math.Ceiling((double)totalPosts / pageSize);
 			if (page >= totalPages && totalPages > 0) page = totalPages - 1;
