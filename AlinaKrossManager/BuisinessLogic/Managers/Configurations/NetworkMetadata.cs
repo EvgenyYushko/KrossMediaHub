@@ -11,8 +11,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers.Configurations
 			{ NetworkType.Instagram, ("Instagram", "📸") },
 			{ NetworkType.Facebook, ("Facebook", "👥") } ,
 			{ NetworkType.BlueSky,   ("BlueSky", "💠") },
-			{ NetworkType.TelegramPublic, ("Telegram Public", "📱") },
 			{ NetworkType.X, ("X", "✗") },
+			{ NetworkType.TelegramPublic, ("Telegram Public", "📱") },
 			{ NetworkType.TelegramPrivate, ("Telegram Private", "💋") },
 		};
 
@@ -25,8 +25,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers.Configurations
 			NetworkType.Instagram,
 			NetworkType.Facebook,
 			NetworkType.BlueSky,
-			NetworkType.TelegramPublic,
 			NetworkType.X,
+			NetworkType.TelegramPublic,
 		};
 
 		// Куда постить, если нажали "Во все Приватные"

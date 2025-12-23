@@ -62,27 +62,12 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				_ => ("Hi", false)
 			};
 
-			// 2. Логика выбора входных данных для AI
-			// Если кеширование включено И у нас уже есть готовое описание (_tempCaption)
-			// -> мы используем ЕГО (чтобы AI его перефразировал или вернул как есть).
-			// Иначе -> берем чистый промпт из статического метода.
-			string promptToSend = (useCache && !string.IsNullOrEmpty(_tempCaption))
-				? _tempCaption
-				: promptFromStatic;
-
-			// 3. Вызов генерации
-			// Т.к. у нас нет ссылки на конкретный сервис (InstagramService и т.д.),
-			// мы вызываем общий метод генерации (например, через _generativeLanguageModel или ваш фасад),
-			// передавая туда СТРОКУ промпта.
-			string result = await _aiFacade.TryCreateDescription(null, images.Images, promptToSend);
-
-			// 4. Обновляем кеш
-			if (useCache)
+			if (!useCache || string.IsNullOrEmpty(_tempCaption))
 			{
-				_tempCaption = result;
+				_tempCaption = await _aiFacade.TryCreateDescription(null, images.Images, promptFromStatic);
 			}
 
-			return result;
+			return _tempCaption;
 		}
 
 		private async Task HandleMessage(Message message, CancellationToken ct)
@@ -332,7 +317,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 				foreach (var msgId in buffer.MessageIds)
 				{
-					try{await _telegramService.DeleteMessage(msgId, ct);}catch{}
+					try { await _telegramService.DeleteMessage(msgId, ct); } catch { }
 				}
 
 				await ShowMainMenu(buffer.ChatId, ct);

@@ -58,6 +58,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public Task<Message> SendMessage(string text, int? replayMsgId = null, ParseMode parseMode = ParseMode.Html, ReplyMarkup replyMarkup = null, CancellationToken cancellationToken = default)
 		{
+			if (text.Length > 4096)
+			{
+				text = text.Substring(0, 4000) + "\n...(обрезано)";
+				parseMode = ParseMode.Html;
+			}
+
 			if (replayMsgId is null)
 			{
 				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, parseMode: parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);
@@ -299,7 +305,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
-		public async Task<Message> SendPaidVideosAsync(IEnumerable<string> base64Videos, int starCount,string caption = "",ParseMode parseMode = ParseMode.None,
+		public async Task<Message> SendPaidVideosAsync(IEnumerable<string> base64Videos, int starCount, string caption = "", ParseMode parseMode = ParseMode.None,
 			long senderId = EVGENY_YUSHKO_TG_ID)
 		{
 			if (base64Videos == null || !base64Videos.Any())
