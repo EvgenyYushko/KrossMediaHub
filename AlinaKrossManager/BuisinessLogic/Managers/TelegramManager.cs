@@ -456,6 +456,11 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				var description = await GetDescription(rmsg, images, replayText, false, BlueSkyService.GetBaseDescriptionPrompt(images.Existst ? images.Images.First() : null));
 
 				await publisher.BlueSkyPost(description, images.Images, resVideos);
+				try
+				{
+					await _telegramService.SendMessage("✅ Post BlueSky success!", rmsg.MessageId);
+				}
+				catch { }
 			}
 			catch (Exception ex)
 			{

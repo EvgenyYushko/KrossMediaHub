@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using AlinaKrossManager.BuisinessLogic.Managers.Exceptions.BlueSky;
 using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.Services;
 
@@ -145,11 +146,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		// Метод теперь не принимает токены/PDS URL, а использует внутренние свойства класса
 		public async Task<bool> CreatePostAsync(string postText)
 		{
-			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl))
-			{
-				Console.WriteLine("❌ Сессия не активна или PDS URL не определен. Выполните Login/UpdateSession.");
-				return false;
-			}
+			ThrowIfInvalidToken();
 
 			var postEndpoint = $"{PdsUrl}/xrpc/com.atproto.repo.createRecord";
 
@@ -191,18 +188,13 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			else
 			{
 				var errorContent = await response.Content.ReadAsStringAsync();
-				Console.WriteLine($"❌ Ошибка при создании поста: {response.StatusCode} - {errorContent}");
-				return false;
+				throw new BlueSkyCreatePostException(response.StatusCode, errorContent);
 			}
 		}
 
 		public async Task<bool> CreatePostWithVideoAsync(string postText, Blob videoBlob, AspectRatio aspectRatio)
 		{
-			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl))
-			{
-				Console.WriteLine("❌ Сессия не активна.");
-				return false;
-			}
+			ThrowIfInvalidToken();
 
 			List<Facet> facets = TryGetFacets(postText);
 
@@ -250,18 +242,13 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			else
 			{
 				var errorContent = await response.Content.ReadAsStringAsync();
-				Console.WriteLine($"❌ Ошибка при создании поста с видео: {response.StatusCode} - {errorContent}");
-				return false;
+				throw new BlueSkyCreatePostException(response.StatusCode, errorContent);
 			}
 		}
 
 		public async Task<Blob?> UploadVideoFromBase64Async(string base64Video, string mimeType)
 		{
-			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl))
-			{
-				Console.WriteLine("❌ Сессия не активна.");
-				return null;
-			}
+			ThrowIfInvalidToken();
 
 			var uploadUrl = $"{PdsUrl}/xrpc/com.atproto.repo.uploadBlob";
 			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
@@ -311,11 +298,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task<Blob?> UploadImageFromBase64Async(string base64Image, string mimeType)
 		{
-			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl))
-			{
-				Console.WriteLine("❌ Сессия не активна.");
-				return null;
-			}
+			ThrowIfInvalidToken();
 
 			var uploadUrl = $"{PdsUrl}/xrpc/com.atproto.repo.uploadBlob";
 
@@ -371,8 +354,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		{
 			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl))
 			{
-				Console.WriteLine("❌ Сессия не активна.");
-				return false;
+				throw new BlueSkyCreatePostException();
 			}
 			if (images.Count == 0)
 			{
@@ -425,10 +407,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			else
 			{
 				var errorContent = await response.Content.ReadAsStringAsync();
-				Console.WriteLine($"❌ Ошибка при создании поста с изображениями: {response.StatusCode} - {errorContent}");
-				// Выведите отправленный JSON для финальной проверки структуры
-				Console.WriteLine($"Отправленный JSON (для отладки): {jsonPayload}");
-				return false;
+				throw new BlueSkyCreatePostException(response.StatusCode, errorContent);
 			}
 		}
 
@@ -464,6 +443,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 
 			return facets;
+		}
+
+		private void ThrowIfInvalidToken()
+		{
+			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl))
+			{
+				throw new BlueSkyInvalidSessionException();
+			}
 		}
 
 		public async Task<string> TruncateTextToMaxLength(string text)

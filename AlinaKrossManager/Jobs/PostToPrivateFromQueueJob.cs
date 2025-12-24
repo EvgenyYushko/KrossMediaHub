@@ -10,7 +10,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class PostToPrivateFromQueueJob : SchedulerJob
 	{
-		public static string Time => "0 20 15 * * ?";
+		public static string Time => "0 20 15 */2 * ?";
 
 		private readonly ILogger<PostToPublicFromQueueJob> _logger;
 		private readonly IServiceScopeFactory _serviceScopeFactory;

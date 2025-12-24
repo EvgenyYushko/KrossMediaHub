@@ -309,13 +309,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 				if (videoModel is not null)
 				{
 					var videoBlob = await _blueSkyService.UploadVideoFromBase64Async(videoModel.Base64Video, videoModel.MimeType);
-					if (videoBlob == null)
-					{
-						Console.WriteLine("Ошибка bluesky: не удалось загрузить видео.");
-						throw new Exception("Ошибка bluesky: не удалось загрузить видео.");
-					}
 					var ratio = new AspectRatio { Width = 9, Height = 16 };
-
 					success = await _blueSkyService.CreatePostWithVideoAsync(description, videoBlob, ratio);
 				}
 				else if (attachments is not null)
