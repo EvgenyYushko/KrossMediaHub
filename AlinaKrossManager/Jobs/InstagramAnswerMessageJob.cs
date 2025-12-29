@@ -132,7 +132,14 @@ namespace AlinaKrossManager.Jobs
 
 						if (lastMsg != null && lastMsg.Sender == "User")
 						{
-							await _instagramService.SendDellayMessageWithHistory(userId);
+							try
+							{
+								await _instagramService.SendDellayMessageWithHistory(userId);
+							}
+							catch (Exception ex)
+							{
+								Console.WriteLine(ex.Message);
+							}
 
 							// Добавляем пользователя в обработанные
 							_processedUsers.Add(userId);
