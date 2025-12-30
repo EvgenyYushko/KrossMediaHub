@@ -397,9 +397,16 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			}
 		}
 
-		public Task<bool> XPost(string caption, List<string> files)
+		public Task<bool> XPost(string caption, List<string> files = null)
 		{
-			return _xService.CreatePostPost(caption, files);
+			if(files is not null && files.Count > 0)
+			{
+				return _xService.CreatePostPost(caption, files);
+			}
+			else
+			{
+				return _xService.CreateTextPost(caption);
+			}
 		}
 	}
 }

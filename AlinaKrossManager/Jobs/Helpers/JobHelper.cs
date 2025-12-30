@@ -7,6 +7,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 		public static string INSTAGRAM_DAILY_MESSAGE_KEY = "InstagramDailyMessage";
 		public static string POST_TO_PUBLIC_FROM_QUEUE = "PostToPublicFromQueue";
 		public static string POST_TO_PRIVATE_FROM_QUEUE = "PostToPrivateFromQueue";
+		public static string X_DAILY_QUEUE = "XDailyQueue";
 
 		public static List<JobsSetting> JobSettings { get; set; } = new();
 
@@ -23,6 +24,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 			JobSettings.Add(new() { Type = typeof(InstagramDailyMessagesJob), Key = INSTAGRAM_DAILY_MESSAGE_KEY, Time = InstagramDailyMessagesJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(PostToPublicFromQueueJob), Key = POST_TO_PUBLIC_FROM_QUEUE, Time = PostToPublicFromQueueJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(PostToPrivateFromQueueJob), Key = POST_TO_PRIVATE_FROM_QUEUE, Time = PostToPrivateFromQueueJob.Time, Castum = false });
+			JobSettings.Add(new() { Type = typeof(XDailyJob), Key = X_DAILY_QUEUE, Time = XDailyJob.Time, Castum = false });
 		}
 	}
 
