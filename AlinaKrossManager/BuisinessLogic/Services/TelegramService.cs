@@ -56,7 +56,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return _telegramBotClient.AnswerCallbackQuery(callbackQueryId, text);
 		}
 
-		public Task<Message> SendMessage(string text, int? replayMsgId = null, ParseMode parseMode = ParseMode.Html, ReplyMarkup replyMarkup = null, CancellationToken cancellationToken = default)
+		public Task<Message> SendMessage(string text
+			, int? replayMsgId = null
+			, long? senderId = EVGENY_YUSHKO_TG_ID
+			, ParseMode parseMode = ParseMode.Html
+			, ReplyMarkup replyMarkup = null
+			, CancellationToken cancellationToken = default)
 		{
 			if (text.Length > 4096)
 			{
@@ -66,10 +71,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			if (replayMsgId is null)
 			{
-				return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text, parseMode: parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);
+				return _telegramBotClient.SendMessage(senderId, text, parseMode: parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);
 			}
 
-			return _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, text,
+			return _telegramBotClient.SendMessage(senderId, text,
 				replyParameters: new ReplyParameters { MessageId = replayMsgId.Value },
 				parseMode: parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);
 		}

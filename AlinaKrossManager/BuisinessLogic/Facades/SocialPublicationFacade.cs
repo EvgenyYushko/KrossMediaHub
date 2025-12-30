@@ -5,6 +5,7 @@ using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Telegram;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using static AlinaKrossManager.BuisinessLogic.Services.TelegramService;
 
 namespace AlinaKrossManager.BuisinessLogic.Facades
@@ -246,7 +247,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 				case NetworkType.TelegramPrivate:
 					{
 						await TelegramPrivatePost(caption, files, video);
-						await _telegramService.SendPaidPhotosAsync(files, 30, caption, senderId : PublicTelegramChanel.CHANEL_ID);
+						await _telegramService.SendPaidPhotosAsync(files, 30, caption, senderId: PublicTelegramChanel.CHANEL_ID);
 						//await _telegramService.SendPaidVideosAsync(files, 30, caption, senderId : PublicTelegramChanel.CHANEL_ID);
 						//try { await _telegramService.SendMessage("✅ Post TelegramPrivate success"); } catch { }
 					}
@@ -373,7 +374,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 				{
 					await _telegramService.SendVideoAsync(chanelId, caption, video);
 				}
-				else if (files.Count() > 0)
+				else if (files?.Count() > 0)
 				{
 					if (files.Count == 1)
 					{
@@ -386,7 +387,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 				}
 				else
 				{
-					await _telegramService.SendMessage(chanelId, caption);
+					await _telegramService.SendMessage(caption, null, chanelId, ParseMode.Html, null, default);
 				}
 
 				Console.WriteLine($"✅ Post {serviceName} success!");
@@ -399,7 +400,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 
 		public Task<bool> XPost(string caption, List<string> files = null)
 		{
-			if(files is not null && files.Count > 0)
+			if (files is not null && files.Count > 0)
 			{
 				return _xService.CreatePostPost(caption, files);
 			}
