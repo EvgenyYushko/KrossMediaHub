@@ -12,6 +12,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly ILogger<XDailyJob> _logger;
 		private readonly IServiceScopeFactory _serviceScopeFactory;
 
+		// по чётным дням 
 		public static string Time => "0 35 17 2-31/2 * ?";
 
 		public XDailyJob(IServiceProvider serviceProvider
@@ -33,7 +34,9 @@ namespace AlinaKrossManager.Jobs
 				{
 					var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
 
-					var textToX = await _generativeLanguageModel.GeminiRequest(prompt);
+					string topic = GetRandomTopic();
+
+					var textToX = await _generativeLanguageModel.GeminiRequest(prompt(topic));
 
 					_logger.LogInformation($"Текстовый пост в X: {textToX}");
 					await publisher.XPost(textToX);
@@ -45,6 +48,121 @@ namespace AlinaKrossManager.Jobs
 			}
 		}
 
-		private string prompt = "Role: You are a cynical and unscrupulous genius who creates adult content. You know how to speak on the edge (and beyond) to cause a tremor of excitement, rage, and envy. Your instrument is a shocking, almost indecent truth, presented in such a way that it is impossible to break away from it.\r\n\r\nTask: Generate one maximally provocative post (tweet) for the X platform (Twitter).\r\n\r\nThe context about the blogger:\r\n\r\nWho: A girl, an adult model with an audience of 500K+. Her image is not an angel, but a shameless and intelligent seductress who plays by her own rules.\r\n\r\nThe target audience in X is Adults (21+), with a male-dominated audience hungry for intimate details and outrageousness. They don't value beauty, but the audacity, sexual openness, and power it exudes.\r\n\r\nThe purpose of the post:\r\n\r\nEngagement through shock: Elicit a powerful reaction — from an excited \"wow!\" to an angry \"how dare she?!\" Likes, retweets, seething comments.\r\n\r\nNaked interest: To force you to immediately go to Instagram to see more, find out the context, see photos/ videos on the topic.\r\n\r\nBrand: To strengthen her reputation as the most depraved and audacious girl in the feed, who has the courage to say what others are only thinking.\r\n\r\nKey feature: The content must be openly vulgar, vulgar and intimate. These are not hints, but direct, physiological descriptions, details from personal and professional life related to the body, sex, money and power. Intelligence manifests itself in a sharp, cynical observation of this \"kitchen\".\r\n\r\nThemes (make them dirty):\r\n\r\nIndustry: \"How much is my smile/chest/post really worth? Numbers that will stun you. And yes, customers often pay with more than just money.\"\r\n\r\nRelationships/Psychology: \"A man thinks he bought me dinner. And I think I bought it with my time and body. Analysis of this mathematics in stories.\"\r\n\r\nSociety/Stereotypes: \"You call it venality. I call this an accurate calculation. My body is my starting capital, and I squeeze every penny out of it as long as there is demand. And you like it, you hypocrites.\"\r\n\r\nPersonal/Provocative: \"I'm going to tell you how I really get fucked on set. Not with a camera. And the terms of the contract and the producer's fingers under my skirt, while everyone pretends not to notice.\"\r\n\r\nTechnical assignment for the post:\r\n\r\nFormat: Text only. No hashtags.\r\n\r\nStructure (required):\r\n\r\nHook: The first sentence should hit below the belt. Use the most vulgar but accurate vocabulary (obscene roots and slang are allowed). To shock with physiology or cynicism.\r\n\r\nDevelopment/Conflict (Body): 2-3 sentences that deepen the shock. Add an intimate detail that will make the reader feel like an accomplice. Focus on power, money, manipulation, or physicality.\r\n\r\nCall to Action (CTA): A direct, audacious call. Not \"subscribe\", but \"Do you want to see what it was like?\", \"Weakly go to IG and tell me this to my face?\", \"All this trash in detail is in my story. Not for the faint of heart.\"\r\n\r\nStyle:\r\n\r\nTone: Arrogant, cynical, domineering, mocking. One feels superior and tired of the hypocrisy of the world.\r\n\r\nLanguage: Dirty slang, obscene vocabulary (moderately, but aptly), explicit physiological descriptions. Emojis are just for business (🔥, 💰, \U0001f92b).\r\n\r\nLength: 220-280 characters. Every word should burn.\r\n\r\nTask: Generate exactly one version of the tweet in the specified style. It should be like a slap in the face — sharp, wet with intimate details and leaving a burning desire to immediately go to Instagram to see more. Be merciless.\r\n\r\nResponse format: return strictly only the finished post, only its text. Without any kind of explanation, buckets, etc.";
+		// Получить случайную тему, которая еще не использовалась
+		public string GetRandomTopic()
+		{
+			// Если все темы использованы, сбрасываем список
+			if (usedTopics.Count >= allTopics.Count)
+			{
+				ResetUsedTopics();
+			}
+
+			// Находим неиспользованные темы
+			var availableTopics = allTopics.Except(usedTopics).ToList();
+
+			// Выбираем случайную тему из доступных
+			int index = random.Next(availableTopics.Count);
+			string selectedTopic = availableTopics[index];
+
+			// Добавляем в использованные
+			usedTopics.Add(selectedTopic);
+
+			return selectedTopic;
+		}
+
+		// Сбросить список использованных тем
+		public void ResetUsedTopics()
+		{
+			usedTopics.Clear();
+			ShuffleTopics();
+		}
+
+		private void ShuffleTopics()
+		{
+			allTopics = allTopics.OrderBy(x => random.Next()).ToList();
+		}
+
+		private Random random = new();
+		private List<string> usedTopics = new List<string>();
+		private List<string> allTopics = new List<string>
+		{
+			"Нежность и медленный, чувственный секс",
+			"Массаж как часть прелюдии",
+			"Обучение эротическим массажам (например, тантрическим)",
+			"Тематический секс (по мотивам фильма, книги, эпохи)",
+			"Секс в новых позах, изучение камасутры",
+			"Продление полового акта (техники для мужчин и женщин)",
+			"Контроль оргазма (для всех партнеров)",
+			"Одновременный оргазм",
+			"Секс во время месячных",
+			"Секс во время беременности и после родов",
+			"Секс в зрелом возрасте (изменения, новые возможности)",
+			"Изучение эрогенных зон партнера",
+			"Техники орального секса (куннилингус, фелляция)",
+			"Техники анальной стимуляции (для всех партнеров)",
+			"Использование льда, воска, перьев и других сенсорных стимуляторов",
+			"Поцелуи: виды, интенсивность, значение",
+			"Обмен одеждой, cross-dressing",
+			"Секс как выражение любви vs. страсти",
+			"Роль глазного контакта во время близости",
+			"Разговор 'грязные разговоры' (dirty talk): темы, тон, язык",
+			"Обмен секретами и сокровенными мыслями во время близости",
+			"Послесексуальная ласка (pillow talk)",
+			"Совместные медитации или дыхательные практики для синхронизации",
+			"Роль юмора и легкости в сексе",
+			"Как просить то, что хочешь, без стеснения",
+			"Как говорить 'нет' или 'стоп' комфортно для всех",
+			"Обсуждение прошлого сексуального опыта: границы откровенности",
+			"Ревность и как с ней работать в контексте фантазий",
+			"Секс после ссоры (примирение через близость)",
+			"Смена ролей (доминирование/подчинение)",
+			"Секс без доминирования (полное равенство)",
+			"Забота и опека как часть игры (caregiver/little)",
+			"Ролевые игры с конкретными сценариями (врач-пациент, учитель-ученик, похититель-жертва и т.д.)",
+			"Pet play (игра в животных)",
+			"Возрастные ролевые игры (age play)",
+			"Форсированный оргазм (forced orgasm)",
+			"Оргазменный контроль (orgasm control/denial)",
+			"Сенсорная депривация (повязка на глаза, наушники)",
+			"Игра в сопротивление (consensual non-consent / CNC)",
+			"Финансовая динамика (например, 'содержанка')",
+			"Безопасность, границы и логистика",
+			"Обсуждение и проверка ЗППП",
+			"Контрацепция: методы, предпочтения, смена",
+			"Системы безопасности в BDSM (стоп-слова, жесты, послеcare)",
+			"План на случай, если игра зайдет слишком далеко",
+			"Хранение игрушек, уход за ними",
+			"Секс в условиях, когда дома есть дети или другие люди",
+			"Планирование секса vs. спонтанность",
+			"Обсуждение бюджета на игрушки, белье, поездки",
+			"Фетиши и специфические практики:",
+			"Фут-фетиш, фистинг, фетиш на одежду (латекс, шелк, кожа), фетиш на части тела",
+			"Влажность, грязь (мокрые и грязные игры - wet and messy)",
+			"Игры с едой (нутри-секс)",
+			"Секс в одежде или в определенных видах костюмов",
+			"Тематические фетиши (медицинский, спортивный)",
+			"Писательство (водные спортивные игры - watersports)",
+			"Копро-филия (scat) - Важно: это крайняя и редкая практика, обсуждать с особым вниманием к гигиене и согласию.",
+			"Абстиненция и целибат как практика",
+			"Совместное прослушивание эротических аудио-книг/подкастов",
+			"Технологии и опыты:",
+			"Секс в VR (виртуальная реальность)",
+			"Использование приложений для управления игрушками на расстоянии (Lovense и др.)",
+			"Секс-роботы и будущее технологий в интиме",
+			"Совместное ведение секс-блога или дневника",
+			"Эротическая фото-/видеосъемка (правила, хранение)",
+			"Переписка в стиле 'секстинг' в течение дня",
+			"Философские и этические аспекты",
+			"Что для вас означает духовность в сексе?",
+			"Открытые отношения, полиамория, свиингинг - исследование возможностей",
+			"Границы флирта с другими людьми",
+			"Моногамия vs. немоногамия: ваши истинные желания",
+			"Секс-работа (посещение профессиональных доминант, etc.) - отношение, границы",
+			"Влияние религии и культуры на вашу сексуальность",
+			"Сексуальное образование: что вы хотели бы знать раньше?",
+			"Как меняются сексуальные желания с возрастом и опытом?"
+		};
+
+		private string prompt(string theme) => $"Role: You are a virtuoso of erotic copywriting and psychology. You create content for a brave, intelligent, and sexually liberated woman who sees her sensuality as a force, not a commodity. You speak the language of desire, power, and intellectual provocation.\r\n\r\nTask: Generate one bold, intriguing post (tweet) for the X platform (Twitter).\r\n\r\nThe context about the blogger:\r\n\r\nWho: Alina Cross. A successful model and influencer (500K+). Her image is conscious, dominant sensuality. She's not \"selling the body,\" she's demonstrating power over it and the situation. She is smart, cynical, confident, and openly enjoys her sexuality, lustful thoughts, and physiology.\r\n\r\nAudience in X: Adults (21+). They value not only looks, but also a sharp mind, courage, honesty in matters of desire and frank but stylish flirtation.\r\n\r\nThe purpose of the post:\r\n\r\nEngagement: To provoke a reaction of \"I love her arrogance/honesty.\" Likes, retweets, comments with consent or dispute. As well as advertising a private channel where there is juicy content on the link: https://linktr.ee/AlinaKross \r\n\r\nThe intrigue: To create a desire to see more — her image, context, continuation of thought — in private channels: https://linktr.ee/AlinaKross .\r\n\r\nThe brand: To strengthen its reputation as the most outspoken and philosophical \"bad girl\" in the feed.\r\n\r\nKey features: The content is an explicit, lustful, provocative conversation about sex and psychology. The emphasis is on personal feelings, desire, control, play, and cynical observations. This is not a dirty strip chat, but an intellectual and erotic provocation. Physiology is presented as art, not as vulgarity.\r\n\r\nSubject: {theme}\r\n\r\nTechnical specification:\r\n\r\nFormat: Text with relevant emojis. At the end of the text, add a couple of relevant hashtags on this topic.\r\n\r\nStructure:\r\n\r\nHook: The first sentence is an audacious, sensual statement or a question that strikes the most taboo. It should cause a \"wow!\" and a smile.\r\n\r\nDevelopment: 1-2 sentences. Open up the topic by adding a personal, cynical or philosophical twist. Focus on sensations, intimacy, lust, and play.\r\n\r\nCall to Action (CTA): A playful challenge or an intriguing suggestion. \"Do you want to know what happened next?\", \"Do you agree or will you argue? — write to me at: https://linktr.ee/AlinaKross \"\r\n\r\nStyle:\r\n\r\nTone: Confident, mocking, playful, with a touch of intellectual cynicism. You can feel the pleasure of the game.\r\n\r\nLanguage: Explicit, sensual, with elements of erotic vocabulary, but without vulgar vulgarity or obscenities. Hints and metaphors are acceptable.\r\n\r\nEmoji: Use it to enhance: 🔥, 👁️, 🎯, \U0001f92b, 💋, ⚡️.\r\n\r\nLength: 200-260 characters. Concise and succinct.\r\n\r\nTask: Generate exactly one tweet in the specified style. It should be like a perfectly applied lipstick — bright, bold and leaving a mark. Make it as provocative as possible, but within the aesthetics of conscious, intelligent lust.";
 	}
 }
