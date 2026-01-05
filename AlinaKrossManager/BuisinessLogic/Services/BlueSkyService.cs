@@ -241,6 +241,107 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			await _httpClient.PostAsync(endpoint, content);
 		}
 
+		//
+
+		/// <summary>
+		/// Получает список непрочитанных уведомлений (ответов и упоминаний)
+		/// </summary>
+		public async Task<List<Notification>> GetUnreadNotificationsAsync()
+		{
+			ThrowIfInvalidToken();
+			var endpoint = $"{PdsUrl}/xrpc/app.bsky.notification.listNotifications?limit=10"; // Берем последние 10
+
+			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
+
+			try
+			{
+				var response = await _httpClient.GetAsync(endpoint);
+				if (response.IsSuccessStatusCode)
+				{
+					var json = await response.Content.ReadAsStringAsync();
+					var result = JsonSerializer.Deserialize<NotificationListResponse>(json);
+
+					// Фильтруем: только непрочитанные и только ответы (reply) или упоминания (mention)
+					return result?.Notifications
+						.Where(n => !n.IsRead && (n.Reason == "reply" || n.Reason == "mention"))
+						.ToList() ?? new List<Notification>();
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка получения уведомлений: {ex.Message}");
+			}
+			return new List<Notification>();
+		}
+
+		/// <summary>
+		/// Создает ответ на комментарий
+		/// </summary>
+		public async Task<bool> CreateReplyAsync(string text, string rootUri, string rootCid, string parentUri, string parentCid)
+		{
+			ThrowIfInvalidToken();
+			var endpoint = $"{PdsUrl}/xrpc/com.atproto.repo.createRecord";
+
+			List<Facet> facets = TryGetFacets(text); // Хештеги работают и в ответах
+
+			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
+
+			var record = new
+			{
+				text = text,
+				createdAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+				facets = facets.Any() ? facets : null,
+				// САМОЕ ВАЖНОЕ: Блок reply
+				reply = new
+				{
+					root = new { uri = rootUri, cid = rootCid },     // Ссылка на самый первый пост ветки
+					parent = new { uri = parentUri, cid = parentCid } // Ссылка на комментарий, на который отвечаем
+				}
+			};
+
+			var payload = new
+			{
+				repo = Did,
+				collection = "app.bsky.feed.post",
+				record = record
+			};
+
+			var jsonPayload = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+			var response = await _httpClient.PostAsync(endpoint, content);
+
+			if (response.IsSuccessStatusCode)
+			{
+				Console.WriteLine("✅ Ответ на комментарий опубликован!");
+				return true;
+			}
+			else
+			{
+				var err = await response.Content.ReadAsStringAsync();
+				Console.WriteLine($"❌ Ошибка ответа: {response.StatusCode} - {err}");
+				return false;
+			}
+		}
+
+		/// <summary>
+		/// Обновляет счетчик уведомлений (помечает прочитанными)
+		/// </summary>
+		public async Task UpdateSeenNotificationsAsync(string seenAtParams)
+		{
+			// seenAt должен быть датой последнего обработанного уведомления
+			var endpoint = $"{PdsUrl}/xrpc/app.bsky.notification.updateSeen";
+
+			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
+
+			var payload = new { seenAt = seenAtParams };
+			var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+			await _httpClient.PostAsync(endpoint, content);
+		}
+
+		//
+
 		// --- Шаг 3: Создание поста ---
 
 		// Метод теперь не принимает токены/PDS URL, а использует внутренние свойства класса
@@ -592,8 +693,67 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		}
 	}
 
-	// --- DTO для Чата (Direct Messages) ---
+	public class NotificationListResponse
+	{
+		[JsonPropertyName("notifications")]
+		public List<Notification> Notifications { get; set; } = new List<Notification>();
+	}
 
+	public class Notification
+	{
+		[JsonPropertyName("uri")]
+		public string Uri { get; set; }        // URI комментария
+
+		[JsonPropertyName("cid")]
+		public string Cid { get; set; }        // CID комментария
+
+		[JsonPropertyName("author")]
+		public Author Author { get; set; }
+
+		[JsonPropertyName("reason")]
+		public string Reason { get; set; }     // "reply", "mention", "like" и т.д.
+
+		[JsonPropertyName("record")]
+		public object Record { get; set; }     // Внутренности поста (текст, reply refs)
+
+		[JsonPropertyName("isRead")]
+		public bool IsRead { get; set; }
+
+		[JsonPropertyName("indexedAt")]
+		public string IndexedAt { get; set; }
+	}
+
+	public class Author
+	{
+		[JsonPropertyName("did")]
+		public string Did { get; set; }
+		[JsonPropertyName("handle")]
+		public string Handle { get; set; }
+	}
+
+	// Этот класс нужен, чтобы десериализовать поле "record" и найти Root поста
+	public class NotificationPostRecord
+	{
+		[JsonPropertyName("text")]
+		public string Text { get; set; }
+
+		[JsonPropertyName("reply")]
+		public ReplyRef? Reply { get; set; }
+
+		[JsonPropertyName("$type")]
+		public string Type { get; set; }
+	}
+
+	public class ReplyRef
+	{
+		[JsonPropertyName("root")]
+		public Ref Root { get; set; }
+
+		[JsonPropertyName("parent")]
+		public Ref Parent { get; set; }
+	}
+
+	// --- DTO для Чата (Direct Messages) ---
 	public class ConvoListResponse
 	{
 		[JsonPropertyName("convos")]
@@ -845,9 +1005,18 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 	public class Ref
 	{
-		// CID в формате AT URI
+		// В некоторых случаях API использует $link, в других uri/cid.
+		// При десериализации (чтении) записи поста (Record) структура такая:
+		[JsonPropertyName("uri")]
+		public string Uri { get; set; }
+
+		[JsonPropertyName("cid")]
+		public string Cid { get; set; }
+
+		// Для совместимости со старым кодом (UploadBlob возвращает $link)
+		// Можно оставить свойство Link и мапить его вручную, если нужно.
 		[JsonPropertyName("$link")]
-		public string Link { get; set; } = string.Empty;
+		public string Link { get; set; }
 	}
 
 	public class ImageAttachment

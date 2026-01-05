@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Services;
 using Quartz;
@@ -65,13 +66,141 @@ namespace AlinaKrossManager.Jobs.Messages
 						await _bskyService.MarkConvoAsReadAsync(convo.Id, convo.LastMessage.Id);
 					}
 				}
+
+				// Отвечаем на комменты
+				await AnswerComments();
 			}
 			catch (Exception ex)
 			{
 				_logger.LogError($"Ошибка в BlueSkyDmJob: {ex.Message}");
 				// Если токен протух, пробуем обновить
-				await _bskyService.UpdateSessionAsync();
+				//await _bskyService.UpdateSessionAsync();
 			}
+		}
+
+		private async Task<bool> AnswerComments()
+		{
+			// 1. Получаем новые ответы
+			var notifications = await _bskyService.GetUnreadNotificationsAsync();
+
+			if (notifications == null || !notifications.Any()) return false;
+
+			string lastSeenDate = ""; // Для пометки прочитанным
+
+			foreach (var notif in notifications)
+			{
+				lastSeenDate = notif.IndexedAt; // Запоминаем дату
+
+				if (notif.Reason != "reply" && notif.Reason != "mention")
+				{
+					// Это лайк, репост или подписка - пропускаем
+					continue;
+				}
+
+				// Игнорируем свои собственные ответы (на всякий случай)
+				if (notif.Author.Did == _bskyService.Did) continue;
+
+				// 2. Извлекаем текст комментария и данные Root
+				// Поле Record приходит как object (JsonElement), нужно его распарсить
+				string incomingText = "";
+				string rootUri = "";
+				string rootCid = "";
+
+				// Десериализация "сырого" объекта record
+				if (notif.Record is JsonElement jsonElement)
+				{
+					var recordData = jsonElement.Deserialize<NotificationPostRecord>();
+					if (recordData != null)
+					{
+						incomingText = recordData.Text;
+
+						// ЛОГИКА ROOT:
+						// Если человек ответил на наш пост, то в его комментарии уже есть ссылка на Root.
+						// Нам нужно сохранить этот Root, чтобы ветка не ломалась.
+						if (recordData.Reply != null)
+						{
+							rootUri = recordData.Reply.Root.Link;
+							rootCid = recordData.Reply.Root.Link; // Здесь ошибка в API DTO, CID обычно отдельно, но в Ref он может быть не нужен для отправки, важен URI. 
+																  // Стоп. В Ref (DTO выше) поле $link - это URI. CID нам нужен отдельно.
+																  // В C# Ref классе у вас: public string Link { get; set; } - это обычно URI.
+																  // НО! Для отправки нам нужны и URI и CID. 
+																  // Упрощение: мы берем данные из ReplyRef входящего поста.
+
+							// BlueSky требует точные CID.
+							// В уведомлении (Notif) есть "Record". Но чтобы ответить правильно, 
+							// нам проще всего считать:
+							// Root = то, что было Root у комментатора.
+							// Parent = Сам комментарий (notif.Uri и notif.Cid).
+						}
+						else
+						{
+							// Если это Mention (упоминание в новом посте), то Root = этот новый пост.
+							rootUri = notif.Uri;
+							rootCid = notif.Cid;
+						}
+					}
+				}
+
+				// Если не удалось извлечь Root (бывает), используем сам комментарий как Root (фоллбек)
+				if (string.IsNullOrEmpty(rootUri))
+				{
+					// Пытаемся взять из Reply входящего сообщения, но если там null, значит это новый тред
+					// В DTO Ref поле Link - это URI. CID там нет? 
+					// В NotificationPostRecord -> Reply -> Root -> Link (URI).
+					// Для простоты, если мы не можем найти Root, мы просто не отвечаем, чтобы не ломать дерево.
+					// Но давайте попробуем грубый вариант: Root = Parent.
+					rootUri = notif.Uri;
+					rootCid = notif.Cid;
+				}
+
+				// Parent для нашего ответа - это ВСЕГДА тот пост, на который мы отвечаем (уведомление)
+				string parentUri = notif.Uri;
+				string parentCid = notif.Cid;
+
+				// Однако, если у входящего сообщения БЫЛ root, мы ОБЯЗАНЫ использовать его URI и CID.
+				// К сожалению, из простого JsonElement внутри Notification сложно достать CID рута.
+				// НО! API BlueSky прощает, если Root URI верен.
+				// Давайте попробуем достать Root корректно.
+
+				// Улучшенная десериализация
+				try
+				{
+					var rec = ((JsonElement)notif.Record).Deserialize<NotificationPostRecord>();
+					if (rec?.Reply != null)
+					{
+						// Берем URI рута из входящего
+						// Внимание: Ref класс у вас имеет только $link. 
+						// В API там: "root": { "uri": "...", "cid": "..." }
+						// Вам нужно обновить класс Ref в BlueSkyService.cs
+
+						// Предположим, вы обновите DTO (см. ниже Шаг 4).
+						// Тогда:
+						rootUri = rec.Reply.Root.Uri;
+						rootCid = rec.Reply.Root.Cid;
+					}
+				}
+				catch { }
+
+
+				_logger.LogInformation($"Комментарий от {notif.Author.Handle}: {incomingText}");
+
+				// 3. Генерация ответа
+				string prompt = $"Role: You are Alina Kross. Reply to a comment on BlueSky: \"{incomingText}\". " +
+								"Be witty, slightly dominant or thankful depending on context. Keep it short (max 150 chars).";
+
+				string replyText = await _aiModel.GeminiRequest(prompt);
+
+				// 4. Отправка
+				await _bskyService.CreateReplyAsync(replyText, rootUri, rootCid, parentUri, parentCid);
+			}
+
+			// 5. Помечаем все уведомления как прочитанные
+			if (!string.IsNullOrEmpty(lastSeenDate))
+			{
+				await _bskyService.UpdateSeenNotificationsAsync(lastSeenDate);
+			}
+
+			return true;
 		}
 
 		private string GetPrompt(string incomingText)
