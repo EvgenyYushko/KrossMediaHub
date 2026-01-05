@@ -11,8 +11,7 @@ namespace AlinaKrossManager.Jobs.Messages
 		private readonly IGenerativeLanguageModel _aiModel;
 		private readonly ILogger<FaceBookDmJob> _logger;
 
-		// Запускаем каждые 5 минут
-		public static string Time => "0 0 0 0 * ?";
+		public static string Time => "0 0 10 * * ?";
 
 		public FaceBookDmJob(FaceBookService fbService, IGenerativeLanguageModel aiModel, ILogger<FaceBookDmJob> logger)
 		{
