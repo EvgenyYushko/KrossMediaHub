@@ -13,7 +13,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly IServiceScopeFactory _serviceScopeFactory;
 
 		// по чётным дням 
-		public static string Time => "0 35 17 2-31/2 * ?";
+		public static string Time => "0 10 14 * * ?";
 
 		public XDailyJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel
