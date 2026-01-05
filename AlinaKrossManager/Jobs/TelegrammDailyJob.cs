@@ -81,8 +81,8 @@ namespace AlinaKrossManager.Jobs
 		}
 
 		private Random random = new();
-		private List<string> usedTopics = new List<string>();
-		private List<string> allTopics = new List<string>
+		private static List<string> usedTopics = new List<string>();
+		private static List<string> allTopics = new List<string>
 		{
 			"Нежность и медленный, чувственный секс",
 			"Массаж как часть прелюдии",

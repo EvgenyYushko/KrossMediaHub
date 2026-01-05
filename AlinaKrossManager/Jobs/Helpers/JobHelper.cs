@@ -1,3 +1,5 @@
+using AlinaKrossManager.Jobs.Messages;
+
 namespace AlinaKrossManager.Jobs.Helpers
 {
 	public static class JobHelper
@@ -9,6 +11,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 		public static string POST_TO_PRIVATE_FROM_QUEUE = "PostToPrivateFromQueue";
 		public static string X_DAILY_QUEUE = "XDailyQueue";
 		public static string TELEGRAMM_FREE_DAILY_QUEUE = "TelegrammFreeDailyQueue";
+		public static string BLUE_SKY_DM_JOB_QUEUE = "BlueSkyDmJob";
 
 		public static List<JobsSetting> JobSettings { get; set; } = new();
 
@@ -27,6 +30,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 			JobSettings.Add(new() { Type = typeof(PostToPrivateFromQueueJob), Key = POST_TO_PRIVATE_FROM_QUEUE, Time = PostToPrivateFromQueueJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(XDailyJob), Key = X_DAILY_QUEUE, Time = XDailyJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(TelegrammDailyJob), Key = TELEGRAMM_FREE_DAILY_QUEUE, Time = TelegrammDailyJob.Time, Castum = false });
+			JobSettings.Add(new() { Type = typeof(BlueSkyDmJob), Key = BLUE_SKY_DM_JOB_QUEUE, Time = BlueSkyDmJob.Time, Castum = false });
 		}
 	}
 

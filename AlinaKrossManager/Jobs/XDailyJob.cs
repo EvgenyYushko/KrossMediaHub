@@ -13,7 +13,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly IServiceScopeFactory _serviceScopeFactory;
 
 		// по чётным дням 
-		public static string Time => "0 10 14 * * ?";
+		public static string Time => "0 26 17 2-31/2 * ?";
 
 		public XDailyJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel
@@ -83,8 +83,8 @@ namespace AlinaKrossManager.Jobs
 		}
 
 		private Random random = new();
-		private List<string> usedTopics = new List<string>();
-		private List<string> allTopics = new List<string>
+		private static List<string> usedTopics = new List<string>();
+		private static List<string> allTopics = new List<string>
 		{
 			"Нежность и медленный, чувственный секс",
 			"Массаж как часть прелюдии",

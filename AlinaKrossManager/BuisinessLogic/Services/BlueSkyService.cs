@@ -18,8 +18,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly HttpClient _httpClient;
 		private const string RefreshUrl = "https://bsky.social/xrpc/com.atproto.server.refreshSession";
 		private const string LoginUrl = "https://bsky.social/xrpc/com.atproto.server.createSession"; // Добавлен для удобства
-		private readonly string _identifire = "alinakross.bsky.social";
-		private readonly string _appPassword = "d4an-bvic-ssrd-r663";
+		private const string ChatUrl = "https://api.bsky.chat";
+		private readonly string _identifire;
+		private readonly string _appPassword;
 
 		// Свойства для хранения состояния сессии
 		public string AccessJwt { get; private set; } = string.Empty;
@@ -59,6 +60,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					if (session != null)
 					{
 						InitializeSession(session);
+						BlueSkyLogin = true;
 						return true;
 					}
 				}
@@ -139,6 +141,104 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				Console.WriteLine($"Ошибка при обновлении токена: {ex.Message}");
 			}
 			return false;
+		}
+
+		/// <summary>
+		/// Получает список чатов, где есть непрочитанные сообщения
+		/// </summary>
+		public async Task<List<Convo>> GetUnreadConversationsAsync()
+		{
+			ThrowIfInvalidToken();
+
+			// EndPoint для получения списка диалогов
+			var endpoint = $"{ChatUrl}/xrpc/chat.bsky.convo.listConvos";
+
+			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
+
+			// Обязательный заголовок для проксирования чата
+			if (!_httpClient.DefaultRequestHeaders.Contains("atproto-proxy"))
+			{
+				_httpClient.DefaultRequestHeaders.Add("atproto-proxy", "bsky_chat");
+			}
+
+			try
+			{
+				var response = await _httpClient.GetAsync(endpoint);
+
+				if (response.IsSuccessStatusCode)
+				{
+					var json = await response.Content.ReadAsStringAsync();
+					var result = JsonSerializer.Deserialize<ConvoListResponse>(json);
+
+					// Возвращаем только те, где есть непрочитанные
+					return result?.Convos.Where(c => c.UnreadCount > 0).ToList() ?? new List<Convo>();
+				}
+				else
+				{
+					// Если ошибка 401 - возможно, нужно обновить токен (Refresh)
+					Console.WriteLine($"Ошибка получения чатов: {response.StatusCode}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Exception Chat List: {ex.Message}");
+			}
+
+			return new List<Convo>();
+		}
+
+		/// <summary>
+		/// Отправляет сообщение в указанный диалог (ConvoId)
+		/// </summary>
+		public async Task<bool> SendChatMessageAsync(string convoId, string text)
+		{
+			ThrowIfInvalidToken();
+			var endpoint = $"{ChatUrl}/xrpc/chat.bsky.convo.sendMessage";
+
+			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
+			if (!_httpClient.DefaultRequestHeaders.Contains("atproto-proxy"))
+				_httpClient.DefaultRequestHeaders.Add("atproto-proxy", "bsky_chat");
+
+			var payload = new
+			{
+				convoId = convoId,
+				message = new { text = text }
+			};
+
+			var jsonPayload = JsonSerializer.Serialize(payload);
+			var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+			var response = await _httpClient.PostAsync(endpoint, content);
+
+			if (response.IsSuccessStatusCode)
+			{
+				Console.WriteLine($"✅ Ответ отправлен в чат {convoId}");
+				return true;
+			}
+
+			var err = await response.Content.ReadAsStringAsync();
+			Console.WriteLine($"❌ Ошибка отправки ЛС: {err}");
+			return false;
+		}
+
+		/// <summary>
+		/// Помечает сообщения в диалоге как прочитанные (чтобы не отвечать вечно)
+		/// </summary>
+		public async Task MarkConvoAsReadAsync(string convoId, string lastMessageId)
+		{
+			ThrowIfInvalidToken();
+			var endpoint = $"{ChatUrl}/xrpc/chat.bsky.convo.updateRead";
+
+			_httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessJwt);
+
+			var payload = new
+			{
+				convoId = convoId,
+				messageId = lastMessageId
+			};
+
+			var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+			await _httpClient.PostAsync(endpoint, content);
 		}
 
 		// --- Шаг 3: Создание поста ---
@@ -447,7 +547,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		private void ThrowIfInvalidToken()
 		{
-			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl))
+			if (string.IsNullOrEmpty(AccessJwt) || string.IsNullOrEmpty(PdsUrl) || !BlueSkyLogin)
 			{
 				throw new BlueSkyInvalidSessionException();
 			}
@@ -490,6 +590,61 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				$"Пример ответа: ✨ Feeling the magic of the sunset.\r\n\r\n#ai #aiart #aigenerated #aiartwork #artificialintelligence " +
 				$"#neuralnetwork #digitalart #generativeart #aigirl #virtualmodel #digitalmodel #aiwoman #aibeauty #aiportrait #aiphotography";
 		}
+	}
+
+	// --- DTO для Чата (Direct Messages) ---
+
+	public class ConvoListResponse
+	{
+		[JsonPropertyName("convos")]
+		public List<Convo> Convos { get; set; } = new List<Convo>();
+	}
+
+	public class Convo
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; } = string.Empty;
+
+		[JsonPropertyName("unreadCount")]
+		public int UnreadCount { get; set; }
+
+		[JsonPropertyName("lastMessage")]
+		public MessageBlueSky? LastMessage { get; set; }
+
+		[JsonPropertyName("members")]
+		public List<ConvoMember> Members { get; set; }
+	}
+
+	public class ConvoMember
+	{
+		[JsonPropertyName("did")]
+		public string Did { get; set; }
+
+		// В ответе может быть profile, handle и т.д.
+	}
+
+	public class MessageBlueSky
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+
+		[JsonPropertyName("text")]
+		public string Text { get; set; }
+
+		[JsonPropertyName("sender")]
+		public MessageSender Sender { get; set; }
+	}
+
+	public class MessageSender
+	{
+		[JsonPropertyName("did")]
+		public string Did { get; set; }
+	}
+
+	public class SendMessageResponse
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
 	}
 
 	// Структура для определения диапазона символов

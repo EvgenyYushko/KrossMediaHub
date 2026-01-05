@@ -280,7 +280,6 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 				}
 
 				Console.WriteLine("Успешно удалось войти в аккаунт bluesky. ✅");
-				_blueSkyService.BlueSkyLogin = true;
 			}
 
 			if (await _blueSkyService.UpdateSessionAsync())
