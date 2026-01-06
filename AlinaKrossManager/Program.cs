@@ -73,7 +73,8 @@ builder.Services.AddSingleton(provider =>
 {
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
 	var longLiveToken = GetConfigOrThrow(FACE_BOOK_LONG_TOKEN);
-	return new FaceBookService(longLiveToken, geminiModel);
+	var longLivedTokenMessanger = GetConfigOrThrow(FACE_BOOK_MESSANGER_LONG_TOKEN);
+	return new FaceBookService(longLiveToken, longLivedTokenMessanger, geminiModel);
 });
 
 builder.Services.AddSingleton(provider =>

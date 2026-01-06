@@ -7,15 +7,17 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 	public class FaceBookService : SocialBaseService
 	{
 		private readonly string _longLivedUserToken;
+		private readonly string _longLivedTokenMessanger;
 		private string _userId = "122108650443054121";
 		string _pageIdToPublish = "872506142593246";
 
 		public override string ServiceName => "FaceBook";
 
-		public FaceBookService(string longLivedUserToken, IGenerativeLanguageModel generativeLanguageModel)
+		public FaceBookService(string longLivedUserToken, string longLivedTokenMessanger, IGenerativeLanguageModel generativeLanguageModel)
 			: base(generativeLanguageModel)
 		{
 			_longLivedUserToken = longLivedUserToken;
+			_longLivedTokenMessanger = longLivedTokenMessanger;
 		}
 
 		private async Task<string> GetPageAccessTokenAsync()
@@ -48,7 +50,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public async Task<List<FbMessage>> GetUnreadMessagesAsync()
 		{
 			// 1. Получаем токен страницы (он нужен для чтения ЛС страницы)
-			string pageAccessToken = await GetPageAccessTokenAsync();
+			string pageAccessToken = _longLivedTokenMessanger;
 
 			// 2. Формируем запрос
 			// Мы просим список диалогов, где unread_count > 0
@@ -103,7 +105,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		/// <param name="text">Текст ответа</param>
 		public async Task<bool> SendReplyAsync(string recipientId, string text)
 		{
-			string pageAccessToken = await GetPageAccessTokenAsync();
+			string pageAccessToken = _longLivedTokenMessanger;
 			string url = $"https://graph.facebook.com/v24.0/{_pageIdToPublish}/messages";
 
 			// Формат запроса для отправки текста
