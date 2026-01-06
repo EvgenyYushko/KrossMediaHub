@@ -22,7 +22,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		private async Task<string> GetPageAccessTokenAsync()
 		{
-			string accountsUrl = $"https://graph.facebook.com/v24.0/{_userId}/accounts?access_token={_longLivedUserToken}";
+			string accountsUrl = $"https://graph.facebook.com/v24.0/me/accounts?access_token={_longLivedUserToken}";
 
 			using (var httpClient = new HttpClient())
 			{
