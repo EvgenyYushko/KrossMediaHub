@@ -57,6 +57,9 @@ namespace AlinaKrossManager.Controllers
 		{
 			try
 			{
+				_logger.LogInformation("Ignore Custom - ReceiveEvent start");
+				return Ok();
+
 				_logger.LogInformation("ReceiveEvent start");
 
 				// Логируем сырой запрос для отладки

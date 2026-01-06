@@ -11,7 +11,7 @@ namespace AlinaKrossManager.Jobs.Messages
 		private readonly IGenerativeLanguageModel _aiModel;
 		private readonly ILogger<FaceBookDmJob> _logger;
 
-		public static string Time => "0 0 10 * * ?";
+		public static string Time => "0 * * * * ?";
 
 		public FaceBookDmJob(FaceBookService fbService, IGenerativeLanguageModel aiModel, ILogger<FaceBookDmJob> logger)
 		{
@@ -22,7 +22,9 @@ namespace AlinaKrossManager.Jobs.Messages
 
 		public async Task Execute(IJobExecutionContext context)
 		{
-			return;
+			_logger.LogInformation($"Start Execute Job");
+
+			//return;
 			try
 			{
 				// 1. Получаем сообщения, на которые нужно ответить
