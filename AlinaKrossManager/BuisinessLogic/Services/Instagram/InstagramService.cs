@@ -15,9 +15,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		private readonly ConversationService _conversationService;
 		private readonly IWebHostEnvironment _env;
 		public string _imgbbApiKey = "807392339c89019fcbe08fcdd068a19c";
-		private const string _alinaKrossId = "17841477563266256";
-		private const string _alinaKrossName = "alina.kross.ai";
-		private const string _evgenyYushkoId = "1307933750574022";
+		
 		public override string ServiceName => "Instagram";
 
 		public InstagramService(string accessToken

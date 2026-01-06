@@ -4,7 +4,7 @@ using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
 using Quartz;
 
-namespace AlinaKrossManager.Jobs
+namespace AlinaKrossManager.Jobs.Messages
 {
 	[DisallowConcurrentExecution]
 	public class InstagramAnswerMessageJob : SchedulerJob
