@@ -13,7 +13,7 @@ namespace AlinaKrossManager.Jobs.Messages
 		private readonly ILogger<BlueSkyDmJob> _logger;
 
 		// Запускаем часто, BlueSky API бесплатный и держит нагрузку
-		public static string Time => "0 2 * * * ?";
+		public static string Time => "0 6,32,47 * * * ?";
 
 		public BlueSkyDmJob(BlueSkyService bskyService, IGenerativeLanguageModel aiModel, ILogger<BlueSkyDmJob> logger)
 		{

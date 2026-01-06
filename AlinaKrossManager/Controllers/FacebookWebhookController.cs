@@ -57,7 +57,8 @@ namespace AlinaKrossManager.Controllers
 		{
 			try
 			{
-				_logger.LogInformation("Ignore Custom - ReceiveEvent start");
+				// так как пока приложение не прошло проверку то вебхуки приходят только от админа.
+				// поэтому я сделал джобу которая опрашивает все сообщения и отвчает им
 				return Ok();
 
 				_logger.LogInformation("ReceiveEvent start");
