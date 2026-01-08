@@ -63,7 +63,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			// Сортируем от НОВЫХ к СТАРЫМ, пропускаем 5 самых свежих, берем остальные
 			var entities = await query
 				.OrderByDescending(p => p.CreatedAt)
-				.Skip(1)
+				.Skip(5)
 				.ToListAsync();
 
 			// 3. Маппим в Domain модели
