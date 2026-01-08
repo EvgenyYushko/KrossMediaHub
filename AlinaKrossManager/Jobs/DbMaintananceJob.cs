@@ -13,7 +13,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class DbMaintananceJob : SchedulerJob
 	{
-		public static string Time => "0 33 16 * * ?";
+		public static string Time => "0 43 16 * * ?";
 
 		private readonly ILogger<PostToPublicFromQueueJob> _logger;
 		private readonly IServiceScopeFactory _serviceScopeFactory;
