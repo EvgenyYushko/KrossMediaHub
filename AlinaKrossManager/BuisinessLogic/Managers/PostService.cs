@@ -4,7 +4,6 @@ using AlinaKrossManager.BuisinessLogic.Managers.Models;
 using AlinaKrossManager.DataAccess;
 using AlinaKrossManager.DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
-using static AlinaKrossManager.BuisinessLogic.Managers.TelegramManager;
 
 namespace AlinaKrossManager.BuisinessLogic.Managers
 {
@@ -39,6 +38,40 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			foreach (var entity in entities)
 			{
 				// Можно обновить кэш, чтобы UI сразу увидел, что посты взяты в работу
+				var model = MapToDomain(entity);
+				_cache[entity.Id] = model;
+				result.Add(model);
+			}
+
+			return result;
+		}
+
+		public async Task<List<BlogPost>> GetOldPublishedPostsAsync(AccessLevel accessLevel)
+		{
+			// 1. Ищем посты:
+			// - Нужный уровень доступа
+			// - Есть записи в NetworkStates (защита от пустых)
+			// - ВСЕ записи в NetworkStates имеют статус Published
+			var query = _appDbContext.Posts
+				.Include(p => p.Images)
+				.Include(p => p.NetworkStates)
+				.Where(p => p.AccessLevel == (int)accessLevel)
+				.Where(p => p.NetworkStates.Any() &&
+							p.NetworkStates.All(ns => ns.Status == (int)SocialStatus.Published));
+
+			// 2. Сортировка и выборка
+			// Сортируем от НОВЫХ к СТАРЫМ, пропускаем 5 самых свежих, берем остальные
+			var entities = await query
+				.OrderByDescending(p => p.CreatedAt)
+				.Skip(1)
+				.ToListAsync();
+
+			// 3. Маппим в Domain модели
+			var result = new List<BlogPost>();
+			foreach (var entity in entities)
+			{
+				// Обновляем кэш (хотя если вы собираетесь их удалять, это может быть не обязательно, 
+				// но для консистентности оставим)
 				var model = MapToDomain(entity);
 				_cache[entity.Id] = model;
 				result.Add(model);
@@ -118,6 +151,47 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			}
 
 			return await query.CountAsync();
+		}
+
+		public async Task<PostCountsDto> GetPostCountsAsync(AccessLevel accessLevel)
+		{
+			// Базовый запрос: фильтруем по уровню доступа (Public/Private)
+			var query = _appDbContext.Posts.Where(p => p.AccessLevel == (int)accessLevel);
+
+			// 1. PENDING: Пост считается ожидающим, если у него есть ХОТЯ БЫ ОДНА сеть в статусе Pending
+			var pendingCount = await query.CountAsync(p =>
+				p.NetworkStates.Any(ns => ns.Status == (int)SocialStatus.Pending));
+
+			// 2. ERROR: Пост считается ошибочным, если у него есть ХОТЯ БЫ ОДНА сеть в статусе Error
+			var errorCount = await query.CountAsync(p =>
+				p.NetworkStates.Any(ns => ns.Status == (int)SocialStatus.Error));
+
+			// 3. PUBLISHED: Пост считается полностью опубликованным, если:
+			//    - У него ЕСТЬ записи в NetworkStates (защита от пустых/новых)
+			//    - И ВСЕ эти записи имеют статус Published (нет ни Pending, ни Error)
+			//    - Исключаем записи со статусом None (они не важны)
+			var publishedCount = await query.CountAsync(p =>
+				p.NetworkStates.Any() && // Есть хоть одна сеть
+				!p.NetworkStates.Any(ns => ns.Status != (int)SocialStatus.Published && ns.Status != (int)SocialStatus.None));
+
+			// 4. TOTAL: Общее количество постов в базе
+			var totalCount = await query.CountAsync();
+
+			return new PostCountsDto
+			{
+				Pending = pendingCount,
+				Errors = errorCount,
+				Published = publishedCount,
+				Total = totalCount
+			};
+		}
+
+		public class PostCountsDto
+		{
+			public int Pending { get; set; }   // Ожидают публикации
+			public int Errors { get; set; }    // Требуют внимания (ошибки)
+			public int Published { get; set; } // Полностью опубликованы
+			public int Total { get; set; }     // Всего постов
 		}
 
 		// 2. Получить один пост
