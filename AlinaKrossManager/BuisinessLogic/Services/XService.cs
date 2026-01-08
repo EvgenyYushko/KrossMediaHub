@@ -133,28 +133,31 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					Console.WriteLine("Успех! Твит опубликован.");
 					return true;
 				}
-				else
-				{
-					// Читаем тело ответа, там лежит реальная причина
-					var errorContent = result.Content;
-					Console.WriteLine($"!!! ОШИБКА X API !!!");
-					Console.WriteLine($"Status Code: {result.Response.StatusCode}");
-					Console.WriteLine($"JSON Body: {errorContent}"); // <--- ВОТ ЗДЕСЬ БУДЕТ ОТВЕТ
-					return false;
-				}
+
+				// Этот код редко выполняется для 403, так как выбрасывается Exception, 
+				// но оставим для мягких ошибок
+				Console.WriteLine($"Ошибка (без исключения): {result.Response.StatusCode}");
+				return false;
 			}
 			catch (Tweetinvi.Exceptions.TwitterException twEx)
 			{
-				// Tweetinvi выбрасывает специфичные исключения
-				Console.WriteLine($"Twitter Exception: {twEx.Message}");
-				Console.WriteLine($"Details: {twEx.TwitterDescription}"); // Детали ошибки
-				if (twEx.TwitterExceptionInfos != null)
+				// ВОТ ЗДЕСЬ ПРАВИЛЬНАЯ ОБРАБОТКА
+				Console.WriteLine($"!!! ОШИБКА X API (Exception) !!!");
+				Console.WriteLine($"Status Code: {twEx.StatusCode}");
+
+				// Пытаемся достать JSON с текстом ошибки (например, "Duplicate content")
+				// В разных версиях Tweetinvi это может быть в Content или в Response.Content
+				var errorJson = twEx.Content;
+				Console.WriteLine($"JSON Body: {errorJson}");
+
+				// Дополнительная проверка на дубликат
+				if (errorJson != null && errorJson.Contains("duplicate"))
 				{
-					foreach (var error in twEx.TwitterExceptionInfos)
-					{
-						Console.WriteLine($"Error Code: {error.Message}");
-					}
+					Console.WriteLine("⚠️ Причина: ДУБЛИКАТ КОНТЕНТА. Твит с таким текстом уже был.");
+					// Можно вернуть true, чтобы джоб не считал это провалом
+					return true;
 				}
+
 				return false;
 			}
 			catch (Exception ex)
