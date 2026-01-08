@@ -1,5 +1,6 @@
 start - очередь
 generate_image - создать изображение
+top_hash_posts - поиск по тегу в инсте
 post_to_insta - пост в инсту
 story_to_insta - история в инсте
 post_to_threads - пост в Threads

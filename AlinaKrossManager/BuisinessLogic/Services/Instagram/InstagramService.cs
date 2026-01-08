@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,13 +13,15 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 	{
 		private readonly HttpClient _https;
 		private readonly string _accessToken;
+		private readonly string _faceBooklongLiveToken;
 		private readonly ConversationService _conversationService;
 		private readonly IWebHostEnvironment _env;
 		public string _imgbbApiKey = "807392339c89019fcbe08fcdd068a19c";
-		
+
 		public override string ServiceName => "Instagram";
 
 		public InstagramService(string accessToken
+			, string faceBooklongLiveToken
 			, IGenerativeLanguageModel generativeLanguage
 			, ConversationService conversationService
 			, IWebHostEnvironment env
@@ -26,6 +29,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			: base(generativeLanguage)
 		{
 			_accessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
+			_faceBooklongLiveToken = faceBooklongLiveToken;
 			_conversationService = conversationService;
 			_env = env;
 			_https = new HttpClient { BaseAddress = new Uri("https://graph.instagram.com/") };
@@ -668,6 +672,105 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				Вот изображение для анализа: {base64Img}";
 		}
 
+		private static readonly ConcurrentDictionary<string, string> _hashtagIdCache = new();
+		private readonly HttpClient _httpClientFaceBook = new HttpClient();
+		public async Task<List<InstaMedia>> GetTopViralPostsAsync(string hashtagId, string userId = _alinaKrossId)
+		{
+			// 1. Формируем URL
+			// Обратите внимание: я увеличил limit до 25, чтобы выборка для сортировки была лучше. 
+			// Если оставить 10, мы найдем "лучшее из 10", а не "лучшее из 25".
+			string url = $"https://graph.facebook.com/v18.0/{hashtagId}/top_media" +
+						 $"?user_id={userId}" +
+						 $"&fields=id,caption,media_type,media_url,permalink,like_count,comments_count,timestamp,children{{id,media_type,media_url}}" +
+						 $"&limit=25" +
+						 $"&access_token={_faceBooklongLiveToken}";
+
+			try
+			{
+				// 2. Делаем запрос
+				var response = await _httpClientFaceBook.GetAsync(url);
+
+				if (!response.IsSuccessStatusCode)
+				{
+					var errorBody = await response.Content.ReadAsStringAsync();
+					Console.WriteLine($"Ошибка API Instagram: {response.StatusCode} - {errorBody}");
+					return new List<InstaMedia>();
+				}
+
+				// 3. Читаем JSON
+				var jsonString = await response.Content.ReadAsStringAsync();
+				var instaData = JsonSerializer.Deserialize<InstaResponse>(jsonString);
+
+				if (instaData?.Data == null || !instaData.Data.Any())
+				{
+					Console.WriteLine("Посты не найдены.");
+					return new List<InstaMedia>();
+				}
+
+				var bestPosts = instaData.Data
+					// А. Убираем посты без медиа (на всякий случай)
+					.Where(p => !string.IsNullOrEmpty(p.MediaUrl) || (p.Children?.Data != null && p.Children.Data.Any()))
+					// Б. Сортируем по убыванию лайков (самые популярные сверху)
+					.OrderByDescending(p => p.LikeCount)
+					.Take(5)
+					.ToList();
+
+				return bestPosts;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Критическая ошибка: {ex.Message}");
+				return new List<InstaMedia>();
+			}
+		}
+		public async Task<string?> GetHashtagIdAsync(string hashtagName, string userId = _alinaKrossId)
+		{
+			// ВАЖНО: У Instagram есть лимит — поиск только 30 уникальных хештегов за 7 дней.
+			// Используйте этот метод экономно! Сохраняйте полученные ID в базу данных.
+
+			// Нормализуем ввод: убираем решетку, пробелы и приводим к нижнему регистру
+			var cleanTag = hashtagName.Replace("#", "").Trim().ToLowerInvariant();
+
+			// А. ПРОВЕРКА В КЭШЕ
+			if (_hashtagIdCache.TryGetValue(cleanTag, out string cachedId))
+			{
+				Console.WriteLine($"✅ ID для #{cleanTag} взят из кэша: {cachedId}");
+				return cachedId;
+			}
+
+			// Б. ЕСЛИ НЕТ В КЭШЕ — ИДЕМ В API
+			Console.WriteLine($"🔍 Ищу ID для #{cleanTag} через API (тратится лимит)...");
+
+			string url = $"https://graph.facebook.com/v18.0/ig_hashtag_search" +
+						 $"?user_id={userId}" +
+						 $"&q={cleanTag}" +
+						 $"&access_token={_faceBooklongLiveToken}";
+
+			try
+			{
+				var response = await _httpClientFaceBook.GetAsync(url);
+				if (!response.IsSuccessStatusCode) return null;
+
+				var json = await response.Content.ReadAsStringAsync();
+				var searchResult = JsonSerializer.Deserialize<HashtagSearchResponse>(json);
+				var foundId = searchResult?.Data?.FirstOrDefault()?.Id;
+
+				if (!string.IsNullOrEmpty(foundId))
+				{
+					// В. СОХРАНЯЕМ В КЭШ
+					_hashtagIdCache.TryAdd(cleanTag, foundId);
+					Console.WriteLine($"💾 ID сохранен в память: {foundId}");
+					return foundId;
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка поиска хештега: {ex.Message}");
+			}
+
+			return null;
+		}
+
 		#region OldMethods
 		/// <summary>
 		/// FreeImage.Host (бесплатный, без API ключа)
@@ -746,6 +849,79 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		#endregion
 		#region Models
+
+		// Корневой ответ от поиска хештега
+		public class HashtagSearchResponse
+		{
+			[JsonPropertyName("data")]
+			public List<HashtagData> Data { get; set; }
+		}
+
+		// Объект с ID хештега
+		public class HashtagData
+		{
+			[JsonPropertyName("id")]
+			public string Id { get; set; }
+		}
+
+		public class InstaResponse
+		{
+			[JsonPropertyName("data")]
+			public List<InstaMedia> Data { get; set; }
+		}
+
+		// Данные одного поста
+		public class InstaMedia
+		{
+			[JsonPropertyName("id")]
+			public string Id { get; set; }
+
+			[JsonPropertyName("caption")]
+			public string Caption { get; set; }
+
+			[JsonPropertyName("media_type")]
+			public string MediaType { get; set; } // IMAGE, VIDEO, CAROUSEL_ALBUM
+
+			[JsonPropertyName("media_url")]
+			public string MediaUrl { get; set; } // Ссылка на фото/видео
+
+			[JsonPropertyName("permalink")]
+			public string Permalink { get; set; } // Ссылка на пост в Instagram
+
+			[JsonPropertyName("like_count")]
+			public int LikeCount { get; set; }
+
+			[JsonPropertyName("comments_count")]
+			public int CommentsCount { get; set; }
+
+			[JsonPropertyName("timestamp")]
+			public string Timestamp { get; set; }
+
+			// Для каруселей (альбомов)
+			[JsonPropertyName("children")]
+			public InstaChildren Children { get; set; }
+		}
+
+		// Обертка для вложений карусели
+		public class InstaChildren
+		{
+			[JsonPropertyName("data")]
+			public List<InstaChildMedia> Data { get; set; }
+		}
+
+		// Данные вложения (слайда)
+		public class InstaChildMedia
+		{
+			[JsonPropertyName("id")]
+			public string Id { get; set; }
+
+			[JsonPropertyName("media_type")]
+			public string MediaType { get; set; }
+
+			[JsonPropertyName("media_url")]
+			public string MediaUrl { get; set; }
+		}
+
 		public class ContainerResult
 		{
 			public string Id { get; set; }

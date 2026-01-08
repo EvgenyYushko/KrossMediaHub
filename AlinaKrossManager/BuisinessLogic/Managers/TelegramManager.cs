@@ -1,3 +1,4 @@
+using System.Text;
 using AlinaKrossManager.BuisinessLogic.Facades;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.BuisinessLogic.Services.Instagram;
@@ -214,6 +215,17 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						}
 					}
 					break;
+				case UpdateType.Message when msgText.IsCommand("top_hash_posts") && update.Message.ReplyToMessage is Message rmsg:
+					{
+						if (!await _telegramService.CanUseBot(update, ct)) return;
+						using (var scope = _scopeFactory.CreateScope())
+						{
+							var replayText = rmsg.GetMsgText() ?? "";
+							if (string.IsNullOrEmpty(replayText)) return;
+							await HashSearchHandler(scope, replayText);
+						}
+					}
+					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_all") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						if (!await _telegramService.CanUseBot(update, ct)) return;
@@ -254,6 +266,53 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Error: {ex.Message}");
+			}
+		}
+
+		private async Task HashSearchHandler(IServiceScope scope, string replayText)
+		{
+			try
+			{
+				var instagramService = scope.ServiceProvider.GetRequiredService<InstagramService>();
+
+				// 1. Получаем ID хештега
+				var tagId = await instagramService.GetHashtagIdAsync(replayText);
+
+				if (tagId is null)
+				{
+					await _telegramService.SendMessage($"❌ Хештег #{replayText} не найден.");
+					return;
+				}
+
+				// 2. Получаем посты
+				var viralPosts = await instagramService.GetTopViralPostsAsync(tagId);
+
+				if (viralPosts == null || !viralPosts.Any())
+				{
+					await _telegramService.SendMessage($"🤷‍♂️ Не удалось найти популярные посты по тегу #{replayText}.");
+					return;
+				}
+
+				var sb = new StringBuilder();
+				sb.AppendLine($"🔥 <b>Топ находки по тегу #{replayText}</b>");
+				sb.AppendLine($"<i>Найдено постов: {viralPosts.Count}</i>");
+				sb.AppendLine();
+
+				foreach (var post in viralPosts)
+				{
+					string likes = post.LikeCount.ToString("N0");
+					string comments = post.CommentsCount.ToString("N0");
+
+					sb.AppendLine($"❤️ <b>{likes}</b>  |  💬 <b>{comments}</b>");
+					sb.AppendLine($"🔗 {post.Permalink}");
+					sb.AppendLine("⎯⎯⎯⎯⎯⎯⎯⎯");
+				}
+
+				await _telegramService.SendMessage(sb.ToString());
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(ex.ToString());
 			}
 		}
 

@@ -57,7 +57,8 @@ builder.Services.AddSingleton(provider =>
 	var hostedInvarment = provider.GetService<IWebHostEnvironment>();
 
 	var token = GetConfigOrThrow(INSTAGRAM_BOT_TOKEN);
-	return new InstagramService(token, geminiModel, conversationService, hostedInvarment);
+	var faceBooklongLiveToken = GetConfigOrThrow(FACE_BOOK_LONG_TOKEN);
+	return new InstagramService(token, faceBooklongLiveToken, geminiModel, conversationService, hostedInvarment);
 });
 
 builder.Services.AddSingleton(provider =>
