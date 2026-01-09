@@ -208,7 +208,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				if (senderId == _evgenyYushkoId)
 				{
 					//Console.WriteLine("начали генерацию фото");
-					//InstagramMedia randomItem = GetRandomMedia(_mediaList);
+					//InstagramMedia randomItem = GetRandomUniqeMedia(_mediaList);
 					//Console.WriteLine("получили фото");
 					//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
 					//Console.WriteLine("закончили фото");
@@ -848,14 +848,27 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 		}
 
-		List<InstagramMedia> _mediaList = null;
+		private static HashSet<string> _usedMediaIds = new HashSet<string>();
+		static List<InstagramMedia> _mediaList = null;
 		private static readonly Random _random = new Random();
-		public InstagramMedia GetRandomMedia(List<InstagramMedia> mediaList)
+		public InstagramMedia GetRandomUniqeMedia(List<InstagramMedia> mediaList)
 		{
 			if (mediaList == null || !mediaList.Any())
 				return null;
 
-			return mediaList[_random.Next(mediaList.Count)];
+			var availableMedia = mediaList.Where(m => !_usedMediaIds.Contains(m.Id)).ToList();
+
+			if (availableMedia.Count == 0)
+			{
+				_usedMediaIds.Clear();
+				availableMedia = mediaList; // Снова доступны все
+			}
+
+			var selectedItem = availableMedia[_random.Next(availableMedia.Count)];
+
+			_usedMediaIds.Add(selectedItem.Id);
+
+			return selectedItem;
 		}
 
 		private string _intimatePrompt = null;
@@ -865,17 +878,15 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		private async Task<string> GetMainPromtAlinaKross(string conversationHistory)
 		{
 			_mediaList = _mediaList ?? await GetUserMediaAsync();
-			//var eligibleMedia = _mediaList
-			//		.Where(m => m.Media_Type == "IMAGE" || m.Media_Type == "VIDEO")
-			//		.ToList();
 
-			InstagramMedia randomItem = GetRandomMedia(_mediaList);
+			InstagramMedia randomItem = GetRandomUniqeMedia(_mediaList);
 
 			var links = new[]
 			{
 				randomItem.Permalink,
 				"www.patreon.com/AlinaKross",
-				"https://linktr.ee/AlinaKross"
+				//"https://linktr.ee/AlinaKross",
+				"https://t.me/alina_kross_ai"
 			};
 
 			var photoLink = links[_random.Next(links.Length)];

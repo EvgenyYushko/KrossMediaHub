@@ -318,33 +318,26 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 		}
 
-		public async Task<InstagramMedia> GetRandomMedia()
+		public async Task<InstagramMedia> GetRandomMediaForStory()
 		{
 			try
 			{
-				// Используем твой рабочий метод
-				var mediaList = await GetUserMediaAsync();
+				_mediaList = _mediaList ?? await GetUserMediaAsync();
 
-				if (mediaList == null || !mediaList.Any())
+				if (_mediaList == null || !_mediaList.Any())
 				{
 					Log("📭 No media found");
 					return null;
-				}
+				}			
 
-				// Фильтруем только фото и видео (сторис поддерживают IMAGE и VIDEO)
-				var eligibleMedia = mediaList
-					.Where(m => m.Media_Type == "IMAGE" || m.Media_Type == "VIDEO")
-					.ToList();
-
-				if (!eligibleMedia.Any())
+				if (!_mediaList.Any())
 				{
 					Log("📷 No eligible media found for stories");
 					return null;
 				}
 
 				// Выбираем случайную публикацию
-				var random = new Random();
-				var randomMedia = eligibleMedia[random.Next(eligibleMedia.Count)];
+				var randomMedia = GetRandomUniqeMedia(_mediaList);
 
 				Log($"🎲 Selected random media: {randomMedia.Id} ({randomMedia.Media_Type})");
 
@@ -443,24 +436,16 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		private async Task<string> CreateStoryContainer(InstagramMedia media)
 		{
-			// *** ОПРЕДЕЛЕНИЕ ТИПА МЕДИА ***
 			string videoUrl = null;
 			string imageUrl = null;
 
-			// Если это не CAROUSEL_ALBUM, определяем URL
 			if (media.Media_Type == "VIDEO")
 			{
 				videoUrl = media.Media_Url;
 			}
-			else if (media.Media_Type == "IMAGE")
-			{
-				imageUrl = media.Media_Url;
-			}
 			else
 			{
-				// Невозможно создать Story из CAROUSEL_ALBUM напрямую.
-				Log($"❌ Cannot create story container from media type: {media.Media_Type}");
-				return null;
+				imageUrl = media.Media_Url;
 			}
 
 			var containerPayload = new
@@ -562,7 +547,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		{
 			try
 			{
-				var randomMedia = await GetRandomMedia();
+				var randomMedia = await GetRandomMediaForStory();
 				if (randomMedia == null)
 				{
 					Log("📭 No media available for story");
@@ -594,56 +579,83 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		/// </summary>
 		public async Task<List<InstagramMedia>> GetUserMediaAsync()
 		{
-			var url = $"me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token={_accessToken}";
-			var json = await _https.GetStringAsync(url);
+			var result = new List<InstagramMedia>();
 
-			using (var doc = JsonDocument.Parse(json))
+			// Добавим &limit=100, чтобы забирать по 100 постов за раз (максимум), 
+			// это уменьшит количество запросов к API.
+			string currentUrl = $"me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token={_accessToken}&limit=100";
+
+			while (!string.IsNullOrEmpty(currentUrl))
 			{
-				var root = doc.RootElement.GetProperty("data");
-
-				var result = new List<InstagramMedia>();
-				foreach (var item in root.EnumerateArray())
+				try
 				{
-					var timestampString = item.GetProperty("timestamp").GetString();
-					DateTime timestamp;
+					var json = await _https.GetStringAsync(currentUrl);
 
-					try
+					using (var doc = JsonDocument.Parse(json))
 					{
-						// Пробуем разные форматы даты
-						if (DateTime.TryParse(timestampString, out timestamp))
+						if (doc.RootElement.TryGetProperty("data", out var dataElement))
 						{
-							// Успешно распарсили
+							foreach (var item in dataElement.EnumerateArray())
+							{
+								var timestampString = item.GetProperty("timestamp").GetString();
+								DateTime timestamp;
+
+								try
+								{
+									if (DateTime.TryParse(timestampString, out timestamp))
+									{
+										// Успешно распарсили
+									}
+									else if (timestampString.Contains("+0000"))
+									{
+										timestampString = timestampString.Replace("+0000", "").Trim();
+										timestamp = DateTime.Parse(timestampString);
+									}
+									else
+									{
+										timestamp = DateTime.UtcNow;
+									}
+								}
+								catch
+								{
+									timestamp = DateTime.UtcNow;
+								}
+
+								result.Add(new InstagramMedia
+								{
+									Id = item.GetProperty("id").GetString(),
+									Caption = item.TryGetProperty("caption", out var caption) ? caption.GetString() : null,
+									Media_Type = item.GetProperty("media_type").GetString(),
+									Media_Url = item.GetProperty("media_url").GetString(),
+									Permalink = item.GetProperty("permalink").GetString(),
+									//Thumbnail_Url = item.TryGetProperty("thumbnail_url", out var thumb) ? thumb.GetString() : null,
+									Timestamp = timestamp
+								});
+							}
 						}
-						else if (timestampString.Contains("+0000"))
+
+						// 2. Обработка пагинации (paging.next)
+						if (doc.RootElement.TryGetProperty("paging", out var pagingElement) &&
+							pagingElement.TryGetProperty("next", out var nextElement))
 						{
-							// Убираем временную зону для парсинга
-							timestampString = timestampString.Replace("+0000", "").Trim();
-							timestamp = DateTime.Parse(timestampString);
+							// Instagram возвращает полный абсолютный URL для следующей страницы
+							currentUrl = nextElement.GetString();
 						}
 						else
 						{
-							// Если все равно не парсится, используем текущее время
-							timestamp = DateTime.UtcNow;
+							// Если поля next нет, значит это последняя страница
+							currentUrl = null;
 						}
 					}
-					catch
-					{
-						timestamp = DateTime.UtcNow;
-					}
-
-					result.Add(new InstagramMedia
-					{
-						Id = item.GetProperty("id").GetString(),
-						Caption = item.TryGetProperty("caption", out var caption) ? caption.GetString() : null,
-						Media_Type = item.GetProperty("media_type").GetString(),
-						Media_Url = item.GetProperty("media_url").GetString(),
-						Permalink = item.GetProperty("permalink").GetString(),
-						//Thumbnail_Url = item.TryGetProperty("thumbnail_url", out var thumb) ? thumb.GetString() : null,
-						Timestamp = timestamp
-					});
 				}
-				return result;
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Ошибка при получении медиа: {ex.Message}");
+					break;
+				}
 			}
+
+			return result;
 		}
 
 		public static string GetBaseDescriptionPrompt(string base64Img)
@@ -852,249 +864,249 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		// Корневой ответ от поиска хештега
 		public class HashtagSearchResponse
-		{
-			[JsonPropertyName("data")]
-			public List<HashtagData> Data { get; set; }
-		}
-
-		// Объект с ID хештега
-		public class HashtagData
-		{
-			[JsonPropertyName("id")]
-			public string Id { get; set; }
-		}
-
-		public class InstaResponse
-		{
-			[JsonPropertyName("data")]
-			public List<InstaMedia> Data { get; set; }
-		}
-
-		// Данные одного поста
-		public class InstaMedia
-		{
-			[JsonPropertyName("id")]
-			public string Id { get; set; }
-
-			[JsonPropertyName("caption")]
-			public string Caption { get; set; }
-
-			[JsonPropertyName("media_type")]
-			public string MediaType { get; set; } // IMAGE, VIDEO, CAROUSEL_ALBUM
-
-			[JsonPropertyName("media_url")]
-			public string MediaUrl { get; set; } // Ссылка на фото/видео
-
-			[JsonPropertyName("permalink")]
-			public string Permalink { get; set; } // Ссылка на пост в Instagram
-
-			[JsonPropertyName("like_count")]
-			public int LikeCount { get; set; }
-
-			[JsonPropertyName("comments_count")]
-			public int CommentsCount { get; set; }
-
-			[JsonPropertyName("timestamp")]
-			public string Timestamp { get; set; }
-
-			// Для каруселей (альбомов)
-			[JsonPropertyName("children")]
-			public InstaChildren Children { get; set; }
-		}
-
-		// Обертка для вложений карусели
-		public class InstaChildren
-		{
-			[JsonPropertyName("data")]
-			public List<InstaChildMedia> Data { get; set; }
-		}
-
-		// Данные вложения (слайда)
-		public class InstaChildMedia
-		{
-			[JsonPropertyName("id")]
-			public string Id { get; set; }
-
-			[JsonPropertyName("media_type")]
-			public string MediaType { get; set; }
-
-			[JsonPropertyName("media_url")]
-			public string MediaUrl { get; set; }
-		}
-
-		public class ContainerResult
-		{
-			public string Id { get; set; }
-			public string ExternalContentUrl { get; set; }
-		}
-
-		public class CreateMediaResult
-		{
-			public string Id { get; set; }
-			public bool Success { get; set; }
-			public string ErrorMessage { get; set; }
-			public string ExternalContentUrl { get; set; }
-		}
-
-		public class InstagramMedia
-		{
-			public string Id { get; set; }
-			public string Caption { get; set; }
-			public string Media_Type { get; set; }
-			public string Media_Url { get; set; }
-			public string Permalink { get; set; }
-			public string Thumbnail_Url { get; set; }
-			public DateTime Timestamp { get; set; }
-		}
-
-		public class MediaResponse
-		{
-			[JsonPropertyName("data")]
-			public List<InstagramMedia> Data { get; set; }
-
-			[JsonPropertyName("paging")]
-			public Paging Paging { get; set; }
-		}
-
-		public class Paging
-		{
-			[JsonPropertyName("cursors")]
-			public Cursors Cursors { get; set; }
-		}
-
-		public class Cursors
-		{
-			[JsonPropertyName("before")]
-			public string Before { get; set; }
-
-			[JsonPropertyName("after")]
-			public string After { get; set; }
-		}
-
-		public class StoryPublishResponse
-		{
-			[JsonPropertyName("id")]
-			public string Id { get; set; }
-		}
-
-		////
-		public class InstagramWebhookPayload
-		{
-			[JsonPropertyName("object")]
-			public string Object { get; set; }
-
-			[JsonPropertyName("entry")]
-			public List<InstagramEntry> Entry { get; set; }
-		}
-
-		public class InstagramEntry
-		{
-			[JsonPropertyName("id")]
-			public string Id { get; set; }
-
-			[JsonPropertyName("time")]
-			public long Time { get; set; }
-
-			[JsonPropertyName("messaging")]
-			public List<InstagramMessaging> Messaging { get; set; }
-
-			[JsonPropertyName("changes")]
-			public List<InstagramChange> Changes { get; set; }
-		}
-
-		public class InstagramMessaging
-		{
-			[JsonPropertyName("sender")]
-			public InstagramUser Sender { get; set; }
-
-			[JsonPropertyName("recipient")]
-			public InstagramUser Recipient { get; set; }
-
-			[JsonPropertyName("timestamp")]
-			public long Timestamp { get; set; }
-
-			[JsonPropertyName("message")]
-			public InstagramMessage Message { get; set; }
-
-			[JsonPropertyName("read")]
-			public InstagramRead Read { get; set; }
-		}
-
-		public class InstagramRead
-		{
-			[JsonPropertyName("mid")]
-			public string MessageId { get; set; }
-		}
-
-		public class InstagramMessage
-		{
-			[JsonPropertyName("mid")]
-			public string MessageId { get; set; }
-
-			[JsonPropertyName("text")]
-			public string Text { get; set; }
-
-			[JsonPropertyName("is_echo")]
-			public bool IsEcho { get; set; }
-
-			[JsonPropertyName("attachments")]
-			public List<InstagramAttachment> Attachments { get; set; }
-		}
-
-		public class InstagramAttachment
-		{
-			[JsonPropertyName("type")]
-			public string Type { get; set; } // "image", "video", etc.
-
-			[JsonPropertyName("payload")]
-			public InstagramAttachmentPayload Payload { get; set; }
-		}
-
-		public class InstagramAttachmentPayload
-		{
-			[JsonPropertyName("url")]
-			public string Url { get; set; }
-		}
-
-		public class InstagramUser
-		{
-			[JsonPropertyName("id")]
-			public string Id { get; set; }
-
-			[JsonPropertyName("username")]
-			public string Username { get; set; }
-
-			[JsonPropertyName("self_ig_scoped_id")]
-			public string SelfIgScopedId { get; set; } // Добавь это поле
-		}
-
-		public class InstagramChange
-		{
-			[JsonPropertyName("field")]
-			public string Field { get; set; }
-
-			[JsonPropertyName("value")]
-			public JsonElement Value { get; set; } // Изменено на JsonElement для гибкости
-		}
-
-		// Модель для комментариев
-		public class CommentValue
-		{
-			[JsonPropertyName("id")]
-			public string Id { get; set; }
-
-			[JsonPropertyName("text")]
-			public string Text { get; set; }
-
-			[JsonPropertyName("from")]
-			public InstagramUser From { get; set; }
-
-			[JsonPropertyName("media")]
-			public InstagramMedia Media { get; set; }
-
-			[JsonPropertyName("parent_id")]
-			public string ParentId { get; set; }
-		}
-		#endregion
+	{
+		[JsonPropertyName("data")]
+		public List<HashtagData> Data { get; set; }
 	}
+
+	// Объект с ID хештега
+	public class HashtagData
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+	}
+
+	public class InstaResponse
+	{
+		[JsonPropertyName("data")]
+		public List<InstaMedia> Data { get; set; }
+	}
+
+	// Данные одного поста
+	public class InstaMedia
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+
+		[JsonPropertyName("caption")]
+		public string Caption { get; set; }
+
+		[JsonPropertyName("media_type")]
+		public string MediaType { get; set; } // IMAGE, VIDEO, CAROUSEL_ALBUM
+
+		[JsonPropertyName("media_url")]
+		public string MediaUrl { get; set; } // Ссылка на фото/видео
+
+		[JsonPropertyName("permalink")]
+		public string Permalink { get; set; } // Ссылка на пост в Instagram
+
+		[JsonPropertyName("like_count")]
+		public int LikeCount { get; set; }
+
+		[JsonPropertyName("comments_count")]
+		public int CommentsCount { get; set; }
+
+		[JsonPropertyName("timestamp")]
+		public string Timestamp { get; set; }
+
+		// Для каруселей (альбомов)
+		[JsonPropertyName("children")]
+		public InstaChildren Children { get; set; }
+	}
+
+	// Обертка для вложений карусели
+	public class InstaChildren
+	{
+		[JsonPropertyName("data")]
+		public List<InstaChildMedia> Data { get; set; }
+	}
+
+	// Данные вложения (слайда)
+	public class InstaChildMedia
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+
+		[JsonPropertyName("media_type")]
+		public string MediaType { get; set; }
+
+		[JsonPropertyName("media_url")]
+		public string MediaUrl { get; set; }
+	}
+
+	public class ContainerResult
+	{
+		public string Id { get; set; }
+		public string ExternalContentUrl { get; set; }
+	}
+
+	public class CreateMediaResult
+	{
+		public string Id { get; set; }
+		public bool Success { get; set; }
+		public string ErrorMessage { get; set; }
+		public string ExternalContentUrl { get; set; }
+	}
+
+	public class InstagramMedia
+	{
+		public string Id { get; set; }
+		public string Caption { get; set; }
+		public string Media_Type { get; set; }
+		public string Media_Url { get; set; }
+		public string Permalink { get; set; }
+		public string Thumbnail_Url { get; set; }
+		public DateTime Timestamp { get; set; }
+	}
+
+	public class MediaResponse
+	{
+		[JsonPropertyName("data")]
+		public List<InstagramMedia> Data { get; set; }
+
+		[JsonPropertyName("paging")]
+		public Paging Paging { get; set; }
+	}
+
+	public class Paging
+	{
+		[JsonPropertyName("cursors")]
+		public Cursors Cursors { get; set; }
+	}
+
+	public class Cursors
+	{
+		[JsonPropertyName("before")]
+		public string Before { get; set; }
+
+		[JsonPropertyName("after")]
+		public string After { get; set; }
+	}
+
+	public class StoryPublishResponse
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+	}
+
+	////
+	public class InstagramWebhookPayload
+	{
+		[JsonPropertyName("object")]
+		public string Object { get; set; }
+
+		[JsonPropertyName("entry")]
+		public List<InstagramEntry> Entry { get; set; }
+	}
+
+	public class InstagramEntry
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+
+		[JsonPropertyName("time")]
+		public long Time { get; set; }
+
+		[JsonPropertyName("messaging")]
+		public List<InstagramMessaging> Messaging { get; set; }
+
+		[JsonPropertyName("changes")]
+		public List<InstagramChange> Changes { get; set; }
+	}
+
+	public class InstagramMessaging
+	{
+		[JsonPropertyName("sender")]
+		public InstagramUser Sender { get; set; }
+
+		[JsonPropertyName("recipient")]
+		public InstagramUser Recipient { get; set; }
+
+		[JsonPropertyName("timestamp")]
+		public long Timestamp { get; set; }
+
+		[JsonPropertyName("message")]
+		public InstagramMessage Message { get; set; }
+
+		[JsonPropertyName("read")]
+		public InstagramRead Read { get; set; }
+	}
+
+	public class InstagramRead
+	{
+		[JsonPropertyName("mid")]
+		public string MessageId { get; set; }
+	}
+
+	public class InstagramMessage
+	{
+		[JsonPropertyName("mid")]
+		public string MessageId { get; set; }
+
+		[JsonPropertyName("text")]
+		public string Text { get; set; }
+
+		[JsonPropertyName("is_echo")]
+		public bool IsEcho { get; set; }
+
+		[JsonPropertyName("attachments")]
+		public List<InstagramAttachment> Attachments { get; set; }
+	}
+
+	public class InstagramAttachment
+	{
+		[JsonPropertyName("type")]
+		public string Type { get; set; } // "image", "video", etc.
+
+		[JsonPropertyName("payload")]
+		public InstagramAttachmentPayload Payload { get; set; }
+	}
+
+	public class InstagramAttachmentPayload
+	{
+		[JsonPropertyName("url")]
+		public string Url { get; set; }
+	}
+
+	public class InstagramUser
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+
+		[JsonPropertyName("username")]
+		public string Username { get; set; }
+
+		[JsonPropertyName("self_ig_scoped_id")]
+		public string SelfIgScopedId { get; set; } // Добавь это поле
+	}
+
+	public class InstagramChange
+	{
+		[JsonPropertyName("field")]
+		public string Field { get; set; }
+
+		[JsonPropertyName("value")]
+		public JsonElement Value { get; set; } // Изменено на JsonElement для гибкости
+	}
+
+	// Модель для комментариев
+	public class CommentValue
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+
+		[JsonPropertyName("text")]
+		public string Text { get; set; }
+
+		[JsonPropertyName("from")]
+		public InstagramUser From { get; set; }
+
+		[JsonPropertyName("media")]
+		public InstagramMedia Media { get; set; }
+
+		[JsonPropertyName("parent_id")]
+		public string ParentId { get; set; }
+	}
+	#endregion
+}
 }

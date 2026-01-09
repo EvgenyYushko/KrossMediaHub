@@ -15,7 +15,7 @@ namespace AlinaKrossManager.Jobs
 		private readonly IWebHostEnvironment _env;
 		private const string _evgenyYushkoId = "1307933750574022";
 
-		public static string Time => "0 0 17 * * ?";
+		public static string Time => "0 51 23 * * ?";
 
 		public InstagramDailyMessagesJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel
@@ -32,6 +32,14 @@ namespace AlinaKrossManager.Jobs
 
 		public override async Task Execute(IJobExecutionContext context)
 		{
+			try
+			{
+				await _instagramService.PublishRandomStory();
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(ex.ToString());
+			}
 			return;
 			try
 			{
@@ -47,7 +55,7 @@ namespace AlinaKrossManager.Jobs
 					if (randomMedia is null)
 					{
 						Console.WriteLine("начали генерацию фото");
-						randomMedia = await _instagramService.GetRandomMedia();
+						randomMedia = await _instagramService.GetRandomMediaForStory();
 						Console.WriteLine("получили фото");
 					}
 

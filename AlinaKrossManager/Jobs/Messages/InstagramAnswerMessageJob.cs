@@ -88,7 +88,7 @@ namespace AlinaKrossManager.Jobs.Messages
 			//	{
 			//		await _instagramService.SendInstagramMessage(userId, "💋");
 			//		//Console.WriteLine("начали генерацию фото");
-			//		//InstagramMedia randomItem = GetRandomMedia(_mediaList);
+			//		//InstagramMedia randomItem = GetRandomUniqeMedia(_mediaList);
 			//		//Console.WriteLine("получили фото");
 			//		//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
 			//		//Console.WriteLine("закончили фото");
@@ -175,7 +175,7 @@ namespace AlinaKrossManager.Jobs.Messages
 				//{
 				//	await _instagramService.SendInstagramMessage(userId, "💋");
 				//	//Console.WriteLine("начали генерацию фото");
-				//	//InstagramMedia randomItem = GetRandomMedia(_mediaList);
+				//	//InstagramMedia randomItem = GetRandomUniqeMedia(_mediaList);
 				//	//Console.WriteLine("получили фото");
 				//	//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
 				//	//Console.WriteLine("закончили фото");
