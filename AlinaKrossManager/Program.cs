@@ -1,4 +1,5 @@
 using AlinaKrossManager.BackgroundServices;
+using AlinaKrossManager.BuisinessLogic;
 using AlinaKrossManager.BuisinessLogic.Facades;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Managers;
@@ -55,10 +56,11 @@ builder.Services.AddSingleton(provider =>
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
 	var conversationService = provider.GetService<ConversationService>();
 	var hostedInvarment = provider.GetService<IWebHostEnvironment>();
+	var elevenLabService = provider.GetService<ElevenLabService>();
 
 	var token = GetConfigOrThrow(INSTAGRAM_BOT_TOKEN);
 	var faceBooklongLiveToken = GetConfigOrThrow(FACE_BOOK_LONG_TOKEN);
-	return new InstagramService(token, faceBooklongLiveToken, geminiModel, conversationService, hostedInvarment);
+	return new InstagramService(token, faceBooklongLiveToken, geminiModel, conversationService, hostedInvarment, elevenLabService);
 });
 
 builder.Services.AddSingleton(provider =>
@@ -89,6 +91,12 @@ builder.Services.AddSingleton(provider =>
 
 	var client = new TwitterClient(apiKey, apiSecret, accessToken, accessTokenSecret);
 	return new XService(geminiModel, client);
+});
+
+builder.Services.AddSingleton(provider =>
+{
+	var apiKey = GetConfigOrThrow(ELEVEN_LABS_KEY);
+	return new ElevenLabService(apiKey);
 });
 
 builder.Services.AddSingleton<TelegramService>();

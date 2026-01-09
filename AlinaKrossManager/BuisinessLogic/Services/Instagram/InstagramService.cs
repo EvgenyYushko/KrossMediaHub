@@ -16,6 +16,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		private readonly string _faceBooklongLiveToken;
 		private readonly ConversationService _conversationService;
 		private readonly IWebHostEnvironment _env;
+		private readonly ElevenLabService _elevenLabService;
 		public string _imgbbApiKey = "807392339c89019fcbe08fcdd068a19c";
 
 		public override string ServiceName => "Instagram";
@@ -25,6 +26,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			, IGenerativeLanguageModel generativeLanguage
 			, ConversationService conversationService
 			, IWebHostEnvironment env
+			, ElevenLabService elevenLabService
 		)
 			: base(generativeLanguage)
 		{
@@ -32,6 +34,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			_faceBooklongLiveToken = faceBooklongLiveToken;
 			_conversationService = conversationService;
 			_env = env;
+			_elevenLabService = elevenLabService;
 			_https = new HttpClient { BaseAddress = new Uri("https://graph.instagram.com/") };
 			_https.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 		}

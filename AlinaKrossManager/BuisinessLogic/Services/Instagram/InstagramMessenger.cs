@@ -252,24 +252,26 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			_conversationService.AddBotMessage(senderId, responseText);
 
 			//if (_random.Next(10) == 1)
-			if (false)
+			//if (false)
+			if (senderId == _evgenyYushkoId)
 			{
 				await GenerateAndSendAudio(senderId, responseText);
 			}
 			else
 			{
 				await SendResponse(senderId, responseText);
-				var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
-				Console.WriteLine("historyIsReaded: " + historyIsReaded);
 			}
+
+			var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
+			Console.WriteLine("historyIsReaded: " + historyIsReaded);
 		}
 
 		private async Task GenerateAndSendAudio(string senderId, string responseText)
 		{
-			var promt = "Отредактируй данный текст таким образом, что бы он был пригрдным для генерации по нему речи моделью от google. " +
-						"Убери разные смайлы, сдлеай этот тепкст максимально пригодным для генерации по нему красивого и чёткого голосового сообщения. " +
+			var promt = "Отредактируй данный текст таким образом, что бы он был пригрдным для генерации по нему речи моделью от ElvenLabs. " +
+						"Убери разные смайлы, сдлеай этот текст максимально пригодным для генерации по нему красивого и чёткого голосового сообщения. " +
 						"Убери разного рода ссылки из этого текста. Оставь только текст. " +
-						"А так же переведи этот текст на английский язык если он не на английском. " +
+						"Если он слишком длинный то сделай его более коротким, для дальнешего формирования по нему корткого голосового сообщения. " +
 						"Формат ответа: верни сторого только готовый ответ, без всякого рода форматирования и пояснений. " +
 						$"Вот этот текст: {responseText}";
 			string cleanText = await _generativeLanguageModel.GeminiRequest(promt);
@@ -299,9 +301,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			//}
 			//else
 			//{
-			string base64Audio = await _generativeLanguageModel.GeminiTextToSpeechEn(cleanText);
-			//
-			var audioBytes = Convert.FromBase64String(base64Audio);
+			//string base64Audio = await _generativeLanguageModel.GeminiTextToSpeechEn(cleanText);
+			////
+			//var audioBytes = Convert.FromBase64String(base64Audio);
+
 
 			Console.WriteLine("WebRootPath: " + _env.WebRootPath);
 			Console.WriteLine("ContentRootPath: " + _env.ContentRootPath);
@@ -325,7 +328,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			// 3. Сохраняем файл
 			var fileName = $"{Guid.NewGuid()}.wav";
 			var filePath = Path.Combine(tempFolder, fileName);
-			await File.WriteAllBytesAsync(filePath, audioBytes);
+
+			await _elevenLabService.TextToSpeechAsync(cleanText, "jqcCZkN6Knx8BJ5TBdYR", filePath);
+
+			//await File.WriteAllBytesAsync(filePath, audioBytes);
 
 			// 4. Публичная ссылка
 			var publicUrl = $"{APP_URL}/temp_audio/{fileName}";
