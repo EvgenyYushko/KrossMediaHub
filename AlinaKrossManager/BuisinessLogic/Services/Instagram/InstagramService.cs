@@ -697,7 +697,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			string url = $"https://graph.facebook.com/v18.0/{hashtagId}/top_media" +
 						 $"?user_id={userId}" +
 						 $"&fields=id,caption,media_type,media_url,permalink,like_count,comments_count,timestamp,children{{id,media_type,media_url}}" +
-						 $"&limit=25" +
+						 $"&limit=15" +
 						 $"&access_token={_faceBooklongLiveToken}";
 
 			try

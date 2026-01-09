@@ -143,8 +143,8 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 
 					try
 					{
-						await _telegramService.SendMessage(msg);
-						_logger.LogInformation($"🔔 Уведомление об успехе отправлено админу.");
+						//await _telegramService.SendMessage(msg);
+						_logger.LogInformation(msg);
 					}
 					catch (Exception ex)
 					{
