@@ -34,6 +34,8 @@ namespace AlinaKrossManager.Jobs
 		{
 			try
 			{
+				//await _instagramService.GenerateAndSendAudio(_evgenyYushkoId, "Привет");
+
 				await _instagramService.PublishRandomStory();
 			}
 			catch (Exception ex)

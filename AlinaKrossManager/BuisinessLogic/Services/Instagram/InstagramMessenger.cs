@@ -266,7 +266,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			Console.WriteLine("historyIsReaded: " + historyIsReaded);
 		}
 
-		private async Task GenerateAndSendAudio(string senderId, string responseText)
+		public async Task GenerateAndSendAudio(string senderId, string responseText)
 		{
 			var promt = "Отредактируй данный текст таким образом, что бы он был пригрдным для генерации по нему речи моделью от ElvenLabs. " +
 						"Убери разные смайлы, сдлеай этот текст максимально пригодным для генерации по нему красивого и чёткого голосового сообщения. " +
