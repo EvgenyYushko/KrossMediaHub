@@ -8,7 +8,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class TelegrammDailyJob : SchedulerJob
 	{
-		public static string Time => "0 25 20 1-31/2 * ?";
+		public static string Time => "0 25 20 2-31/2 * ?";
 
 		private readonly ILogger<TelegrammDailyJob> _logger;
 		private readonly IServiceScopeFactory _serviceScopeFactory;
