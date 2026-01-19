@@ -20,7 +20,7 @@ namespace AlinaKrossManager.BuisinessLogic
 
 		public async Task TextToSpeechAsync(string text, string voiceId, string outputFileName)
 		{
-			
+
 			// Список прокси (я выбрал HTTP и SOCKS5, так как они лучше поддерживаются)
 			var proxyList = new List<string>
 			{
@@ -88,10 +88,16 @@ namespace AlinaKrossManager.BuisinessLogic
 						if (response.IsSuccessStatusCode)
 						{
 							Console.WriteLine("УСПЕХ! Данные получены.");
+							// 2. Получаем поток MP3 данных
 							using (var mp3Stream = await response.Content.ReadAsStreamAsync())
-							using (var mp3Reader = new Mp3FileReader(mp3Stream))
 							{
-								WaveFileWriter.CreateWaveFile(outputFileName, mp3Reader);
+								// ИСПОЛЬЗУЕМ КРОССПЛАТФОРМЕННЫЙ ДЕКОДЕР (NLayer)
+								// Это позволит коду работать на Linux (Render)
+								using (var mp3Reader = new NLayer.NAudioSupport.ManagedMpegStream(mp3Stream))
+								{
+									// Сохраняем как стандартный WAV
+									WaveFileWriter.CreateWaveFile(outputFileName, mp3Reader);
+								}
 							}
 							return; // Завершаем метод, файл готов
 						}
