@@ -140,6 +140,25 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return await _telegramBotClient.SendVideo(senderId, video, text);
 		}
 
+		public async Task<Message> SendVideoNoteAsync(long senderId, string originalVideoFileId)
+		{
+			// 1. Получаем информацию о файле
+			var fileInfo = await _telegramBotClient.GetFile(originalVideoFileId);
+
+			// 2. Скачиваем видео во временный поток
+			using (var saveStream = new MemoryStream())
+			{
+				await _telegramBotClient.DownloadFile(fileInfo.FilePath, saveStream);
+				saveStream.Position = 0; // Сбрасываем позицию в начало
+
+				// 3. Отправляем этот поток обратно, но уже как VideoNote
+				return await _telegramBotClient.SendVideoNote(
+					chatId: senderId,
+					videoNote: InputFile.FromStream(saveStream)
+				);
+			}
+		}
+
 		public async Task<Message> SendSinglePhotoAsync(string base64Image, int? msgId, string caption = "", ParseMode parseMode = ParseMode.None, ReplyMarkup replyMarkup = null, long senderId = EVGENY_YUSHKO_TG_ID)
 		{
 			var imageBytes = Convert.FromBase64String(base64Image);

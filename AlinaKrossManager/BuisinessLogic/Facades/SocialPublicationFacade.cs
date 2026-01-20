@@ -371,7 +371,14 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			{
 				if (video is not null)
 				{
-					await _telegramService.SendVideoAsync(chanelId, caption, video);
+					if (caption.ToLower() == "круг")
+					{
+						await _telegramService.SendVideoNoteAsync(chanelId, video.FileId);
+					}
+					else
+					{
+						await _telegramService.SendVideoAsync(chanelId, caption, video);
+					}
 				}
 				else if (files?.Count() > 0)
 				{
