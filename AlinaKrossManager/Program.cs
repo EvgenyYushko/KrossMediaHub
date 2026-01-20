@@ -24,6 +24,7 @@ using static AlinaKrossManager.Jobs.Helpers.JobHelper;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.json", optional: false);
+builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
