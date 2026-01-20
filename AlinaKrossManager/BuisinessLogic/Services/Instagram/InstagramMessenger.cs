@@ -268,12 +268,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		public async Task GenerateAndSendAudio(string senderId, string responseText)
 		{
-			var promt = "Отредактируй данный текст таким образом, что бы он был пригрдным для генерации по нему речи моделью от ElvenLabs. " +
-						"Убери разные смайлы, сдлеай этот текст максимально пригодным для генерации по нему красивого и чёткого голосового сообщения. " +
-						"Убери разного рода ссылки из этого текста. Оставь только текст. " +
-						"Если он слишком длинный то сделай его более коротким, для дальнешего формирования по нему корткого голосового сообщения. " +
-						"Формат ответа: верни сторого только готовый ответ, без всякого рода форматирования и пояснений. " +
-						$"Вот этот текст: {responseText}";
+			var promt = "Edit this text so that it is suitable for generating speech using the ElvenLabs model. " +
+						" Remove the different emoticons, make this text as suitable as possible for generating a beautiful and clear voice message from it. " +
+						" Remove all kinds of links from this text. Leave only the text. " +
+						" If it is too long, then make it shorter, so that a short voice message can be formed from it. " +
+						" Response format: give me only the finished response, without any formatting or explanation. " +
+						$"This is the text: {responseText}";
 			string cleanText = await _generativeLanguageModel.GeminiRequest(promt);
 
 			//var promptLanguageAnalyze =
