@@ -404,11 +404,15 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			}
 		}
 
-		public Task<bool> XPost(string caption, List<string> files = null)
+		public Task<bool> XPost(string caption, List<string> files = null, string videoBase64 = null)
 		{
 			if (files is not null && files.Count > 0)
 			{
-				return _xService.CreatePostPost(caption, files);
+				return _xService.CreateImagePost(caption, files);
+			}
+			else if (!string.IsNullOrEmpty(videoBase64))
+			{
+				return _xService.CreateVideoPost(caption, videoBase64);
 			}
 			else
 			{

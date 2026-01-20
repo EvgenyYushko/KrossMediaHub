@@ -466,25 +466,35 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			try
 			{
 				var replayText = rmsg.GetMsgText() ?? "";
+				var resVideos = await _telegramService.TryGetVideoBase64FromTelegram(rmsg);
 				var images = await _telegramService.TryGetImagesPromTelegram(rmsg.MediaGroupId, rmsg.Photo);
-				if (!images.Existst && string.IsNullOrEmpty(replayText))
+				if (!images.Existst && string.IsNullOrEmpty(replayText) && resVideos is null)
 				{
 					return false;
 				}
 
 				var description = await GetDescription(rmsg, images, replayText, false, XService.GetBaseDescriptionPrompt(images.Existst ? images.Images.First() : null));
-
+				bool success = false;
 				if (images.Existst)
 				{
-					var success = await publisher.XPost(description, images.Images);
-					if (success)
+					success = await publisher.XPost(description, images.Images);
+				}
+				else if (resVideos is not null)
+				{
+					success = await publisher.XPost(description, null, resVideos.Base64Video);					
+				}
+				else
+				{
+					success = await publisher.XPost(description);
+				}
+
+				if (success)
+				{
+					try
 					{
-						try
-						{
-							await _telegramService.SendMessage("✅ Post X success!", rmsg.MessageId);
-						}
-						catch { }
+						await _telegramService.SendMessage("✅ Post X success!", rmsg.MessageId);
 					}
+					catch { }
 				}
 			}
 			catch (Exception ex)

@@ -41,7 +41,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		/// <summary>
 		/// Метод для публикации текста с картинками
 		/// </summary>
-		public async Task<bool> CreatePostPost(string caption, List<string> base64Files)
+		public async Task<bool> CreateImagePost(string caption, List<string> base64Files)
 		{
 			// Твиттер разрешает максимум 4 картинки на один твит
 			var filesToUpload = base64Files?.Take(4).ToList();
@@ -163,6 +163,106 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Критическая ошибка при запросе: {ex.Message}");
+				return false;
+			}
+		}
+
+		/// <summary>
+		/// Метод для публикации видео (MP4) из Base64
+		/// </summary>
+		public async Task<bool> CreateVideoPost(string caption, string base64Video)
+		{
+			if (string.IsNullOrEmpty(base64Video))
+			{
+				Console.WriteLine("Ошибка: передана пустая строка Base64 для видео.");
+				return false;
+			}
+
+			try
+			{
+				// 1. Подготовка байтов
+				string cleanBase64 = base64Video;
+				if (cleanBase64.Contains(","))
+				{
+					cleanBase64 = cleanBase64.Split(',')[1];
+				}
+
+				byte[] videoBytes = Convert.FromBase64String(cleanBase64);
+				Console.WriteLine($"Размер видео: {videoBytes.Length / 1024 / 1024} MB. Начинаем загрузку...");
+
+				// 2. Загрузка видео (Upload)
+				var uploadedMedia = await _twitterClient.Upload.UploadTweetVideoAsync(videoBytes);
+
+				if (uploadedMedia == null || uploadedMedia.Id == 0)
+				{
+					Console.WriteLine("Ошибка: Не удалось загрузить видео файл.");
+					return false;
+				}
+
+				Console.WriteLine($"Видео загружено (ID: {uploadedMedia.Id}). Ожидаем процессинг...");
+
+				// 3. ВАЖНО: Ручное ожидание обработки (вместо WaitForMediaProcessingAsync)
+				var isProcessed = false;
+				var attempts = 0;
+
+				while (!isProcessed && attempts < 20) // Максимум 20 попыток (около 1-2 минут)
+				{
+					// Получаем актуальный статус медиа
+					var mediaStatus = await _twitterClient.Upload.GetVideoProcessingStatusAsync(uploadedMedia);
+
+					// Если ProcessingInfo == null, значит видео уже готово (или это картинка/гифка, которая не требует процессинга)
+					if (mediaStatus.ProcessingInfo == null)
+					{
+						isProcessed = true;
+						break;
+					}
+
+					var state = mediaStatus.ProcessingInfo.State;
+
+					if (state == "succeeded")
+					{
+						isProcessed = true;
+						Console.WriteLine("Процессинг видео успешно завершен.");
+					}
+					else if (state == "failed")
+					{
+						var error = mediaStatus.ProcessingInfo.Error;
+						Console.WriteLine($"Ошибка процессинга Twitter: {error?.Code} - {error?.Message}");
+						return false;
+					}
+					else
+					{
+						// Если "pending" или "in_progress"
+						attempts++;
+						// Twitter сам говорит, сколько миллисекунд подождать до следующей проверки
+						var waitTime = mediaStatus.ProcessingInfo.CheckAfterInMilliseconds;
+						// Если вдруг вернул 0 или null, ждем 2 секунды по умолчанию
+						await Task.Delay(waitTime > 0 ? waitTime : 2000);
+					}
+				}
+
+				if (!isProcessed)
+				{
+					Console.WriteLine("Превышено время ожидания обработки видео.");
+					return false;
+				}
+
+				// 4. Формирование запроса V2
+				var tweetRequest = new TweetV2Request
+				{
+					Text = caption,
+					Media = new TweetV2Media
+					{
+						MediaIds = new List<string> { uploadedMedia.Id.ToString() }
+					}
+				};
+
+				// 5. Отправка твита
+				return await SendTweetV2Async(tweetRequest);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Общая ошибка метода публикации видео: {ex.Message}");
 				return false;
 			}
 		}
