@@ -329,7 +329,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			var fileName = $"{Guid.NewGuid()}.wav";
 			var filePath = Path.Combine(tempFolder, fileName);
 
-			await _elevenLabService.TextToSpeechAsync(cleanText, "jqcCZkN6Knx8BJ5TBdYR", filePath);
+			//"jqcCZkN6Knx8BJ5TBdYR"
+			await _elevenLabService.TextToSpeechAsync(cleanText, "19STyYD15bswVz51nqLf", filePath);
 
 			//await File.WriteAllBytesAsync(filePath, audioBytes);
 
