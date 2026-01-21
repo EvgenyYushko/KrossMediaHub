@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.Services;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
@@ -34,6 +33,13 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
 
 			_conversationService.AddBotMessage(senderId, responseText);
+
+			await MarkMessageAsReadAsync(messageId);
+
+			if (Random.Shared.Next(100) < 90)
+			{
+				messageId = null;
+			}
 
 			await SendReplyAsync(senderId, responseText, messageId);
 
@@ -106,7 +112,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
 
 			// 1. Создаем список эмодзи, которые хотим использовать
-			var availableEmojis = new[] { "😘", "❤️", "🥰", "💋", "💖", "😉", "😍", "💘", "💜", "😻", "👍", "🔥", "😂" };
+			var availableEmojis = new[] { "😘", "❤️", "🥰", "💋", "💖", "😍", "💘", "💜", "😻", "👍", "🔥" };
 
 			// 2. Выбираем случайный эмодзи
 			var randomEmoji = availableEmojis[Random.Shared.Next(availableEmojis.Length)];
@@ -149,6 +155,45 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			catch (Exception ex)
 			{
 				Console.WriteLine($"[EXCEPTION] Не удалось отправить реакцию: {ex.Message}");
+			}
+		}
+
+		public async Task MarkMessageAsReadAsync(string messageId)
+		{
+			if (string.IsNullOrEmpty(messageId)) return;
+
+			// 1. Данные для подключения
+			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
+
+			// 2. Формируем JSON payload по документации
+			var payload = new
+			{
+				messaging_product = "whatsapp",
+				status = "read",
+				message_id = messageId
+			};
+
+			try
+			{
+				var client = _httpClientFactory.CreateClient();
+				client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
+
+				// 3. Отправляем запрос
+				var response = await client.PostAsJsonAsync(url, payload);
+
+				if (response.IsSuccessStatusCode)
+				{
+					Console.WriteLine($"[STATUS] Сообщение {messageId} помечено как прочитанное.");
+				}
+				else
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					Console.WriteLine($"[ERROR] Не удалось пометить как прочитанное: {error}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[EXCEPTION] Ошибка при отправке статуса read: {ex.Message}");
 			}
 		}
 

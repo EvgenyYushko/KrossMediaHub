@@ -1,4 +1,4 @@
-using AlinaKrossManager.BuisinessLogic.Instagram;
+using AlinaKrossManager.BuisinessLogic;
 using AlinaKrossManager.BuisinessLogic.Services;
 using AlinaKrossManager.Jobs.Base;
 using AlinaKrossManager.Services;
@@ -43,17 +43,20 @@ namespace AlinaKrossManager.Jobs.Messages
 					{
 						try
 						{
-							try
+							if (Random.Shared.Next(100) < 40)
 							{
-								var randomUnreadMsgId = _conversationService.GetLastUnreadUserMessageId(phoneNumber);
-								if (randomUnreadMsgId != null)
+								try
 								{
-									await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, randomUnreadMsgId);
+									var randomUnreadMsgId = _conversationService.GetLastUnreadUserMessageId(phoneNumber);
+									if (randomUnreadMsgId != null)
+									{
+										await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, randomUnreadMsgId);
+									}
 								}
-							}
-							catch (Exception ex)
-							{
-								Console.WriteLine(ex.Message);
+								catch (Exception ex)
+								{
+									Console.WriteLine(ex.Message);
+								}
 							}
 							await _whatsAppService.SendDellayMessageWithHistory(phoneNumber, lastMsg.Id);
 						}

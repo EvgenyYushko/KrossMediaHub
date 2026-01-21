@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using AlinaKrossManager.BuisinessLogic.Instagram;
+using AlinaKrossManager.BuisinessLogic;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AlinaKrossManager.Controllers

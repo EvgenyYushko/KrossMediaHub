@@ -1,4 +1,4 @@
-namespace AlinaKrossManager.BuisinessLogic.Instagram
+namespace AlinaKrossManager.BuisinessLogic
 {
 	public class ConversationServiceWhatsApp
 	{
