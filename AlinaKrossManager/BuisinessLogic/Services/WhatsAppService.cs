@@ -23,27 +23,53 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			_generativeLanguageModel = generativeLanguageModel;
 		}
 
-		public async Task SendDellayMessageWithHistory(string senderId, string messageId)
+		public async Task SendDellayMessageWithHistory(string phoneNumber, string messageId)
 		{
-			var conversationHistory = _conversationService.GetFormattedHistory(senderId);
+			await MarkMessageAsReadAsync(messageId);
+
+			await Task.Delay(1000);
+
+			if (Random.Shared.Next(100) < 40)
+			{
+				try
+				{
+					var randomUnreadMsgId = _conversationService.GetRandomUnreadUserMessageId(phoneNumber);
+					if (randomUnreadMsgId != null)
+					{
+						await ReactToUnreadMessageAsync(phoneNumber, randomUnreadMsgId);
+					}
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine(ex.Message);
+				}
+			}
+
+			await Task.Delay(1000);
+
+			await SendTypingIndicatorAsync(phoneNumber);
+
+			var conversationHistory = _conversationService.GetFormattedHistory(phoneNumber);
 			var prompt = GetMainPromtAlinaKross(conversationHistory);
+
+			int typingTime = Math.Clamp(prompt.Length * 70, 2000, 10000); // Минимум 2 сек, максимум 10 сек
+			await Task.Delay(typingTime);
 
 			//Log($"SENDED PROMPT: {prompt}");
 
 			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
 
-			_conversationService.AddBotMessage(senderId, responseText);
+			_conversationService.AddBotMessage(phoneNumber, responseText);
 
-			await MarkMessageAsReadAsync(messageId);
 
-			if (Random.Shared.Next(100) < 90)
+			if (Random.Shared.Next(100) < 70)
 			{
 				messageId = null;
 			}
 
-			await SendReplyAsync(senderId, responseText, messageId);
+			await SendReplyAsync(phoneNumber, responseText, messageId);
 
-			var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
+			var historyIsReaded = _conversationService.MakeHistoryAsReaded(phoneNumber);
 			Console.WriteLine("historyIsReaded: " + historyIsReaded);
 		}
 
@@ -194,6 +220,43 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			catch (Exception ex)
 			{
 				Console.WriteLine($"[EXCEPTION] Ошибка при отправке статуса read: {ex.Message}");
+			}
+		}
+
+		public async Task SendTypingIndicatorAsync(string toPhoneNumber)
+		{
+			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
+
+			// 2. Формируем JSON для статуса "печатает"
+			var payload = new
+			{
+				messaging_product = "whatsapp",
+				recipient_type = "individual",
+				to = toPhoneNumber,
+				type = "sender_action",
+				sender_action = "typing_on"
+			};
+
+			try
+			{
+				var client = _httpClientFactory.CreateClient();
+				client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
+
+				var response = await client.PostAsJsonAsync(url, payload);
+
+				if (!response.IsSuccessStatusCode)
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					Console.WriteLine($"[ERROR] Ошибка отправки typing_on: {error}");
+				}
+				else
+				{
+					Console.WriteLine($"[ACTION] Отправлен статус 'печатает...' на номер {toPhoneNumber}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[EXCEPTION] {ex.Message}");
 			}
 		}
 

@@ -140,7 +140,7 @@ namespace AlinaKrossManager.BuisinessLogic
 			}
 		}
 
-		public string? GetLastUnreadUserMessageId(string userId)
+		public string? GetRandomUnreadUserMessageId(string userId)
 		{
 			if (!_conversations.ContainsKey(userId))
 				return null;

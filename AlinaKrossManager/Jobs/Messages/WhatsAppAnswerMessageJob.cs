@@ -42,22 +42,7 @@ namespace AlinaKrossManager.Jobs.Messages
 					if (lastMsg != null && lastMsg.Sender == "User")
 					{
 						try
-						{
-							if (Random.Shared.Next(100) < 40)
-							{
-								try
-								{
-									var randomUnreadMsgId = _conversationService.GetLastUnreadUserMessageId(phoneNumber);
-									if (randomUnreadMsgId != null)
-									{
-										await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, randomUnreadMsgId);
-									}
-								}
-								catch (Exception ex)
-								{
-									Console.WriteLine(ex.Message);
-								}
-							}
+						{							
 							await _whatsAppService.SendDellayMessageWithHistory(phoneNumber, lastMsg.Id);
 						}
 						catch (Exception ex)
