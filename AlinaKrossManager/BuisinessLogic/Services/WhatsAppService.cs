@@ -47,7 +47,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			await Task.Delay(1000);
 
-			await SendTypingIndicatorAsync(phoneNumber);
+			await SendTypingIndicatorAsync(messageId);
 
 			var conversationHistory = _conversationService.GetFormattedHistory(phoneNumber);
 			var prompt = GetMainPromtAlinaKross(conversationHistory);
@@ -223,18 +223,20 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
-		public async Task SendTypingIndicatorAsync(string toPhoneNumber)
+		public async Task SendTypingIndicatorAsync(string messageId)
 		{
 			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
 
-			// 2. Формируем JSON для статуса "печатает"
+			// Формируем JSON точь-в-точь как на скриншоте
 			var payload = new
 			{
 				messaging_product = "whatsapp",
-				recipient_type = "individual",
-				to = toPhoneNumber,
-				type = "sender_action",
-				sender_action = "typing_on"
+				status = "read",
+				message_id = messageId,
+				typing_indicator = new
+				{
+					type = "text"
+				}
 			};
 
 			try
@@ -244,19 +246,19 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				var response = await client.PostAsJsonAsync(url, payload);
 
-				if (!response.IsSuccessStatusCode)
+				if (response.IsSuccessStatusCode)
 				{
-					var error = await response.Content.ReadAsStringAsync();
-					Console.WriteLine($"[ERROR] Ошибка отправки typing_on: {error}");
+					Console.WriteLine($"[SUCCESS] Статус 'Read + Typing' отправлен для сообщения {messageId}");
 				}
 				else
 				{
-					Console.WriteLine($"[ACTION] Отправлен статус 'печатает...' на номер {toPhoneNumber}");
+					var error = await response.Content.ReadAsStringAsync();
+					Console.WriteLine($"[ERROR] Ошибка отправки комбинированного статуса: {error}");
 				}
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"[EXCEPTION] {ex.Message}");
+				Console.WriteLine($"[EXCEPTION] Ошибка запроса: {ex.Message}");
 			}
 		}
 
