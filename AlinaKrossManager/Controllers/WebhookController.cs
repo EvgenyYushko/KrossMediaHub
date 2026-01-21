@@ -8,10 +8,10 @@ namespace AlinaKrossManager.Controllers
 	[Route("api/whatsapp")]
 	public class WebhookController : ControllerBase
 	{
-		private readonly ConversationService _conversationService;
+		private readonly ConversationServiceWhatsApp _conversationService;
 		private const string VerifyToken = "MY_SUPER_SECRET_TOKEN"; // Придумайте сами и впишите в поле "Подтверждение маркера"
 
-		public WebhookController(IConfiguration configuration, ConversationService conversationService)
+		public WebhookController(IConfiguration configuration, ConversationServiceWhatsApp conversationService)
 		{
 			_conversationService = conversationService;
 		}
