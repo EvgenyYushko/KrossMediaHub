@@ -15,13 +15,14 @@ namespace AlinaKrossManager.Controllers
 		// Данные возьмите из вашего Dashboard (Скриншот 1 и 2)
 		// Лучше вынести их в appsettings.json
 		private const string VerifyToken = "MY_SUPER_SECRET_TOKEN"; // Придумайте сами и впишите в поле "Подтверждение маркера"
-		private const string AccessToken = "EAATFga3INnABQr098IsrGPZAK1yDgBJhXFqVPfvGn9diXZBZBXvxlIpZB2uXZA6OnZABd2TkN92Ba8aFZBtN83P2q1GnAmpaLDxSofoijYMFfT1QYNOQhOod3700MOryssGOHametgI3aZBgkZBpG0YDhD80FPirtTj08DchPHaXE4541m3L7vDybq0A6L1IwykGUuiVVZBFhjytpJcNnKAzxEJn5jovRqCzulTyUD4KnDbZBe6FfUCZCLwDeM8RXxDgLkf15uKHfFwbnuYgvL59vSfU"; // Ваш временный или постоянный токен доступа
+		private readonly string _accessToken;
 		private const string PhoneNumberId = "966767783183438"; // ID номера телефона со скриншота
 
 		public WebhookController(IConfiguration configuration, IHttpClientFactory httpClientFactory)
 		{
 			_configuration = configuration;
 			_httpClientFactory = httpClientFactory;
+			_accessToken = _configuration["WHATS_APP_TOKEN"];
 		}
 
 		// 1. ПОДТВЕРЖДЕНИЕ WEBHOOK (GET)
@@ -98,7 +99,7 @@ namespace AlinaKrossManager.Controllers
 			var content = new StringContent(json, Encoding.UTF8, "application/json");
 
 			var client = _httpClientFactory.CreateClient();
-			client.DefaultRequestHeaders.Add("Authorization", $"Bearer {AccessToken}");
+			client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
 
 			var response = await client.PostAsync(url, content);
 
