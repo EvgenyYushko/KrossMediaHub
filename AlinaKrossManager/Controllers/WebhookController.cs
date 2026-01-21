@@ -1,6 +1,5 @@
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Serialization;
+using AlinaKrossManager.BuisinessLogic.Instagram;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AlinaKrossManager.Controllers
@@ -9,20 +8,12 @@ namespace AlinaKrossManager.Controllers
 	[Route("api/whatsapp")]
 	public class WebhookController : ControllerBase
 	{
-		private readonly IConfiguration _configuration;
-		private readonly IHttpClientFactory _httpClientFactory;
-
-		// Данные возьмите из вашего Dashboard (Скриншот 1 и 2)
-		// Лучше вынести их в appsettings.json
+		private readonly ConversationService _conversationService;
 		private const string VerifyToken = "MY_SUPER_SECRET_TOKEN"; // Придумайте сами и впишите в поле "Подтверждение маркера"
-		private readonly string _accessToken;
-		private const string PhoneNumberId = "966767783183438"; // ID номера телефона со скриншота
 
-		public WebhookController(IConfiguration configuration, IHttpClientFactory httpClientFactory)
+		public WebhookController(IConfiguration configuration, ConversationService conversationService)
 		{
-			_configuration = configuration;
-			_httpClientFactory = httpClientFactory;
-			_accessToken = _configuration["WHATS_APP_TOKEN"];
+			_conversationService = conversationService;
 		}
 
 		// 1. ПОДТВЕРЖДЕНИЕ WEBHOOK (GET)
@@ -65,49 +56,23 @@ namespace AlinaKrossManager.Controllers
 
 			Console.WriteLine($"Получено сообщение от {senderPhone}: {messageText}");
 
-			string targetPhone = senderPhone;
-
-			if (targetPhone.StartsWith("37529"))
+			if (!string.IsNullOrEmpty(messageText))
 			{
-				// Превращаем 37529... в 3758029...
-				targetPhone = targetPhone.Replace("37529", "3758029");
-			}
+				string targetPhone = senderPhone;
 
-			// --- ЛОГИКА АВТООТВЕТА ---
-			if (!string.IsNullOrEmpty(targetPhone))
-			{
-				await SendReplyAsync(targetPhone, "Привет! Я получил твое сообщение: " + messageText);
+				if (!string.IsNullOrEmpty(targetPhone))
+				{
+					if (targetPhone.StartsWith("37529"))
+					{
+						// Превращаем 37529... в 3758029...
+						targetPhone = targetPhone.Replace("37529", "3758029");
+					}
+
+					_conversationService.AddUserMessage(targetPhone, messageText);
+				}
 			}
 
 			return Ok();
-		}
-
-		// Метод отправки ответа через API
-		private async Task SendReplyAsync(string toPhoneNumber, string message)
-		{
-			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
-
-			var payload = new
-			{
-				messaging_product = "whatsapp",
-				to = toPhoneNumber,
-				type = "text",
-				text = new { body = message }
-			};
-
-			var json = JsonSerializer.Serialize(payload);
-			var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-			var client = _httpClientFactory.CreateClient();
-			client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
-
-			var response = await client.PostAsync(url, content);
-
-			if (!response.IsSuccessStatusCode)
-			{
-				var error = await response.Content.ReadAsStringAsync();
-				Console.WriteLine($"Ошибка отправки: {error}");
-			}
 		}
 	}
 

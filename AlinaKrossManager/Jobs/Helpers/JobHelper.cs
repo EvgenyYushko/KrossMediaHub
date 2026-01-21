@@ -14,6 +14,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 		public static string BLUE_SKY_DM_QUEUE = "BlueSkyDmQueue";
 		public static string FACEBOOK_DM_QUEUE = "FaceBookDmQueue";
 		public static string DB_MAINTANANCE_QUEUE = "DbMaintananceQueue";
+		public static string WHATS_APP_ANSWER_MESSAGE_QUEUE = "WhatsAppAnswerMessageQueue";
 
 		public static List<JobsSetting> JobSettings { get; set; } = new();
 
@@ -35,6 +36,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 			JobSettings.Add(new() { Type = typeof(BlueSkyDmJob), Key = BLUE_SKY_DM_QUEUE, Time = BlueSkyDmJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(FaceBookDmJob), Key = FACEBOOK_DM_QUEUE, Time = FaceBookDmJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(DbMaintananceJob), Key = DB_MAINTANANCE_QUEUE, Time = DbMaintananceJob.Time, Castum = false });
+			JobSettings.Add(new() { Type = typeof(WhatsAppAnswerMessageJob), Key = WHATS_APP_ANSWER_MESSAGE_QUEUE, Time = WhatsAppAnswerMessageJob.Time, Castum = false });
 		}
 	}
 

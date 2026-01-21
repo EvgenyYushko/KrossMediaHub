@@ -100,6 +100,15 @@ builder.Services.AddSingleton(provider =>
 	return new ElevenLabService(apiKey);
 });
 
+builder.Services.AddSingleton(provider =>
+{
+	var accessToken = GetConfigOrThrow(WHATS_APP_TOKEN);
+	var conversationService = provider.GetService<ConversationService>();
+	var httpClientFactory = provider.GetService<IHttpClientFactory>();
+	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
+	return new WhatsAppService(accessToken, httpClientFactory, conversationService, geminiModel);
+});
+
 builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<PublicTelegramChanel>();

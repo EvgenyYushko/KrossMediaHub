@@ -221,8 +221,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			if (true)
 			{
 				_conversationService.AddUserMessage(senderId, messageText);
-				var history = _conversationService.GetFormattedHistory(senderId);
-				Log(history);
+				//var history = _conversationService.GetFormattedHistory(senderId);
+				//Log(history);
 				return;
 			}
 
