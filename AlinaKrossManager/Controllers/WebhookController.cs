@@ -64,10 +64,18 @@ namespace AlinaKrossManager.Controllers
 
 			Console.WriteLine($"Получено сообщение от {senderPhone}: {messageText}");
 
-			// --- ЛОГИКА АВТООТВЕТА ---
-			if (!string.IsNullOrEmpty(senderPhone))
+			string targetPhone = senderPhone;
+
+			if (targetPhone.StartsWith("37529"))
 			{
-				await SendReplyAsync(senderPhone, "Привет! Я получил твое сообщение: " + messageText);
+				// Превращаем 37529... в 3758029...
+				targetPhone = targetPhone.Replace("37529", "3758029");
+			}
+
+			// --- ЛОГИКА АВТООТВЕТА ---
+			if (!string.IsNullOrEmpty(targetPhone))
+			{
+				await SendReplyAsync(targetPhone, "Привет! Я получил твое сообщение: " + messageText);
 			}
 
 			return Ok();
@@ -191,4 +199,5 @@ namespace AlinaKrossManager.Controllers
 	{
 		[JsonPropertyName("body")]
 		public string Body { get; set; }
-	}}
+	}
+}
