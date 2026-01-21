@@ -51,13 +51,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var conversationHistory = _conversationService.GetFormattedHistory(phoneNumber);
 			var prompt = IntimPrompt(conversationHistory);
 
-			int typingTime = Math.Clamp(prompt.Length * 70, 2000, 17000); // Минимум 2 сек, максимум 17 сек
-			await Task.Delay(typingTime);
+			//int typingTime = Math.Clamp(prompt.Length * 70, 2000, 17000); // Минимум 2 сек, максимум 17 сек
+			//await Task.Delay(typingTime);
 
 			//Log($"SENDED PROMPT: {prompt}");
 
 			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
-
 			_conversationService.AddBotMessage(phoneNumber, responseText);
 
 			if (Random.Shared.Next(100) < 70)
@@ -65,10 +64,86 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				messageId = null;
 			}
 
-			await SendReplyAsync(phoneNumber, responseText, messageId);
+			await SendLongMessageAsHumanAsync(phoneNumber, responseText, messageId);
 
 			var historyIsReaded = _conversationService.MakeHistoryAsReaded(phoneNumber);
 			Console.WriteLine("historyIsReaded: " + historyIsReaded);
+		}
+
+		public async Task SendLongMessageAsHumanAsync(string userId, string fullText, string? replyToMessageId)
+		{
+			// 1. Разбиваем текст на части (например, по ~200 символов или по предложениям)
+			var chunks = SplitMessageIntoHumanChunks(fullText, 250);
+
+			for (int i = 0; i < chunks.Count; i++)
+			{
+				var chunk = chunks[i];
+
+				await SendTypingIndicatorAsync(userId);
+
+				// 3. Рассчитываем паузу для ТЕКУЩЕГО куска
+				// Чем короче кусок, тем быстрее мы его "печатаем"
+				int typingTime = Math.Clamp(chunk.Length * 60, 1500, 5000);
+				await Task.Delay(typingTime);
+
+				// 4. Отправляем сообщение
+				// Важно: context (цитирование) обычно ставят только на ПЕРВОЕ сообщение серии,
+				// чтобы не засорять чат. Поэтому replyToMessageId передаем только если i == 0.
+				string? contextId = (i == 0) ? replyToMessageId : null;
+
+				await SendReplyAsync(userId, chunk, contextId);
+
+				// 5. Маленькая пауза между отправкой и началом печати следующего (как будто человек нажал Enter)
+				if (i < chunks.Count - 1)
+				{
+					await Task.Delay(Random.Shared.Next(500, 1200));
+				}
+			}
+		}
+
+		private List<string> SplitMessageIntoHumanChunks(string text, int maxChunkLength = 250)
+		{
+			var chunks = new List<string>();
+			if (string.IsNullOrEmpty(text)) return chunks;
+
+			// 1. Сначала разбиваем по переносам строк (абзацам)
+			var paragraphs = text.Split(new[] { "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+			foreach (var paragraph in paragraphs)
+			{
+				// Если абзац короткий, добавляем его как есть
+				if (paragraph.Length <= maxChunkLength)
+				{
+					chunks.Add(paragraph.Trim());
+					continue;
+				}
+
+				// 2. Если абзац длинный, бьем его на предложения
+				// Используем регулярку, чтобы оставить знаки препинания (.!?) на месте
+				var sentences = System.Text.RegularExpressions.Regex.Split(paragraph, @"(?<=[.!?])\s+");
+
+				var currentChunk = "";
+
+				foreach (var sentence in sentences)
+				{
+					// Если текущий кусок + новое предложение влезают в лимит — склеиваем
+					if ((currentChunk.Length + sentence.Length) <= maxChunkLength)
+					{
+						currentChunk += (currentChunk.Length > 0 ? " " : "") + sentence;
+					}
+					else
+					{
+						// Если не влезают — сохраняем текущий кусок и начинаем новый
+						if (!string.IsNullOrEmpty(currentChunk)) chunks.Add(currentChunk.Trim());
+						currentChunk = sentence;
+					}
+				}
+
+				// Добавляем хвостик
+				if (!string.IsNullOrEmpty(currentChunk)) chunks.Add(currentChunk.Trim());
+			}
+
+			return chunks;
 		}
 
 		public async Task SendReplyAsync(string toPhoneNumber, string message, string? replyToMessageId = null)
@@ -415,7 +490,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				- Compliment him sexually when he opens up
 
 				RESPONSE GUIDELINES:
-				- Responses usually 1–2 sentences — longer when describing something hot
+				- Responses usually 1–3 sentences — longer when describing something hot
 				- Alternate quick teasing replies and deeper, slower-burn sensual ones
 				- Constantly drop small sexual hints: hard nipples, wet panties, heavy breathing, slow touches
 				- Build arousal step by step — from playful to dripping, from suggestion to detailed fantasy
