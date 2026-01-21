@@ -1,4 +1,3 @@
-using System;
 using System.Text;
 using System.Text.Json;
 using AlinaKrossManager.BuisinessLogic.Instagram;
@@ -65,6 +64,59 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				var error = await response.Content.ReadAsStringAsync();
 				Console.WriteLine($"Ошибка отправки: {error}");
+			}
+		}
+
+		public async Task ReactToUnreadMessageAsync(string userId, string messageId)
+		{
+			// 2. Исправляем номер телефона (ваш фикс для тестового режима с 80/29)
+			string targetPhone = userId;
+			if (targetPhone.StartsWith("37529"))
+			{
+				targetPhone = targetPhone.Replace("37529", "3758029");
+			}
+
+			// 3. Данные для авторизации
+			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
+
+			// 4. Формируем JSON (как в документации)
+			var payload = new
+			{
+				messaging_product = "whatsapp",
+				recipient_type = "individual",
+				to = targetPhone,
+				type = "reaction",
+				reaction = new
+				{
+					message_id = messageId,
+					emoji = "❤️" // Или любой другой, например "👍"
+				}
+			};
+
+			// 5. Отправляем запрос
+			try
+			{
+				var client = _httpClientFactory.CreateClient();
+				client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
+
+				var response = await client.PostAsJsonAsync(url, payload);
+
+				if (response.IsSuccessStatusCode)
+				{
+					Console.WriteLine($"[REACTION] Поставлен лайк на сообщение {messageId}");
+
+					// Опционально: Можно сразу пометить историю как прочитанную, если реакция считается "прочтением"
+					// _conversationService.MakeHistoryAsReaded(userId); 
+				}
+				else
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					Console.WriteLine($"[ERROR] Ошибка реакции: {error}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[EXCEPTION] Не удалось отправить реакцию: {ex.Message}");
 			}
 		}
 

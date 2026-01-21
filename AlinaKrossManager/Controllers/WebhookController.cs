@@ -53,6 +53,7 @@ namespace AlinaKrossManager.Controllers
 			var message = change.Value.Messages.First();
 			var senderPhone = message.From; // Номер телефона отправителя
 			var messageText = message.Text?.Body; // Текст сообщения
+			var messageId = message.Id;
 
 			Console.WriteLine($"Получено сообщение от {senderPhone}: {messageText}");
 
@@ -68,7 +69,7 @@ namespace AlinaKrossManager.Controllers
 						targetPhone = targetPhone.Replace("37529", "3758029");
 					}
 
-					_conversationService.AddUserMessage(targetPhone, messageText);
+					_conversationService.AddUserMessage(targetPhone, messageText, messageId);
 				}
 			}
 

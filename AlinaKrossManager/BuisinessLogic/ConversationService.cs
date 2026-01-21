@@ -17,7 +17,7 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 		}
 
 		// Добавляем сообщение пользователя
-		public void AddUserMessage(string userId, string messageText)
+		public void AddUserMessage(string userId, string messageText, string messageId)
 		{
 			if (string.IsNullOrEmpty(messageText))
 				return;
@@ -26,9 +26,10 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 
 			_conversations[userId].Messages.Add(new ChatMessageWhatsApp
 			{
+				Id = messageId,
 				Sender = "User",
 				Text = messageText,
-				Timestamp = DateTime.UtcNow,
+				Timestamp = DateTime.UtcNow,				
 				Readed = false
 			});
 
@@ -46,6 +47,7 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 
 			_conversations[userId].Messages.Add(new ChatMessageWhatsApp
 			{
+				Id = Guid.NewGuid().ToString(),
 				Sender = "Alina",
 				Text = messageText,
 				Timestamp = DateTime.UtcNow
@@ -141,6 +143,7 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 
 	public class ChatMessageWhatsApp
 	{
+		public string Id { get; set; }
 		public string Sender { get; set; } // "user" или "alina"
 		public string Text { get; set; }
 		public bool Readed { get; set; }

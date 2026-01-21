@@ -111,6 +111,7 @@ builder.Services.AddSingleton(provider =>
 
 builder.Services.AddSingleton<TelegramService>();
 builder.Services.AddSingleton<ConversationService>();
+builder.Services.AddSingleton<ConversationServiceWhatsApp>();
 builder.Services.AddSingleton<PublicTelegramChanel>();
 builder.Services.AddSingleton<PrivateTelegramChanel>();
 builder.Services.AddSingleton<AiFacade>();

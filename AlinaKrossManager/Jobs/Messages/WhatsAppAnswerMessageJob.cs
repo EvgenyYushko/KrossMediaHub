@@ -43,6 +43,14 @@ namespace AlinaKrossManager.Jobs.Messages
 					{
 						try
 						{
+							try
+							{
+								await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, lastMsg.Id);
+							}
+							catch (Exception ex)
+							{
+								Console.WriteLine(ex.Message);
+							}
 							await _whatsAppService.SendDellayMessageWithHistory(phoneNumber);
 						}
 						catch (Exception ex)
