@@ -251,11 +251,19 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 			_conversationService.AddBotMessage(senderId, responseText);
 
-			if (_random.Next(15) == 1)
+			if (_random.Next(20) == 1)
 			//if (false)
 			//if (senderId == _evgenyYushkoId)
 			{
-				await GenerateAndSendAudio(senderId, responseText);
+				try
+				{
+					await GenerateAndSendAudio(senderId, responseText);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine(ex.Message);
+					await SendResponse(senderId, responseText);
+				}
 			}
 			else
 			{

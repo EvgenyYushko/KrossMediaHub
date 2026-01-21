@@ -11,11 +11,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private const string PhoneNumberId = "966767783183438"; // ID номера телефона со скриншота
 		private readonly string _accessToken;
 		private readonly IHttpClientFactory _httpClientFactory;
-		private readonly ConversationService _conversationService;
+		private readonly ConversationServiceWhatsApp _conversationService;
 		private readonly IGenerativeLanguageModel _generativeLanguageModel;
 
 		public WhatsAppService(string accessToken, IHttpClientFactory httpClientFactory
-			, ConversationService conversationService
+			, ConversationServiceWhatsApp conversationService
 			, IGenerativeLanguageModel generativeLanguageModel)
 		{
 			_accessToken = accessToken;

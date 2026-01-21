@@ -103,7 +103,7 @@ builder.Services.AddSingleton(provider =>
 builder.Services.AddSingleton(provider =>
 {
 	var accessToken = GetConfigOrThrow(WHATS_APP_TOKEN);
-	var conversationService = provider.GetService<ConversationService>();
+	var conversationService = provider.GetService<ConversationServiceWhatsApp>();
 	var httpClientFactory = provider.GetService<IHttpClientFactory>();
 	var geminiModel = provider.GetService<IGenerativeLanguageModel>();
 	return new WhatsAppService(accessToken, httpClientFactory, conversationService, geminiModel);
