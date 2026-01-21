@@ -12,12 +12,12 @@ namespace AlinaKrossManager.Jobs.Messages
 		public static string Time => "0 * * * * ?";
 
 		private readonly WhatsAppService _whatsAppService;
-		private readonly ConversationService _conversationService;
+		private readonly ConversationServiceWhatsApp _conversationService;
 
 		public WhatsAppAnswerMessageJob(IServiceProvider serviceProvider
 			, IGenerativeLanguageModel generativeLanguageModel
 			, WhatsAppService whatsAppService
-			, ConversationService conversationService
+			, ConversationServiceWhatsApp conversationService
 			)
 			: base(serviceProvider, generativeLanguageModel)
 		{
