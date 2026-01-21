@@ -59,18 +59,13 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var responseText = await _generativeLanguageModel.GeminiRequest(prompt);
 			_conversationService.AddBotMessage(phoneNumber, responseText);
 
-			if (Random.Shared.Next(100) < 70)
-			{
-				messageId = null;
-			}
-
 			await SendLongMessageAsHumanAsync(phoneNumber, responseText, messageId);
 
 			var historyIsReaded = _conversationService.MakeHistoryAsReaded(phoneNumber);
 			Console.WriteLine("historyIsReaded: " + historyIsReaded);
 		}
 
-		public async Task SendLongMessageAsHumanAsync(string userId, string fullText, string? replyToMessageId)
+		public async Task SendLongMessageAsHumanAsync(string userId, string fullText, string replyToMessageId)
 		{
 			// 1. Разбиваем текст на части (например, по ~200 символов или по предложениям)
 			var chunks = SplitMessageIntoHumanChunks(fullText, 250);
@@ -79,7 +74,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				var chunk = chunks[i];
 
-				await SendTypingIndicatorAsync(userId);
+				await SendTypingIndicatorAsync(replyToMessageId);
 
 				// 3. Рассчитываем паузу для ТЕКУЩЕГО куска
 				// Чем короче кусок, тем быстрее мы его "печатаем"
@@ -90,6 +85,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				// Важно: context (цитирование) обычно ставят только на ПЕРВОЕ сообщение серии,
 				// чтобы не засорять чат. Поэтому replyToMessageId передаем только если i == 0.
 				string? contextId = (i == 0) ? replyToMessageId : null;
+
+				if (Random.Shared.Next(100) < 70)
+				{
+					contextId = null;
+				}
 
 				await SendReplyAsync(userId, chunk, contextId);
 
