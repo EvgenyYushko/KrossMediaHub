@@ -79,6 +79,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			// 3. Данные для авторизации
 			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
 
+			// 1. Создаем список эмодзи, которые хотим использовать
+			var availableEmojis = new[] { "😘", "❤️", "🥰", "💋", "💖", "😉", "😍", "💘", "💜", "😻", "👍", "🔥", "😂"};
+
+			// 2. Выбираем случайный эмодзи
+			var randomEmoji = availableEmojis[Random.Shared.Next(availableEmojis.Length)];
+
 			// 4. Формируем JSON (как в документации)
 			var payload = new
 			{
@@ -89,7 +95,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				reaction = new
 				{
 					message_id = messageId,
-					emoji = "❤️" // Или любой другой, например "👍"
+					emoji = randomEmoji // Или любой другой, например "👍"
 				}
 			};
 

@@ -45,7 +45,11 @@ namespace AlinaKrossManager.Jobs.Messages
 						{
 							try
 							{
-								await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, lastMsg.Id);
+								var randomUnreadMsgId = _conversationService.GetLastUnreadUserMessageId(phoneNumber);
+								if (randomUnreadMsgId != null)
+								{
+									await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, lastMsg.Id);
+								}
 							}
 							catch (Exception ex)
 							{

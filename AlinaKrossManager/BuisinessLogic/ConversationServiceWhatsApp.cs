@@ -29,7 +29,7 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 				Id = messageId,
 				Sender = "User",
 				Text = messageText,
-				Timestamp = DateTime.UtcNow,				
+				Timestamp = DateTime.UtcNow,
 				Readed = false
 			});
 
@@ -138,6 +138,27 @@ namespace AlinaKrossManager.BuisinessLogic.Instagram
 				_conversations.Remove(oldUser.Key);
 				_logger.LogInformation($"Removed old conversation for {oldUser.Key}");
 			}
+		}
+
+		public string? GetLastUnreadUserMessageId(string userId)
+		{
+			if (!_conversations.ContainsKey(userId))
+				return null;
+
+			// 1. Получаем список всех непрочитанных сообщений от пользователя
+			var unreadMessages = _conversations[userId].Messages
+				.Where(m => m.Sender == "User" && !m.Readed)
+				.ToList();
+
+			// 2. Если сообщений нет — возвращаем null
+			if (unreadMessages.Count == 0)
+				return null;
+
+			// 3. Генерируем случайный индекс от 0 до количества сообщений
+			int randomIndex = Random.Shared.Next(unreadMessages.Count);
+
+			// 4. Возвращаем ID случайного сообщения
+			return unreadMessages[randomIndex].Id;
 		}
 	}
 
