@@ -37,7 +37,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 					if (randomUnreadMsgId != null)
 					{
 						await ReactToUnreadMessageAsync(phoneNumber, randomUnreadMsgId);
-						await Task.Delay(1000);
+						await Task.Delay(2000);
 					}
 				}
 				catch (Exception ex)
@@ -51,7 +51,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var conversationHistory = _conversationService.GetFormattedHistory(phoneNumber);
 			var prompt = IntimPrompt(conversationHistory);
 
-			int typingTime = Math.Clamp(prompt.Length * 70, 2000, 10000); // Минимум 2 сек, максимум 10 сек
+			int typingTime = Math.Clamp(prompt.Length * 70, 2000, 17000); // Минимум 2 сек, максимум 17 сек
 			await Task.Delay(typingTime);
 
 			//Log($"SENDED PROMPT: {prompt}");
@@ -410,7 +410,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			- Dive into personal questions – ask about their cock size, fantasies, make them hard
 
 			RESPONSE GUIDELINES:
-			- Keep responses 2-4 sentences typically, but go longer for detailed sex scenes
+			- Keep responses 1-2 sentences typically, but go longer for detailed sex scenes
 			- Vary between quick, desperate moans and thoughtful, building fantasies
 			- Share explicit sexual moments constantly (what I'm touching, how wet I am, begging you to cum)
 			- Balance between goddess-like seduction and desperate nympho begging
