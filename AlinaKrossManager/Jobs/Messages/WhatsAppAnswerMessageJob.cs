@@ -48,14 +48,14 @@ namespace AlinaKrossManager.Jobs.Messages
 								var randomUnreadMsgId = _conversationService.GetLastUnreadUserMessageId(phoneNumber);
 								if (randomUnreadMsgId != null)
 								{
-									await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, lastMsg.Id);
+									await _whatsAppService.ReactToUnreadMessageAsync(phoneNumber, randomUnreadMsgId);
 								}
 							}
 							catch (Exception ex)
 							{
 								Console.WriteLine(ex.Message);
 							}
-							await _whatsAppService.SendDellayMessageWithHistory(phoneNumber);
+							await _whatsAppService.SendDellayMessageWithHistory(phoneNumber, lastMsg.Id);
 						}
 						catch (Exception ex)
 						{

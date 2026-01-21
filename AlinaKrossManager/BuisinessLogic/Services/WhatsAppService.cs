@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.Services;
 
@@ -23,7 +24,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			_generativeLanguageModel = generativeLanguageModel;
 		}
 
-		public async Task SendDellayMessageWithHistory(string senderId)
+		public async Task SendDellayMessageWithHistory(string senderId, string messageId)
 		{
 			var conversationHistory = _conversationService.GetFormattedHistory(senderId);
 			var prompt = GetMainPromtAlinaKross(conversationHistory);
@@ -34,25 +35,46 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			_conversationService.AddBotMessage(senderId, responseText);
 
-			await SendReplyAsync(senderId, responseText);
+			await SendReplyAsync(senderId, responseText, messageId);
 
 			var historyIsReaded = _conversationService.MakeHistoryAsReaded(senderId);
 			Console.WriteLine("historyIsReaded: " + historyIsReaded);
 		}
 
-		public async Task SendReplyAsync(string toPhoneNumber, string message)
+		public async Task SendReplyAsync(string toPhoneNumber, string message, string? replyToMessageId = null)
 		{
 			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
+
+			// 2. Формируем объект payload согласно вашему новому JSON
+			// Мы создаем объект contextObj только если есть ID
+			object? contextObj = null;
+			if (!string.IsNullOrEmpty(replyToMessageId))
+			{
+				contextObj = new { message_id = replyToMessageId };
+			}
 
 			var payload = new
 			{
 				messaging_product = "whatsapp",
+				recipient_type = "individual",
 				to = toPhoneNumber,
+				context = contextObj, // Это поле добавится в JSON или будет проигнорировано
 				type = "text",
-				text = new { body = message }
+				text = new
+				{
+					preview_url = false, // Как в вашем примере
+					body = message
+				}
 			};
 
-			var json = JsonSerializer.Serialize(payload);
+			// 3. Важная настройка: игнорировать null при сериализации
+			// Если contextObj == null, то поле "context" вообще не попадет в JSON
+			var jsonOptions = new JsonSerializerOptions
+			{
+				DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+			};
+
+			var json = JsonSerializer.Serialize(payload, jsonOptions);
 			var content = new StringContent(json, Encoding.UTF8, "application/json");
 
 			var client = _httpClientFactory.CreateClient();
@@ -64,6 +86,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				var error = await response.Content.ReadAsStringAsync();
 				Console.WriteLine($"Ошибка отправки: {error}");
+			}
+			else
+			{
+				Console.WriteLine($"Ответ отправлен на номер {toPhoneNumber}");
 			}
 		}
 
@@ -80,7 +106,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			var url = $"https://graph.facebook.com/v22.0/{PhoneNumberId}/messages";
 
 			// 1. Создаем список эмодзи, которые хотим использовать
-			var availableEmojis = new[] { "😘", "❤️", "🥰", "💋", "💖", "😉", "😍", "💘", "💜", "😻", "👍", "🔥", "😂"};
+			var availableEmojis = new[] { "😘", "❤️", "🥰", "💋", "💖", "😉", "😍", "💘", "💜", "😻", "👍", "🔥", "😂" };
 
 			// 2. Выбираем случайный эмодзи
 			var randomEmoji = availableEmojis[Random.Shared.Next(availableEmojis.Length)];
