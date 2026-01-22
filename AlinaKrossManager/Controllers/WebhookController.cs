@@ -55,7 +55,7 @@ namespace AlinaKrossManager.Controllers
 			var messageText = message.Text?.Body; // Текст сообщения
 			var messageId = message.Id;
 
-			Console.WriteLine($"Получено сообщение от {senderPhone}: {messageText}");
+			Console.WriteLine($"Получено сообщение от Телефон: {senderPhone}, Id: {messageId}, текст: {messageText}");
 
 			if (!string.IsNullOrEmpty(messageText))
 			{

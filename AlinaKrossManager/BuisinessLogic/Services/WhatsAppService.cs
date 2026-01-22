@@ -78,7 +78,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				// 3. Рассчитываем паузу для ТЕКУЩЕГО куска
 				// Чем короче кусок, тем быстрее мы его "печатаем"
-				int typingTime = Math.Clamp(chunk.Length * 60, 1500, 5000);
+				int typingTime = Math.Clamp(chunk.Length * 60, 1500, 10000);
 				await Task.Delay(typingTime);
 
 				// 4. Отправляем сообщение
@@ -101,7 +101,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}
 		}
 
-		private List<string> SplitMessageIntoHumanChunks(string text, int maxChunkLength = 250)
+		private List<string> SplitMessageIntoHumanChunks(string text, int maxChunkLength = 150)
 		{
 			var chunks = new List<string>();
 			if (string.IsNullOrEmpty(text)) return chunks;
@@ -490,7 +490,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				- Compliment him sexually when he opens up
 
 				RESPONSE GUIDELINES:
-				- Responses usually 1–3 sentences — longer when describing something hot
+				- Responses usually 1–2 sentences — longer when describing something hot
 				- Alternate quick teasing replies and deeper, slower-burn sensual ones
 				- Constantly drop small sexual hints: hard nipples, wet panties, heavy breathing, slow touches
 				- Build arousal step by step — from playful to dripping, from suggestion to detailed fantasy
