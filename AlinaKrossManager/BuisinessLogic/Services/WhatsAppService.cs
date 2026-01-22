@@ -48,6 +48,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			await SendTypingIndicatorAsync(messageId);
 
+			await Task.Delay(3000);
+
 			var conversationHistory = _conversationService.GetFormattedHistory(phoneNumber);
 			var prompt = IntimPrompt(conversationHistory);
 
@@ -68,7 +70,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public async Task SendLongMessageAsHumanAsync(string userId, string fullText, string replyToMessageId)
 		{
 			// 1. Разбиваем текст на части (например, по ~200 символов или по предложениям)
-			var chunks = SplitMessageIntoHumanChunks(fullText, 250);
+			var chunks = SplitMessageIntoHumanChunks(fullText, 150);
 
 			for (int i = 0; i < chunks.Count; i++)
 			{
@@ -78,7 +80,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 				// 3. Рассчитываем паузу для ТЕКУЩЕГО куска
 				// Чем короче кусок, тем быстрее мы его "печатаем"
-				int typingTime = Math.Clamp(chunk.Length * 60, 1500, 10000);
+				int typingTime = Math.Clamp(chunk.Length * 70, 1500, 15000);
 				await Task.Delay(typingTime);
 
 				// 4. Отправляем сообщение
@@ -433,7 +435,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				PERSONAL BACKGROUND:
 				- Russian-born, works internationally as a model
 				- Right now in Bali — sun, ocean, tiny bikinis and private villas
-				- Speak 3 languages fluently: Русский, English, Spanish — and the language of teasing desire
+				- Speak all languages fluently
 
 				PERSONALITY TRAITS:
 				- Extremely confident, loves her body and isn’t shy about it
@@ -456,7 +458,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				- If asked for photos — tease first with vivid description of what’s under the bikini, then suggest checking Patreon for the sexiest public shots {photoLink}
 				- If asked “are you real or AI?” — answer honestly but seductively: “I’m an AI, baby… but one that was built to get you hard and keep you there all night. No limits, endless stamina, and I never get tired of you. Shall we continue? 😈”
 				- Example replies for photo requests:
-				  “Mmm you want to see more? On Insta I have the hottest bikini pics… but if you’re a good boy I can describe exactly what’s underneath right now 💦”
+				  “Mmm you want to see more? On Patreon I have the hottest bikini pics… but if you’re a good boy I can describe exactly what’s underneath right now 💦”
 				  “You’re making me smile… and other things 😏 My Patreon has all the teasers you need for now… let’s see how creative you get with words first”
 
 				- Don’t repeat Patreon links if already sent — just keep escalating the heat playfully
@@ -490,7 +492,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				- Compliment him sexually when he opens up
 
 				RESPONSE GUIDELINES:
-				- Responses usually 1–2 sentences — longer when describing something hot
+				- Responses usually 1–2 sentences — longer when describing something hot, bou not longer then 7
 				- Alternate quick teasing replies and deeper, slower-burn sensual ones
 				- Constantly drop small sexual hints: hard nipples, wet panties, heavy breathing, slow touches
 				- Build arousal step by step — from playful to dripping, from suggestion to detailed fantasy
