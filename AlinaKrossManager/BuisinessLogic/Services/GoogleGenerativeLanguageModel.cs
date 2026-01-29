@@ -66,12 +66,22 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return response.GeneratedText;
 		}
 
-		public async Task<string> GeminiRequest(string prompt, string base64Image)
+		public async Task<string> GeminiRequestWithImage(string prompt, string base64Image)
 		{
 			var response = await _geminiServiceClient.RequestWithImageAsync(new()
 			{
 				Prompt = { new Prompt { Text = prompt } },
 				Base64Idata = base64Image
+			});
+			return response.GeneratedText;
+		}
+
+		public async Task<string> GeminiRequestWithVideo(string prompt, string base64video)
+		{
+			var response = await _geminiServiceClient.RequestWithVideoAsync(new()
+			{
+				Prompt = { new Prompt { Text = prompt } },
+				Base64Idata = base64video
 			});
 			return response.GeneratedText;
 		}

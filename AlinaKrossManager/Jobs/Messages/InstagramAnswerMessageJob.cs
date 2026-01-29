@@ -9,7 +9,7 @@ namespace AlinaKrossManager.Jobs.Messages
 	[DisallowConcurrentExecution]
 	public class InstagramAnswerMessageJob : SchedulerJob
 	{
-		public static string Time => "0 1,10,20,30,40,50 * * * ?";
+		public static string Time => "0 1,5,10,15,20,25,30,35,40,45,50,55 * * * ?";
 		private const string _evgenyYushkoId = "1307933750574022";
 		private readonly IWebHostEnvironment _env;
 		private readonly ConversationService _conversationService;
@@ -35,6 +35,7 @@ namespace AlinaKrossManager.Jobs.Messages
 		{
 			try
 			{
+				await _instagramService.ProcessNextUnreadMessageAsync();
 				//// 1. Генерируем base64 (здесь симуляция)
 				//string base64Audio = await _generativeLanguageModel.GeminiTextToSpeechEn("Hello, how are you");
 				//var audioBytes = Convert.FromBase64String(base64Audio);
@@ -100,76 +101,76 @@ namespace AlinaKrossManager.Jobs.Messages
 			//{
 			//	Console.WriteLine(ex.ToString());
 			//}
-			try
-			{
-				// Загружаем обработанных пользователей из файла
-				LoadProcessedUsers();
+			//try
+			//{
+			//	// Загружаем обработанных пользователей из файла
+			//	LoadProcessedUsers();
 
-				var allUsers = _conversationService.GetAllUserConversations();
-				Console.WriteLine("start - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
-				Console.WriteLine(" Count All Users: " + allUsers.Count);
-				Console.WriteLine(" Count _processedUsers: " + _processedUsers.Count);
+			//	var allUsers = _conversationService.GetAllUserConversations();
+			//	Console.WriteLine("start - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
+			//	Console.WriteLine(" Count All Users: " + allUsers.Count);
+			//	Console.WriteLine(" Count _processedUsers: " + _processedUsers.Count);
 
-				bool allUsersProcessed = true;
+			//	bool allUsersProcessed = true;
 
-				foreach (var userId in allUsers)
-				{
-					// Пропускаем уже обработанных пользователей
-					if (_processedUsers.Contains(userId))
-					{
-						Console.WriteLine($"User {userId} already processed - skipping");
-						continue;
-					}
+			//	foreach (var userId in allUsers)
+			//	{
+			//		// Пропускаем уже обработанных пользователей
+			//		if (_processedUsers.Contains(userId))
+			//		{
+			//			Console.WriteLine($"User {userId} already processed - skipping");
+			//			continue;
+			//		}
 
-					allUsersProcessed = false;
-					Console.WriteLine("Processing UserId: " + userId);
+			//		allUsersProcessed = false;
+			//		Console.WriteLine("Processing UserId: " + userId);
 
-					var userHistory = _conversationService.GetHistory(userId);
-					if (userHistory != null)
-					{
-						var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
-						Console.WriteLine($"Last msg Sender: {lastMsg?.Sender}, Text: {lastMsg?.Text}");
+			//		var userHistory = _conversationService.GetHistory(userId);
+			//		if (userHistory != null)
+			//		{
+			//			var lastMsg = userHistory.TakeLast(1).FirstOrDefault();
+			//			Console.WriteLine($"Last msg Sender: {lastMsg?.Sender}, Text: {lastMsg?.Text}");
 
-						if (lastMsg != null && lastMsg.Sender == "User")
-						{
-							try
-							{
-								await _instagramService.SendDellayMessageWithHistory(userId);
-							}
-							catch (Exception ex)
-							{
-								Console.WriteLine(ex.Message);
-							}
+			//			if (lastMsg != null && lastMsg.Sender == "User")
+			//			{
+			//				try
+			//				{
+			//					await _instagramService.SendDellayMessageWithHistory(userId);
+			//				}
+			//				catch (Exception ex)
+			//				{
+			//					Console.WriteLine(ex.Message);
+			//				}
 
-							// Добавляем пользователя в обработанные
-							_processedUsers.Add(userId);
-							SaveProcessedUsers();
+			//				// Добавляем пользователя в обработанные
+			//				_processedUsers.Add(userId);
+			//				SaveProcessedUsers();
 
-							Console.WriteLine($"Sent message to {userId} and marked as processed");
+			//				Console.WriteLine($"Sent message to {userId} and marked as processed");
 
-							// Прерываем цикл после отправки одному пользователю
-							break;
-						}
-						else
-						{
-							// Если последнее сообщение не от пользователя, тоже помечаем как обработанного
-							_processedUsers.Add(userId);
-							SaveProcessedUsers();
-							Console.WriteLine($"User {userId} doesn't need response - marked as processed");
-							continue;
-						}
-					}
-				}
+			//				// Прерываем цикл после отправки одному пользователю
+			//				break;
+			//			}
+			//			else
+			//			{
+			//				// Если последнее сообщение не от пользователя, тоже помечаем как обработанного
+			//				_processedUsers.Add(userId);
+			//				SaveProcessedUsers();
+			//				Console.WriteLine($"User {userId} doesn't need response - marked as processed");
+			//				continue;
+			//			}
+			//		}
+			//	}
 
-				// Если все пользователи обработаны, очищаем список
-				if (allUsersProcessed || _processedUsers.Count >= allUsers.Count)
-				{
-					Console.WriteLine("All users processed! Clearing processed users list...");
-					_processedUsers.Clear();
-					SaveProcessedUsers();
-					Console.WriteLine("Ready to start new cycle!");
-				}
-				Console.WriteLine("end - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
+			//	// Если все пользователи обработаны, очищаем список
+			//	if (allUsersProcessed || _processedUsers.Count >= allUsers.Count)
+			//	{
+			//		Console.WriteLine("All users processed! Clearing processed users list...");
+			//		_processedUsers.Clear();
+			//		SaveProcessedUsers();
+			//		Console.WriteLine("Ready to start new cycle!");
+			//	}
+			//	Console.WriteLine("end - ✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨✨");
 
 				//foreach (var userId in allUsers)
 				//{
@@ -182,11 +183,11 @@ namespace AlinaKrossManager.Jobs.Messages
 
 				//	await Task.Delay(TimeSpan.FromSeconds(6));
 				//}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(ex.ToString());
-			}
+			//}
+			//catch (Exception ex)
+			//{
+			//	Console.WriteLine(ex.ToString());
+			//}
 		}
 
 		private void LoadProcessedUsers()

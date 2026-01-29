@@ -190,30 +190,29 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			// Обрабатываем вложения (теперь поддерживает и аудио и изображения)
 			if (hasAttachments)
 			{
-				await ProcessAttachments(messaging.Message.Attachments, senderId, messageText);
-				return;
+				await ProcessAttachments(messaging.Message.Attachments, senderId, messageId, messageText);
 			}
 
-			if (!string.IsNullOrEmpty(messageText))
-			{
-				// Ваш существующий код обработки текста...
-				if (messageText.Contains("Send me photo please"))
-				{
-					await ProcessMessageWithGeneratedPhoto(senderId, messageText);
-					return;
-				}
+			//if (!string.IsNullOrEmpty(messageText))
+			//{
+			//	// Ваш существующий код обработки текста...
+			//	//if (messageText.Contains("Send me photo please"))
+			//	//{
+			//	//	await ProcessMessageWithGeneratedPhoto(senderId, messageText);
+			//	//	return;
+			//	//}
 
-				await SendMessageWithHistory(messageText, senderId);
+			//	await SendMessageWithHistory(messageText, senderId);
 
-				if (senderId == _evgenyYushkoId)
-				{
-					//Console.WriteLine("начали генерацию фото");
-					//InstagramMedia randomItem = GetRandomUniqeMedia(_mediaList);
-					//Console.WriteLine("получили фото");
-					//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
-					//Console.WriteLine("закончили фото");
-				}
-			}
+			//	if (senderId == _evgenyYushkoId)
+			//	{
+			//		//Console.WriteLine("начали генерацию фото");
+			//		//InstagramMedia randomItem = GetRandomUniqeMedia(_mediaList);
+			//		//Console.WriteLine("получили фото");
+			//		//await SendInstagramPhotoFromUrl(senderId, randomItem.Media_Url);
+			//		//Console.WriteLine("закончили фото");
+			//	}
+			//}
 		}
 
 		public async Task SendMessageWithHistory(string messageText, string senderId)
@@ -294,7 +293,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			//	"3. Если не уверен — возвращай 0. " +
 			//	$"\nТекст для анализа: \"{cleanText}\"";
 			//// 1. Отправляем запрос
-			//string rawResponse = await _generativeLanguageModel.GeminiRequest(promptLanguageAnalyze);
+			//string rawResponse = await _generativeLanguageModel.GeminiRequestWithImage(promptLanguageAnalyze);
 
 			//// 2. Метод для жесткой очистки и проверки
 			//int isRussian = AiHelper.ParseBooleanResponse(rawResponse);
@@ -450,91 +449,71 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			await SendInstagramMessage(recipientId, text, _accessToken);
 		}
 
-		private async Task ProcessAttachments(List<InstagramAttachment> attachments, string senderId, string caption = "")
+		private async Task ProcessAttachments(List<InstagramAttachment> attachments, string senderId, string messageId, string caption = "")
 		{
-			// Сначала проверяем аудио
-			var audioAttachments = attachments
-				.Where(a => a.Type == "audio")
-				.ToList();
-
+			// 1. Проверяем АУДИО
+			var audioAttachments = attachments.Where(a => a.Type == "audio").ToList();
 			if (audioAttachments.Any())
 			{
-				await ProcessAudioAttachments(audioAttachments, senderId);
+				await ProcessMediaAttachments(audioAttachments, senderId, messageId, "audio");
+				return; // Если есть аудио, считаем сообщение голосовым
+			}
+
+			// 2. Проверяем ВИДЕО
+			var videoAttachments = attachments.Where(a => a.Type == "video").ToList();
+			if (videoAttachments.Any())
+			{
+				await ProcessMediaAttachments(videoAttachments, senderId, messageId, "video");
 				return;
 			}
 
-			// Затем проверяем изображения (ваш существующий код)
-			var imageAttachments = attachments
-				.Where(a => a.Type == "image")
-				.ToList();
-
-			if (!imageAttachments.Any())
+			// 3. Проверяем ИЗОБРАЖЕНИЯ
+			var imageAttachments = attachments.Where(a => a.Type == "image").ToList();
+			if (imageAttachments.Any())
 			{
-				Log("No image attachments found");
+				await ProcessMediaAttachments(imageAttachments, senderId, messageId, "image");
 				return;
 			}
 
-			Log($"Processing {imageAttachments.Count} image attachments from {senderId}");
-
-			// Ваш существующий код обработки изображений...
-			var imageBase64List = new List<string>();
-
-			foreach (var attachment in imageAttachments)
-			{
-				try
-				{
-					var imageUrl = attachment.Payload?.Url;
-					if (!string.IsNullOrEmpty(imageUrl))
-					{
-						var base64Image = await DownloadImageAsBase64(imageUrl);
-						if (!string.IsNullOrEmpty(base64Image))
-						{
-							imageBase64List.Add(base64Image);
-							Log($"Successfully downloaded image as base64 ({base64Image.Length} chars)");
-						}
-					}
-				}
-				catch (Exception ex)
-				{
-					Log(ex, $"Error processing attachment from {senderId}");
-				}
-			}
-
-			foreach (var base64Image in imageBase64List)
-			{
-				await ProcessSingleImage(base64Image, senderId, caption);
-				await Task.Delay(5000);
-			}
+			// Если ничего не нашли
+			Log($"No supported media attachments found from {senderId}");
 		}
 
-		private async Task ProcessAudioAttachments(List<InstagramAttachment> audioAttachments, string senderId)
+		private async Task ProcessMediaAttachments(List<InstagramAttachment> attachments, string senderId, string messageId, string type)
 		{
-			Log($"Processing {audioAttachments.Count} audio attachments from {senderId}");
+			Log($"Processing {attachments.Count} {type} attachments from {senderId}");
 
-			foreach (var audioAttachment in audioAttachments)
+			var mediaEntries = new List<MediaDataEntry>();
+
+			foreach (var item in attachments)
 			{
 				try
 				{
-					var audioUrl = audioAttachment.Payload?.Url;
-					if (!string.IsNullOrEmpty(audioUrl))
+					var url = item.Payload?.Url;
+					if (!string.IsNullOrEmpty(url))
 					{
-						Log($"Audio URL: {audioUrl}");
-
-						// Получаем base64 строку вместо byte[]
-						var audioBase64 = await DownloadAudioFileAsBase64(audioUrl);
-						if (!string.IsNullOrEmpty(audioBase64))
+						mediaEntries.Add(new MediaDataEntry
 						{
-							Log($"Successfully downloaded audio as base64 ({audioBase64.Length} chars)");
+							Url = url,
+							MediaType = type, // сохраняем тип ("video", "image", "audio")
+							IsProcessed = false,
+							AiResult = null
+						});
 
-							// Теперь передаем base64 строку
-							await ProcessAudioMessage(audioBase64, senderId, audioUrl);
-						}
+						Log($"Cached {type} URL: {url}");
 					}
 				}
 				catch (Exception ex)
 				{
-					Log(ex, $"Error processing audio attachment from {senderId}");
+					Log(ex, $"Error processing {type} attachment from {senderId}");
 				}
+			}
+
+			if (mediaEntries.Any())
+			{
+				// Сохраняем в статический словарь. 
+				// Если для этого ID уже есть запись, мы её перезапишем (обычно ID уникален)
+				MediaMessageStorage.Storage.AddOrUpdate(messageId, mediaEntries, (key, oldValue) => mediaEntries);
 			}
 		}
 
@@ -569,20 +548,23 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 		}
 
-		private async Task ProcessAudioMessage(string audioBase64, string senderId, string audioUrl)
+		private async Task<string> ProcessAudioMessage(string audioBase64)
 		{
 			try
 			{
-				Log($"Audio message received from {senderId}, base64 length: {audioBase64.Length} chars");
+				Log($"Audio message received");
 
 				var audioText = await _generativeLanguageModel.GeminiAudioToText(audioBase64);
 				Console.WriteLine("Распознонное голосовое: " + audioText);
-				await SendMessageWithHistory(audioText, senderId);
+				return audioText;
+				//await SendMessageWithHistory(audioText, senderId);
 			}
 			catch (Exception ex)
 			{
-				Log(ex, $"Error processing audio message from {senderId}");
+				Log(ex, $"Error processing audio");
 			}
+
+			return "";
 		}
 
 		private async Task<string> DownloadImageAsBase64(string imageUrl)
@@ -614,85 +596,34 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 		}
 
-		private async Task ProcessSingleImage(string base64Image, string senderId, string caption = "")
+		private async Task<string> AnalyzeImageAsync(string base64Image, string type)
 		{
+			Log($"Starting image analysis");
+
+			var prompt = $"Analyze what is depicted on this {type} and give a brief description. " +
+						"Response format: only the response text, no quotes or formatting.";
+
+			Log($"Calling Gemini with base64 {type} (length: {base64Image?.Length ?? 0})");
+
+			string responseText = "";
 			try
 			{
-				Log($"Sending image to processing service for user {senderId}");
-
-				await SendToImageProcessingService(base64Image, senderId, caption);
-
-				// Логируем факт обработки (без самого base64 чтобы не засорять логи)
-				Log($"Image processed for user {senderId} (Base64 length: {base64Image.Length})");
-			}
-			catch (Exception ex)
-			{
-				Log(ex, $"Error processing image for user {senderId}");
-			}
-		}
-
-		private async Task SendToImageProcessingService(string base64Image, string senderId, string caption)
-		{
-			try
-			{
-				Log($"Starting image analysis for user {senderId}");
-
-				var prompt = "Analyze what is shown in this image and give a brief response. You are Alina Kross, a 25-year-old model. " +
-							"Someone sent you this photo in Instagram DMs. Come up with an appropriate response to this photo. " +
-							"Be playful and have a sense of humor. Always respond in English. Use some emojis. " +
-							"Almost always praise what is shown in the photo. " +
-							"Response format: only the response text, no quotes or formatting.";
-
-				Log($"Calling Gemini with base64 image (length: {base64Image?.Length ?? 0})");
-
-				string responseText = null;
-				try
+				if (type == "video")
 				{
-					responseText = await _generativeLanguageModel.GeminiRequest(prompt, base64Image);
-					Log($"Gemini response received: {responseText?.Substring(0, Math.Min(50, responseText.Length))}...");
-				}
-				catch (Exception geminiEx)
-				{
-					Log(geminiEx, $"Gemini API error for user {senderId}");
-					responseText = "Thanks for the photo! Love seeing your perspective 📸✨";
-				}
-
-				if (!string.IsNullOrEmpty(responseText))
-				{
-					Log($"Image analysis successful for user {senderId}");
-
-					try
-					{
-						await SendResponse(senderId, responseText);
-						Log($"Sent image response to {senderId}: ***");
-					}
-					catch (Exception sendEx)
-					{
-						Log(sendEx, $"Error sending response to user {senderId}");
-
-						var fallbackResponse = "Thanks for the photo! So cute 😊📸";
-						await SendResponse(senderId, fallbackResponse);
-					}
+					responseText = await _generativeLanguageModel.GeminiRequestWithVideo(prompt, base64Image);
 				}
 				else
 				{
-					Log($"Empty response from Gemini for user {senderId}");
-					var fallbackResponse = "Thanks for sharing this with me! 📸💫";
-					await SendResponse(senderId, fallbackResponse);
+					responseText = await _generativeLanguageModel.GeminiRequestWithImage(prompt, base64Image);
 				}
+				Log($"Gemini response received: {responseText?.Substring(0, Math.Min(50, responseText.Length))}...");
 			}
-			catch (Exception ex)
+			catch (Exception geminiEx)
 			{
-				Log(ex, $"Unexpected error in image processing for user {senderId}");
-
-				// Фолбэк ответ
-				try
-				{
-					var fallbackResponse = "Appreciate you sending me photos! 💕📸";
-					await SendResponse(senderId, fallbackResponse);
-				}
-				catch { /* Игнорируем если даже фолбэк не сработал */ }
+				Log(geminiEx, $"Gemini API error");
 			}
+
+			return responseText ?? "";
 		}
 
 		private async Task ProcessMessageWithGeneratedPhoto(string senderId, string messageText)
@@ -1020,7 +951,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					CHAT HISTORY:
 					""{conversationHistory}""
 
-					Continue the conversation. Review the most recent unread messages from User[Unreaded]. And respond to them, taking into account the context of YOUR ENTIRE message history. That is, always consider all previously sent messages from you (Alina) and User..
+					Continue the conversation. Review the most recent unread messages from User. And respond to them, taking into account the context of YOUR ENTIRE message history. That is, always consider all previously sent messages from you (Alina) and User..
 
 					Answer as the real Alina would text back right now (only response text, no explanations or formatting).";
 		}

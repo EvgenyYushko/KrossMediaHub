@@ -33,7 +33,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 			JobSettings.Add(new() { Type = typeof(PostToPrivateFromQueueJob), Key = POST_TO_PRIVATE_FROM_QUEUE, Time = PostToPrivateFromQueueJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(XDailyJob), Key = X_DAILY_QUEUE, Time = XDailyJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(TelegrammDailyJob), Key = TELEGRAMM_FREE_DAILY_QUEUE, Time = TelegrammDailyJob.Time, Castum = false });
-			JobSettings.Add(new() { Type = typeof(BlueSkyDmJob), Key = BLUE_SKY_DM_QUEUE, Time = BlueSkyDmJob.Time, Castum = false });
+			//JobSettings.Add(new() { Type = typeof(BlueSkyDmJob), Key = BLUE_SKY_DM_QUEUE, Time = BlueSkyDmJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(FaceBookDmJob), Key = FACEBOOK_DM_QUEUE, Time = FaceBookDmJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(DbMaintananceJob), Key = DB_MAINTANANCE_QUEUE, Time = DbMaintananceJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(WhatsAppAnswerMessageJob), Key = WHATS_APP_ANSWER_MESSAGE_QUEUE, Time = WhatsAppAnswerMessageJob.Time, Castum = false });
