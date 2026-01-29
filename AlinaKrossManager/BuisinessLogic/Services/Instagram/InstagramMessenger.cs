@@ -460,7 +460,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 
 			// 2. Проверяем ВИДЕО
-			var videoAttachments = attachments.Where(a => a.Type == "video").ToList();
+			var videoAttachments = attachments.Where(a => a.Type == "video" || a.Type == "ig_reel").ToList();
 			if (videoAttachments.Any())
 			{
 				await ProcessMediaAttachments(videoAttachments, senderId, messageId, "video");
