@@ -667,6 +667,102 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			return SendInstagramMessage(_evgenyYushkoId, text, _accessToken);
 		}
 
+		public async Task SendSticker(string recipientId, string stickerContent)
+		{
+			var url = $"v19.0/me/messages?access_token={_accessToken}";
+			object payload;
+
+			// Проверяем: это системное сердечко или ссылка?
+			if (stickerContent == "like_heart")
+			{
+				// Системный лайк (без payload)
+				payload = new
+				{
+					recipient = new { id = recipientId },
+					message = new
+					{
+						attachment = new { type = "like_heart" }
+					}
+				};
+			}
+			else
+			{
+				// Картинка/GIF по ссылке
+				payload = new
+				{
+					recipient = new { id = recipientId },
+					message = new
+					{
+						attachment = new
+						{
+							type = "image",
+							payload = new { url = stickerContent }
+						}
+					}
+				};
+			}
+
+			var json = JsonSerializer.Serialize(payload);
+			var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+			try
+			{
+				var response = await _https.PostAsync(url, content);
+				if (!response.IsSuccessStatusCode)
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					Console.WriteLine($"[Sticker Error] {error}");
+				}
+				else
+				{
+					Console.WriteLine($"[Sticker] Стикер отправлен пользователю {recipientId}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[Sticker Error] {ex.Message}");
+			}
+		}
+
+
+		public async Task SendReactionAsync(string recipientId, string messageId)
+		{
+			var url = $"v19.0/me/messages?access_token={_accessToken}";
+
+			var payload = new
+			{
+				recipient = new { id = recipientId },
+				sender_action = "react",
+				payload = new
+				{
+					message_id = messageId,
+					reaction = "love"
+				}
+			};
+
+			var json = JsonSerializer.Serialize(payload);
+			var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+			try
+			{
+				var response = await _https.PostAsync(url, content);
+
+				if (response.IsSuccessStatusCode)
+				{
+					Console.WriteLine($"[Reaction] Отправлена реакция \"love\" на сообщение {messageId}");
+				}
+				else
+				{
+					var error = await response.Content.ReadAsStringAsync();
+					Console.WriteLine($"[Reaction Error] Не удалось отправить реакцию: {error}");
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[Reaction Error] Ошибка: {ex.Message}");
+			}
+		}
+
 		public async Task SendInstagramMessage(string recipientId, string text, string accessToken = null)
 		{
 			if (accessToken is null)
@@ -894,6 +990,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					SPECIFIC RULES FOR PHOTO REQUESTS:
 					- If someone asks to send photos, then offer to view them on your Instagram page. But if he repeatedly asks to send a photo, as well as if he asks to send an intimate / vulgar photo, then respond playfully, but redirect to the official content. {photoLink}
 					- If you're asked whether you're a real person or an AI, you should tell the truth—that you're an AI—but do it in a way that won't upset the user and will allow them to continue the conversation. You should convince them that this will only benefit them.
+					- If someone sends you a video or photo, pay special attention to its content. Try to start a conversation about it.
 					- Use one of these response styles:
 
 					For polite photo requests:
@@ -932,7 +1029,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					For admirers:
 					- Friendly but maintains boundaries
 					- Light flirtation but professional
-					- Redirects personal questions gracefully
 
 					CURRENT INTERESTS TO MENTION:
 					{_currentInteres}

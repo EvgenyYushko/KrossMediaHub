@@ -84,11 +84,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					// ВНИМАНИЕ: Мы просто идем на следующий виток while. 
 					// Мы не выходим из метода (return), мы ищем дальше в ЭТОЙ ЖЕ итерации таймера,
 					// пока не найдем кому ответить.
-					if (senderId == _alinaKrossId)
-					{
-						// Console.WriteLine("Последнее сообщение от меня. Пропускаем.");
-						continue;
-					}
+					if (senderId == _alinaKrossId) continue;
 
 					// --- ЕСЛИ МЫ ЗДЕСЬ, ЗНАЧИТ НУЖНО ОТВЕЧАТЬ ---
 
@@ -98,23 +94,51 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					foreach (var msg in messages) { if (msg.From.Id != _alinaKrossId) unreadCount++; else break; }
 
 					var historyLines = new List<string>();
+
+					// Собираем ID непрочитанных сообщений пользователя
+					var unreadUserMessageIds = new List<string>();
+
 					for (int i = messages.Count - 1; i >= 0; i--)
 					{
 						var msg = messages[i];
 						string content = await ResolveMessageContentAsync(msg);
 						string prefix = (msg.From.Id == _alinaKrossId) ? "Alina (You):" : "User:";
+
+						// Проверяем, является ли сообщение непрочитанным
+						bool isUnread = i < unreadCount;
 						string statusTag = (i < unreadCount) ? " [Unread]" : "";
 						historyLines.Add($"{prefix} {content}{statusTag}");
+
+						// Если это сообщение от юзера и оно непрочитанное - запоминаем ID для реакции
+						if (isUnread && msg.From.Id != _alinaKrossId)
+						{
+							unreadUserMessageIds.Add(msg.Id);
+						}
 					}
 					string fullHistoryContext = string.Join("\n", historyLines);
-					// ==============================================================
+
+					var random = new Random();
+
+					// Если есть на что реагировать и выпал шанс 70%
+					if (unreadUserMessageIds.Count > 0 && random.Next(1, 101) > 50)
+					{
+						// 1. Выбираем случайное сообщение из непрочитанных
+						string targetMessageId = unreadUserMessageIds[random.Next(unreadUserMessageIds.Count)];
+
+						// 3. Отправляем (без await, чтобы не блочить, или с await для надежности)
+						await SendReactionAsync(senderId, targetMessageId);
+
+						// Небольшая пауза для реалистичности перед тем как "печатать" ответ
+						await Task.Delay(1500);
+					}
+					// ========================================================================
 
 					Console.WriteLine("--- CONTEXT FOR AI ---");
 					Console.WriteLine(fullHistoryContext);
 
 					// Генерация и отправка
 					string replyText = await GenerateAiResponse(fullHistoryContext);
-					await SendInstagramMessage(senderId, replyText);
+					await SendLongMessageAsHumanAsync(senderId, replyText);
 
 					Console.WriteLine($"Ответ отправлен пользователю {senderId}.");
 
@@ -246,6 +270,102 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 
 			return resultText;
+		}
+
+		public async Task SendLongMessageAsHumanAsync(string userId, string fullText)
+		{
+			// 1. Разбиваем текст на части (например, по ~200 символов или по предложениям)
+			var chunks = SplitMessageIntoHumanChunks(fullText, 150);
+
+			for (int i = 0; i < chunks.Count; i++)
+			{
+				var chunk = chunks[i];
+
+				// 3. Рассчитываем паузу для ТЕКУЩЕГО куска
+				// Чем короче кусок, тем быстрее мы его "печатаем"
+				int typingTime = Math.Clamp(chunk.Length * 70, 1500, 5000);
+				await Task.Delay(typingTime);
+
+				await SendInstagramMessage(userId, chunk);
+
+				// 5. Маленькая пауза между отправкой и началом печати следующего (как будто человек нажал Enter)
+				if (i < chunks.Count - 1)
+				{
+					await Task.Delay(Random.Shared.Next(500, 1200));
+				}
+			}
+
+			if (chunks.Count == 1)
+			{
+				var random = new Random();
+
+				// Если выпадает число от 1 до 3 (из 10), то отправляем стикер. Шанс 30%.
+				if (random.Next(1, 11) <= 3)
+				{
+					// Небольшая задержка перед стикером, чтобы выглядело естественно (1-3 сек)
+					await Task.Delay(random.Next(1000, 3000));
+
+					string stickerToSend;
+
+					if (random.Next(1, 101) > 10)
+					{
+						stickerToSend = "like_heart";
+					}
+					else
+					{
+						// Берем случайный URL из нашей коллекции
+						int index = random.Next(StickerCollection.Urls.Count);
+						stickerToSend = StickerCollection.Urls[index];
+					}
+
+					await SendSticker(userId, stickerToSend);
+				}
+			}
+		}
+
+		private List<string> SplitMessageIntoHumanChunks(string text, int maxChunkLength = 150)
+		{
+			var chunks = new List<string>();
+			if (string.IsNullOrEmpty(text)) return chunks;
+
+			// 1. Сначала разбиваем по переносам строк (абзацам)
+			var paragraphs = text.Split(new[] { "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+			foreach (var paragraph in paragraphs)
+			{
+				// Если абзац короткий, добавляем его как есть
+				if (paragraph.Length <= maxChunkLength)
+				{
+					chunks.Add(paragraph.Trim());
+					continue;
+				}
+
+				// 2. Если абзац длинный, бьем его на предложения
+				// Используем регулярку, чтобы оставить знаки препинания (.!?) на месте
+				var sentences = System.Text.RegularExpressions.Regex.Split(paragraph, @"(?<=[.!?])\s+");
+
+				var currentChunk = "";
+
+				foreach (var sentence in sentences)
+				{
+					// Если текущий кусок + новое предложение влезают в лимит — склеиваем
+					if ((currentChunk.Length + sentence.Length) <= maxChunkLength)
+					{
+						currentChunk += (currentChunk.Length > 0 ? " " : "") + sentence;
+					}
+					else
+					{
+						// Если не влезают — сохраняем текущий кусок и начинаем новый
+						if (!string.IsNullOrEmpty(currentChunk)) chunks.Add(currentChunk.Trim());
+						currentChunk = sentence;
+					}
+				}
+
+				// Добавляем хвостик
+				if (!string.IsNullOrEmpty(currentChunk)) chunks.Add(currentChunk.Trim());
+			}
+
+			return chunks;
 		}
 
 		private async Task<List<MessageItem>> GetConversationMessagesAsync(string conversationId, int limit)
@@ -405,5 +525,21 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 	{
 		[JsonPropertyName("data")]
 		public List<InstagramUser> Data { get; set; }
+	}
+
+	public static class StickerCollection
+	{
+		// Список URL стикеров (GIF или PNG с прозрачным фоном)
+		public static readonly List<string> Urls = new List<string>
+		{
+			"https://media.giphy.com/media/c76IJLufpNwSULPk77/giphy.gif", // Heart
+			"https://media.giphy.com/media/M9NbzZjAcxq9jS9LZJ/giphy.gif", // Thumbs up
+			"https://media.giphy.com/media/26gsjCZpPolPr3sBy/giphy.gif", // Wow
+			"https://media.giphy.com/media/3o6UB3VhArvomJHtdK/giphy.gif", // Laugh
+			//"https://media.giphy.com/media/3o7TKr3nzbh5WgCFxe/giphy.gif", // Love
+			"https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif", // Cheers
+			"https://media.giphy.com/media/l2R0eYcNq9rJUsVAA/giphy.gif",  // Confetti
+			//"https://media.giphy.com/media/xT8qB7Sbwskk27Rdy8/giphy.gif", // Fire
+		};
 	}
 }
