@@ -22,125 +22,113 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 	public partial class InstagramService
 	{
-		// Статическое поле для хранения ID тех, кому уже ответили в текущем цикле
-		// (Пока приложение работает, этот список держится в памяти)
-		private static HashSet<string> _repliedUserIds = new HashSet<string>();
+		// Вместо списка игнора используем Очередь диалогов.
+		// Это наш "Snapshot" текущего состояния.
+		private static Queue<ConversationItem> _conversationQueue = new Queue<ConversationItem>();
 
-		// Статическое время последнего сброса списка, если нужно сбрасывать раз в сутки или просто при перезапуске
-		private static DateTime _lastResetTime = DateTime.Now;
-
-		/// <summary>
-		/// Основной метод, который нужно вызывать раз в 5 минут
-		/// </summary>
 		public async Task ProcessNextUnreadMessageAsync()
 		{
 			try
 			{
-				Console.WriteLine($"[{DateTime.Now}] Начинаем поиск сообщений...");
+				Console.WriteLine($"[{DateTime.Now}] Запуск обработчика...");
 
-				// 1. Получаем список диалогов
-				var conversations = await GetRecentConversationsAsync();
-				Console.WriteLine($"Найдено диалогов: {conversations.Count}");
-
-				foreach (var convo in conversations)
+				// 1. ПРОВЕРКА / ЗАПОЛНЕНИЕ ОЧЕРЕДИ
+				// Если очередь пуста, значит мы прошли полный круг (или это первый запуск).
+				// Нужно сделать новый "снимок" диалогов из API.
+				if (_conversationQueue.Count == 0)
 				{
-					if (!IsRecent(convo.UpdatedTime, hours: 24)) continue;
+					Console.WriteLine("Очередь пуста. Запрашиваем свежий список диалогов из API...");
 
-					// 2. Получаем ИСТОРИЮ сообщений (например, последние 20)
-					// Важно: API возвращает от Новых к Старым (Data[0] - самое свежее)
+					var freshConversations = await GetRecentConversationsAsync();
+
+					// Фильтруем и заполняем очередь
+					int addedCount = 0;
+					foreach (var convo in freshConversations)
+					{
+						// Сразу отсекаем старые диалоги, чтобы не засорять очередь
+						if (IsRecent(convo.UpdatedTime, hours: 24))
+						{
+							_conversationQueue.Enqueue(convo);
+							addedCount++;
+						}
+					}
+
+					Console.WriteLine($"Сформирована новая очередь из {addedCount} диалогов.");
+
+					if (addedCount == 0)
+					{
+						Console.WriteLine("Нет активных диалогов за последние 24 часа. Ждем следующего таймера.");
+						return;
+					}
+				}
+
+				// 2. ОБРАБОТКА ОЧЕРЕДИ
+				// Мы будем доставать диалоги из очереди ПО ОДНОМУ, пока не найдем тот, 
+				// которому нужно ответить, ИЛИ пока очередь не кончится.
+				while (_conversationQueue.Count > 0)
+				{
+					// Достаем следующий диалог (и удаляем его из очереди)
+					var convo = _conversationQueue.Dequeue();
+
+					Console.WriteLine($"Проверяем диалог {convo.Id}. Осталось в очереди: {_conversationQueue.Count}");
+
+					// Получаем историю сообщений
 					var messages = await GetConversationMessagesAsync(convo.Id, limit: 10);
 
-					if (messages == null || messages.Count == 0) continue;
+					if (messages == null || messages.Count == 0) continue; // Диалог пуст, берем следующий из while
 
-					// Самое свежее сообщение
 					var lastMsg = messages[0];
 					string senderId = lastMsg.From.Id;
 
-					// Если последнее сообщение от НАС (бота) или мы уже ответили на него -> пропускаем
-					bool isFromMe = senderId == _alinaKrossId;
-					bool alreadyReplied = _repliedUserIds.Contains(senderId);
-
-					if (isFromMe || alreadyReplied) continue;
-
-					// --- ФОРМИРОВАНИЕ КОНТЕКСТА ---
-
-					// Определяем, сколько сообщений подряд сверху написал пользователь (блок Unread)
-					int unreadCount = 0;
-					foreach (var msg in messages)
+					// Если последнее сообщение от НАС (бота) -> пропускаем.
+					// ВНИМАНИЕ: Мы просто идем на следующий виток while. 
+					// Мы не выходим из метода (return), мы ищем дальше в ЭТОЙ ЖЕ итерации таймера,
+					// пока не найдем кому ответить.
+					if (senderId == _alinaKrossId)
 					{
-						if (msg.From.Id != _alinaKrossId) unreadCount++;
-						else break; // Как только встретили сообщение от бота - прерываем
+						// Console.WriteLine("Последнее сообщение от меня. Пропускаем.");
+						continue;
 					}
 
-					var historyLines = new List<string>();
+					// --- ЕСЛИ МЫ ЗДЕСЬ, ЗНАЧИТ НУЖНО ОТВЕЧАТЬ ---
 
-					// Идем по списку с конца (от старых) к началу (к новым)
-					// messages.Count - 1 ... 0
+					// Формирование контекста (код без изменений)
+					// ==============================================================
+					int unreadCount = 0;
+					foreach (var msg in messages) { if (msg.From.Id != _alinaKrossId) unreadCount++; else break; }
+
+					var historyLines = new List<string>();
 					for (int i = messages.Count - 1; i >= 0; i--)
 					{
 						var msg = messages[i];
-
-						// 1. Получаем текстовое содержание (с учетом кэша, фото, видео)
-						// Вынесли логику в отдельный метод, чтобы не раздувать цикл
 						string content = await ResolveMessageContentAsync(msg);
-
-						// 2. Формируем префикс (Кто писал?)
 						string prefix = (msg.From.Id == _alinaKrossId) ? "Alina (You):" : "User:";
-
-						// 3. Добавляем пометку [Unread], если сообщение входит в верхний блок
-						// Индекс i меньше unreadCount, так как 0 - самое новое.
-						// Например, unreadCount=2. Значит индексы 0 и 1 - это unread.
 						string statusTag = (i < unreadCount) ? " [Unread]" : "";
-
-						// Собираем строку
 						historyLines.Add($"{prefix} {content}{statusTag}");
 					}
-
-					// Склеиваем всё в один большой текст для промпта
 					string fullHistoryContext = string.Join("\n", historyLines);
+					// ==============================================================
 
 					Console.WriteLine("--- CONTEXT FOR AI ---");
 					Console.WriteLine(fullHistoryContext);
-					Console.WriteLine("----------------------");
 
-					// --- ГЕНЕРАЦИЯ ОТВЕТА ---
-					// Передаем ИИ всю историю. Он должен понять, что отвечать нужно на те, где [Unread]
+					// Генерация и отправка
 					string replyText = await GenerateAiResponse(fullHistoryContext);
-
 					await SendInstagramMessage(senderId, replyText);
 
-					// Добавляем ID пользователя в "отвеченные", чтобы пропустить его в след. раз
-					_repliedUserIds.Add(senderId);
+					Console.WriteLine($"Ответ отправлен пользователю {senderId}.");
 
+					// ВАЖНО: Мы ответили ОДНОМУ человеку.
+					// Делаем return, чтобы выйти из метода и освободить ресурсы до следующего тика таймера (через 5 мин).
+					// Очередь _conversationQueue сохранит свое состояние в памяти.
 					return;
 				}
 
-				// =================================================================================
-				// ЛОГИКА СБРОСА (RESET)
-				// =================================================================================
-				// Если мы дошли сюда, значит цикл foreach закончился, и мы НИКОМУ не ответили.
-				// Это могло произойти по двум причинам:
-				// 1. Реально нет новых сообщений (последние сообщения везде от меня).
-				// 2. Сообщения есть, но пользователи находятся в _repliedUserIds (уже ответили им ранее).
-				// Если список игнора НЕ пуст, значит мы могли пропустить кого-то из-за него.
-				// Сбрасываем список и пробуем снова (рекурсивно или просто ждем след. таймера).
-				if (_repliedUserIds.Count > 0)
-				{
-					Console.WriteLine("Никому не ответили, но список игнора не пуст. Сбрасываем и проверяем заново...");
+				// Если while закончился, а мы так и не сделали return,
+				// значит мы перебрали всю очередь, и никому отвечать не надо было.
+				Console.WriteLine("Очередь разобрана полностью, отвечать некому. В следующем запуске загрузим новый список.");
 
-					ResetIgnoredList();
-
-					// РЕКУРСИЯ: Вызываем метод снова, чтобы сразу найти собеседника, 
-					// не дожидаясь следующих 5 минут.
-					// Так как список теперь пуст, мы точно попадем в обработку (если есть непрочитанные).
-					await ProcessNextUnreadMessageAsync();
-				}
-				else
-				{
-					Console.WriteLine("Нет новых сообщений (список игнора пуст, везде отвечено). Ждем.");
-				}
-
-				Console.WriteLine("Цикл проверки завершен.");
+				// В следующий раз _conversationQueue.Count будет 0, и мы загрузим новый список из API.
 			}
 			catch (Exception ex)
 			{
@@ -329,13 +317,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		{
 			var prompt = await GetMainPromptWithHistory(incomingText);
 			return await _generativeLanguageModel.GeminiRequest(prompt);
-		}
-
-		// Метод для ручного сброса списка (если нужно вызывать извне)
-		public void ResetIgnoredList()
-		{
-			_repliedUserIds.Clear();
-			Console.WriteLine("[System] Список обработанных пользователей сброшен. Начинаем новый круг.");
 		}
 	}
 
