@@ -48,7 +48,7 @@ namespace AlinaKrossManager.Controllers
 				using var reader = new StreamReader(Request.Body);
 				var body = await reader.ReadToEndAsync();
 
-				_logger.LogInformation($"Received Instagram webhook: {body}");
+				//_logger.LogInformation($"Received Instagram webhook: {body}");
 
 				var payload = JsonSerializer.Deserialize<InstagramWebhookPayload>(body);
 

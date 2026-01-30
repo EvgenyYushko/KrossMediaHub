@@ -15,7 +15,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		{
 			try
 			{
-				Log($"Processing change field: {change.Field}");
+				//Log($"Processing change field: {change.Field}");
 
 				switch (change.Field)
 				{
@@ -42,7 +42,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 				if (comment != null && IsValidComment(comment))
 				{
-					Log($"New comment from {comment.From?.Username}: *** "); //{comment.Text}
+					//Log($"New comment from {comment.From?.Username}: *** "); //{comment.Text}
 
 					if (string.IsNullOrEmpty(comment.ParentId))
 					{
@@ -598,7 +598,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		private async Task<string> AnalyzeImageAsync(string base64Image, string type)
 		{
-			Log($"Starting image analysis");
+			Log($"Starting {type} analysis");
 
 			var prompt = $"Analyze what is depicted on this {type} and give a brief description. " +
 						"Response format: only the response text, no quotes or formatting.";

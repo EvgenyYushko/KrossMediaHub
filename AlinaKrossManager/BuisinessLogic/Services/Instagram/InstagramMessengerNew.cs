@@ -152,7 +152,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				else
 				{
 					// Есть ссылка, но не обработано. Обрабатываем сейчас.
-					return await ProcessAndCacheMediaAsync(media, messageId, isUpdateCache: true);
+					return await ProcessAndCacheMediaAsync(media, messageId);
 				}
 			}
 
@@ -182,7 +182,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					if (newEntry != null)
 					{
 						// Анализируем и сохраняем в кэш
-						string aiResult = await ProcessAndCacheMediaAsync(newEntry, messageId, isUpdateCache: false);
+						string aiResult = await ProcessAndCacheMediaAsync(newEntry, messageId);
 
 						// Сохраняем в static storage, чтобы в следующий раз брать готовое
 						newEntry.AiResult = aiResult;
@@ -202,7 +202,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			return "[Пустое сообщение]";
 		}
 
-		private async Task<string> ProcessAndCacheMediaAsync(MediaDataEntry media, string messageId, bool isUpdateCache)
+		public async Task<string> ProcessAndCacheMediaAsync(MediaDataEntry media, string messageId)
 		{
 			string resultText = "";
 			try
