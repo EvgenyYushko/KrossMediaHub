@@ -763,6 +763,32 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 		}
 
+		public async Task SetTypingStatusAsync(string recipientId, bool on = true)
+		{
+			var url = $"v19.0/me/messages?access_token={_accessToken}";
+
+			var payload = new
+			{
+				recipient = new { id = recipientId },
+				sender_action = on ? "typing_on" : "typing_off"
+			};
+
+			var json = JsonSerializer.Serialize(payload);
+			var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+			try
+			{
+				// Мы не ждем ответа (fire and forget), чтобы не тормозить основной поток,
+				// или можно ждать, если критично. Обычно ошибки тут не важны.
+				await _https.PostAsync(url, content);
+				Console.WriteLine($"[System] Показали статус 'печатает' для {recipientId}");
+			}
+			catch
+			{
+				// Игнорируем ошибки "печатания", они не критичны
+			}
+		}
+
 		public async Task SendInstagramMessage(string recipientId, string text, string accessToken = null)
 		{
 			if (accessToken is null)

@@ -8,13 +8,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 {
 	public static class MediaMessageStorage
 	{
-		// Ключ: MessageId (mid), Значение: данные об аудио
 		public static ConcurrentDictionary<string, List<MediaDataEntry>> Storage = new();
 	}
 
 	public class MediaDataEntry
 	{
-		public string Url { get; set; }          // Ссылка на аудио (из вебхука)
+		public string Url { get; set; } 
 		public string AiResult { get; set; } // Распознанный текст
 		public string MediaType { get; set; }
 		public bool IsProcessed { get; set; }    // Флаг: false - только ссылка, true - текст готов
@@ -93,6 +92,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					int unreadCount = 0;
 					foreach (var msg in messages) { if (msg.From.Id != _alinaKrossId) unreadCount++; else break; }
 
+					await SetTypingStatusAsync(senderId);
+
 					var historyLines = new List<string>();
 
 					// Собираем ID непрочитанных сообщений пользователя
@@ -132,6 +133,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 						await Task.Delay(1500);
 					}
 					// ========================================================================
+
+					await SetTypingStatusAsync(senderId);
 
 					Console.WriteLine("--- CONTEXT FOR AI ---");
 					Console.WriteLine(fullHistoryContext);
@@ -223,7 +226,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				}
 			}
 
-			return "[Пустое сообщение]";
+			return "[Empty message]";
 		}
 
 		public async Task<string> ProcessAndCacheMediaAsync(MediaDataEntry media, string messageId)
@@ -266,7 +269,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Ошибка обработки медиа ({media.MediaType}): {ex.Message}");
-				resultText = $"[Не удалось обработать {media.MediaType}]";
+				resultText = $"[Failed to process {media.MediaType}]";
 			}
 
 			return resultText;
@@ -275,10 +278,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		public async Task SendLongMessageAsHumanAsync(string userId, string fullText)
 		{
 			// 1. Разбиваем текст на части (например, по ~200 символов или по предложениям)
-			var chunks = SplitMessageIntoHumanChunks(fullText, 150);
+			var chunks = SplitMessageIntoHumanChunks(fullText, 100);
 
 			for (int i = 0; i < chunks.Count; i++)
 			{
+				await SetTypingStatusAsync(userId);
+
 				var chunk = chunks[i];
 
 				// 3. Рассчитываем паузу для ТЕКУЩЕГО куска
@@ -302,6 +307,8 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				// Если выпадает число от 1 до 3 (из 10), то отправляем стикер. Шанс 30%.
 				if (random.Next(1, 11) <= 3)
 				{
+					await SetTypingStatusAsync(userId);
+
 					// Небольшая задержка перед стикером, чтобы выглядело естественно (1-3 сек)
 					await Task.Delay(random.Next(1000, 3000));
 
@@ -323,7 +330,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 		}
 
-		private List<string> SplitMessageIntoHumanChunks(string text, int maxChunkLength = 150)
+		private List<string> SplitMessageIntoHumanChunks(string text, int maxChunkLength)
 		{
 			var chunks = new List<string>();
 			if (string.IsNullOrEmpty(text)) return chunks;
