@@ -198,8 +198,8 @@ log_info "Восстановление данных из бэкапа $BACKUP_FI
 NEW_DB_PASSWORD=$(render_api_request "GET" "${RENDER_SERVICE_TYPE}/$NEW_DB_ID/connection-info" "" | jq -r '.password')
 export PGPASSWORD=$NEW_DB_PASSWORD
 
-log_info "⏳ Ждём 20 секунд..."
-sleep 20
+log_info "⏳ Ждём 120 секунд..."
+sleep 120
 
 #echo "NEW_DB_USER="$NEW_DB_USER "NEW_DB_NAME=" $NEW_DB_NAME "NEW_DB_PASSWORD="$NEW_DB_PASSWORD
 
