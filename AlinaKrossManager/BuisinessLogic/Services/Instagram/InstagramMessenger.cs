@@ -789,6 +789,17 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 		}
 
+		public async Task MarkMessageAsSeenAsync(string recipientId)
+		{
+			var url = $"v19.0/me/messages?access_token={_accessToken}";
+			var payload = new { recipient = new { id = recipientId }, sender_action = "mark_seen" };
+
+			// Fire and forget (не ждем ответа)
+			var json = JsonSerializer.Serialize(payload);
+			var content = new StringContent(json, Encoding.UTF8, "application/json");
+			_ = _https.PostAsync(url, content);
+		}
+
 		public async Task SendInstagramMessage(string recipientId, string text, string accessToken = null)
 		{
 			if (accessToken is null)

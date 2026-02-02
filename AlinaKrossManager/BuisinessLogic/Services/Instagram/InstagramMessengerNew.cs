@@ -92,6 +92,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					int unreadCount = 0;
 					foreach (var msg in messages) { if (msg.From.Id != _alinaKrossId) unreadCount++; else break; }
 
+					await MarkMessageAsSeenAsync(senderId);
+
+					await Task.Delay(2000);
+
 					await SetTypingStatusAsync(senderId);
 
 					var historyLines = new List<string>();
