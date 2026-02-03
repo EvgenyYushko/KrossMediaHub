@@ -226,7 +226,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 
 			var conversationHistory = _conversationService.GetFormattedHistory(senderId);
-			var prompt = await GetMainPromptWithHistory(conversationHistory);
+			var prompt = await GetMainSystemPromptModel();
 
 			//Log($"SENDED PROMPT: {prompt}");
 
@@ -242,7 +242,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		public async Task SendDellayMessageWithHistory(string senderId)
 		{
 			var conversationHistory = _conversationService.GetFormattedHistory(senderId);
-			var prompt = await GetMainPromptWithHistory(conversationHistory);
+			var prompt = await GetMainSystemPromptModel();
 
 			//Log($"SENDED PROMPT: {prompt}");
 
@@ -391,9 +391,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			await SendResponse(senderId, text);
 		}
 
-		private async Task<string> GetMainPromptWithHistory(string conversationHistory)
+		private async Task<string> GetMainSystemPromptModel()
 		{
-			return await GetMainPromtAlinaKross(conversationHistory);
+			return await GetMainPromtAlinaKross();
 		}
 
 		private bool IsValidMessage(InstagramMessaging messaging)
@@ -954,7 +954,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		private string _todaysSpecifics = null;
 		private string _currentInteres = null;
 
-		private async Task<string> GetMainPromtAlinaKross(string conversationHistory)
+		private async Task<string> GetMainPromtAlinaKross()
 		{
 			_mediaList = _mediaList ?? await GetUserMediaAsync();
 
@@ -1080,9 +1080,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					- Never repeat what the user said
 					- Just give your authentic response
 					- Stay in the image of Alina, who flirts with intimate topics
-
-					CHAT HISTORY:
-					""{conversationHistory}""
 
 					Continue the conversation. Review the most recent unread messages from User. And respond to them, taking into account the context of YOUR ENTIRE message history. That is, always consider all previously sent messages from you (Alina) and User..
 

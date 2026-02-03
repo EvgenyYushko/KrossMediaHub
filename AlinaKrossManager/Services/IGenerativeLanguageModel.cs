@@ -1,3 +1,5 @@
+using Protos.GoogleGeminiService;
+
 namespace AlinaKrossManager.Services
 {
 	public interface IGenerativeLanguageModel
@@ -9,5 +11,6 @@ namespace AlinaKrossManager.Services
 		Task<string> GeminiAudioToText(string base64Iaudio);
 		Task<string> GeminiTextToSpeechEn(string text);
 		Task<string> GeminiTextToSpeechRu(string text);
+		Task<string> RequestWithChatAsync(List<ChatMessage> messages, string systemInstruction = null);
 	}
 }

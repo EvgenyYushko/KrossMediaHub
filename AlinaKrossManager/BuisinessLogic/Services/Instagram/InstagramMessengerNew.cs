@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Protos.GoogleGeminiService;
 using static AlinaKrossManager.BuisinessLogic.Services.Instagram.InstagramService;
 
 namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
@@ -13,7 +14,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 	public class MediaDataEntry
 	{
-		public string Url { get; set; } 
+		public string Url { get; set; }
 		public string AiResult { get; set; } // Распознанный текст
 		public string MediaType { get; set; }
 		public bool IsProcessed { get; set; }    // Флаг: false - только ссылка, true - текст готов
@@ -94,60 +95,81 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 					await MarkMessageAsSeenAsync(senderId);
 
-					await Task.Delay(2000);
+					//await Task.Delay(2000);
 
 					await SetTypingStatusAsync(senderId);
 
-					var historyLines = new List<string>();
+					var chatHistory = new List<ChatMessage>();
+					var unreadUserMessageIds = new List<string>(); // Для реакций
 
-					// Собираем ID непрочитанных сообщений пользователя
-					var unreadUserMessageIds = new List<string>();
-
+					// Идем по списку с конца (от старых) к началу (к новым), чтобы сохранить хронологию
 					for (int i = messages.Count - 1; i >= 0; i--)
 					{
 						var msg = messages[i];
+
+						// 1. Получаем текстовое содержание (с учетом кэша, фото, видео)
 						string content = await ResolveMessageContentAsync(msg);
-						string prefix = (msg.From.Id == _alinaKrossId) ? "Alina (You):" : "User:";
 
-						// Проверяем, является ли сообщение непрочитанным
+						// 2. Определяем роль для AI (model - это бот, user - это пользователь)
+						string role = (msg.From.Id == _alinaKrossId) ? "model" : "user";
+
+						// 3. Добавляем в историю в формате объектов
+						chatHistory.Add(new ChatMessage
+						{
+							Role = role,
+							Text = string.IsNullOrEmpty(content) ? "[Empty message]" : content
+						});
+
+						// 4. Логика для Реакций:
+						// Проверяем, является ли сообщение непрочитанным (по индексу unreadCount) и от пользователя
+						// (unreadCount вычисляется перед этим циклом, как в прошлом коде)
 						bool isUnread = i < unreadCount;
-						string statusTag = (i < unreadCount) ? " [Unread]" : "";
-						historyLines.Add($"{prefix} {content}{statusTag}");
-
-						// Если это сообщение от юзера и оно непрочитанное - запоминаем ID для реакции
-						if (isUnread && msg.From.Id != _alinaKrossId)
+						if (isUnread && role == "user")
 						{
 							unreadUserMessageIds.Add(msg.Id);
 						}
 					}
-					string fullHistoryContext = string.Join("\n", historyLines);
 
+					// ========================================================================
+					// ЛОГИКА ОТПРАВКИ РЕАКЦИИ (Random)
+					// ========================================================================
 					var random = new Random();
 
-					// Если есть на что реагировать и выпал шанс 70%
+					// Если есть непрочитанные сообщения от юзера и выпал шанс (например > 50 из 100)
 					if (unreadUserMessageIds.Count > 0 && random.Next(1, 101) > 50)
 					{
-						// 1. Выбираем случайное сообщение из непрочитанных
+						// Выбираем случайное сообщение из списка непрочитанных
 						string targetMessageId = unreadUserMessageIds[random.Next(unreadUserMessageIds.Count)];
 
-						// 3. Отправляем (без await, чтобы не блочить, или с await для надежности)
-						await SendReactionAsync(senderId, targetMessageId);
+						// Отправляем реакцию (без await, чтобы не задерживать процесс, или с await для надежности)
+						await SendReactionAsync(senderId, targetMessageId); // Например "love" или рандом
 
-						// Небольшая пауза для реалистичности перед тем как "печатать" ответ
+						// Небольшая пауза для реалистичности перед тем как "печатать"
 						await Task.Delay(1500);
 					}
+
 					// ========================================================================
 
+					// 1. Показываем статус "Печатает..."
 					await SetTypingStatusAsync(senderId);
 
-					Console.WriteLine("--- CONTEXT FOR AI ---");
-					Console.WriteLine(fullHistoryContext);
+					// Логируем для отладки (опционально, в консоль можно вывести JSON или просто кол-во)
+					Console.WriteLine($"--- CONTEXT FOR AI ({chatHistory.Count} msgs) ---");
+					//Console.WriteLine(JsonSerializer.Serialize(chatHistory)); // Если нужно видеть структуру
 
-					// Генерация и отправка
-					string replyText = await GenerateAiResponse(fullHistoryContext);
-					await SendLongMessageAsHumanAsync(senderId, replyText);
+					// 2. Генерация ответа
+					// Теперь передаем список объектов, а не строку
+					try
+					{
+						string replyText = await GenerateAiResponse(chatHistory);
+						await SendLongMessageAsHumanAsync(senderId, replyText);
 
-					Console.WriteLine($"Ответ отправлен пользователю {senderId}.");
+						Console.WriteLine($"Ответ отправлен пользователю {senderId}.");
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"Ошибка отправки ответа пользаку {senderId} в инсте: {ex.Message}");
+					}
 
 					// ВАЖНО: Мы ответили ОДНОМУ человеку.
 					// Делаем return, чтобы выйти из метода и освободить ресурсы до следующего тика таймера (через 5 мин).
@@ -444,10 +466,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			return false;
 		}
 
-		private async Task<string> GenerateAiResponse(string incomingText)
+		private async Task<string> GenerateAiResponse(List<ChatMessage> chatHistory)
 		{
-			var prompt = await GetMainPromptWithHistory(incomingText);
-			return await _generativeLanguageModel.GeminiRequest(prompt);
+			var systemInstruction = await GetMainSystemPromptModel();
+
+			return await _generativeLanguageModel.RequestWithChatAsync(chatHistory, systemInstruction);
 		}
 	}
 

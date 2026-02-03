@@ -1,26 +1,42 @@
-using AlinaKrossManager.Models;
 using AlinaKrossManager.Services;
 using Protos.GoogleGeminiService;
-using Telegram.Bot;
-using Telegram.Bot.Types;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
 	public class GoogleGenerativeLanguageModel : IGenerativeLanguageModel
 	{
 		private readonly GeminiService.GeminiServiceClient _geminiServiceClient;
-		
+
 		private string[] modelsToTry =
 		{
 			"imagen-4.0-ultra-generate-001",
 			"imagen-4.0-generate-001",
 			"imagen-4.0-fast-generate-001",
-			"imagen-3.0-generate-002"
+			"imagen-3.0-generate-002",
+			"gemini-2.5-flash-image" // nano banana
 		};
 
 		public GoogleGenerativeLanguageModel(GeminiService.GeminiServiceClient geminiServiceClient)
 		{
 			_geminiServiceClient = geminiServiceClient;
+		}
+
+		public async Task<string> RequestWithChatAsync(List<ChatMessage> messages, string systemInstruction = null)
+		{
+			var rsponce = await _geminiServiceClient.RequestWithChatAsync(new()
+			{
+				SystemInstruction = systemInstruction,
+				History =
+				{
+					messages.Select(m => new ChatMessage
+					{
+						Role = m.Role,
+						Text = m.Text
+					})
+				}
+			});
+
+			return rsponce.GeneratedText;
 		}
 
 		public async Task<string> GeminiAudioToText(string base64Iaudio)
@@ -142,4 +158,5 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return new List<string>();
 		}
 	}
+
 }
