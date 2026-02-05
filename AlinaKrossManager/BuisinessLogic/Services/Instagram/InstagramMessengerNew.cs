@@ -12,6 +12,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		public static ConcurrentDictionary<string, List<MediaDataEntry>> Storage = new();
 	}
 
+	public static class UserProfileStorage
+	{
+		// Ключ: UserId, Значение: Готовая текстовая инструкция для AI
+		public static ConcurrentDictionary<string, string> ContextCache = new();
+	}
+
 	public class MediaDataEntry
 	{
 		public string Url { get; set; }
@@ -161,7 +167,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					// Теперь передаем список объектов, а не строку
 					try
 					{
-						string replyText = await GenerateAiResponse(chatHistory);
+						string replyText = await GenerateAiResponse(senderId, chatHistory);
 						await SendLongMessageAsHumanAsync(senderId, replyText);
 
 						Console.WriteLine($"Ответ отправлен пользователю {senderId}.");
@@ -466,9 +472,20 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			return false;
 		}
 
-		private async Task<string> GenerateAiResponse(List<ChatMessage> chatHistory)
+		private async Task<string> GenerateAiResponse(string senderId, List<ChatMessage> chatHistory)
 		{
 			var systemInstruction = await GetMainSystemPromptModel();
+
+			try
+			{
+				string userContextInfo = await GetUserContextForAiAsync(senderId);
+				systemInstruction += "\n\nKeep this information in mind when responding. For example, whether you are mutual subscribers. If not, ask him to subscribe.\n" 
+					+ userContextInfo;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine("Ошибка получения инфы о собеседнике" + ex.ToString());
+			}
 
 			return await _generativeLanguageModel.RequestWithChatAsync(chatHistory, systemInstruction);
 		}
@@ -559,6 +576,33 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 	{
 		[JsonPropertyName("data")]
 		public List<InstagramUser> Data { get; set; }
+	}
+
+	public class InstagramUserProfile
+	{
+		[JsonPropertyName("id")]
+		public string Id { get; set; }
+
+		[JsonPropertyName("name")]
+		public string Name { get; set; }
+
+		[JsonPropertyName("username")]
+		public string Username { get; set; }
+
+		[JsonPropertyName("profile_pic")]
+		public string ProfilePicUrl { get; set; }
+
+		[JsonPropertyName("follower_count")]
+		public int FollowerCount { get; set; }
+
+		[JsonPropertyName("is_verified_user")]
+		public bool IsVerified { get; set; }
+
+		[JsonPropertyName("is_user_follow_business")]
+		public bool IsFollowingMe { get; set; } // Подписан ли он на бота
+
+		[JsonPropertyName("is_business_follow_user")]
+		public bool IsFollowingYou { get; set; } // Подписан ли ты на собеседника
 	}
 
 	public static class StickerCollection

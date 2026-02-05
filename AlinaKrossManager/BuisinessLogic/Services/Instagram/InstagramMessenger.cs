@@ -600,7 +600,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		{
 			Log($"Starting {type} analysis");
 
-			var prompt = $"Analyze what is depicted on this {type} and give a brief description. " +
+			var prompt = $"Analyze what is depicted on this {type} and give a description 2-3 sentences. " +
 						"Response format: only the response text, no quotes or formatting.";
 
 			Log($"Calling Gemini with base64 {type} (length: {base64Image?.Length ?? 0})");
@@ -800,6 +800,77 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			_ = _https.PostAsync(url, content);
 		}
 
+		public async Task<string> GetUserContextForAiAsync(string userId)
+		{
+			// 1. Проверка КЭША
+			if (UserProfileStorage.ContextCache.TryGetValue(userId, out string cachedContext))
+			{
+				return cachedContext;
+			}
+
+			try
+			{
+				// 2. Запрос к API Instagram
+				var userProfile = await GetInstagramUserProfileAsync(userId);
+				if (userProfile == null) return "";
+
+				// 3. Анализ внешности (Vision)
+				string appearanceDescription = "The profile photo is missing.";
+				if (!string.IsNullOrEmpty(userProfile.ProfilePicUrl))
+				{
+					try
+					{
+						// Скачиваем фото в байты/base64 (используем ваш существующий метод)
+						var base64Image = await DownloadImageAsBase64(userProfile.ProfilePicUrl);
+
+						// Допустим, у вас есть такой метод AnalyzeImageAsync(base64, prompt)
+						appearanceDescription = await AnalyzeImageAsync(base64Image, "photo");
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"[Profile Vision Error]: {ex.Message}");
+						appearanceDescription = "Failed to upload profile photo.";
+					}
+				}
+
+				// 4. Формирование текста контекста
+				var sb = new StringBuilder();
+				sb.AppendLine("INFORMATION ABOUT THE INTERLOCUTOR:");
+				sb.AppendLine($"Name: {userProfile.Name ?? "Not specified"}");
+				sb.AppendLine($"Nickname: @{userProfile.Username}");
+				sb.AppendLine($"Subscribers: {userProfile.FollowerCount}");
+				sb.AppendLine($"Subscribed to you: {(userProfile.IsFollowingMe ? "Yes" : "No")}");
+				sb.AppendLine($"Are you subscribed to it: {(userProfile.IsFollowingYou ? "Yes" : "No")}");
+				sb.AppendLine($"Verification check mark: {(userProfile.IsVerified ? "Yes" : "No")}");
+				sb.AppendLine($"Appearance (based on profile photo): {appearanceDescription}");
+
+				string finalContext = sb.ToString();
+
+				// 5. Сохранение в кэш
+				UserProfileStorage.ContextCache.TryAdd(userId, finalContext);
+
+				Console.WriteLine($"[User Profile] Сформирован контекст для {userProfile.Username}");
+				return finalContext;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка получения профиля: {ex.Message}");
+				return "";
+			}
+		}
+
+		private async Task<InstagramUserProfile> GetInstagramUserProfileAsync(string userId)
+		{
+			var fields = "name,username,profile_pic,is_verified_user,follower_count,is_user_follow_business,is_business_follow_user";
+			var url = $"v19.0/{userId}?fields={fields}&access_token={_accessToken}";
+
+			var response = await _https.GetAsync(url);
+			if (!response.IsSuccessStatusCode) return null;
+
+			var json = await response.Content.ReadAsStringAsync();
+			return JsonSerializer.Deserialize<InstagramUserProfile>(json);
+		}
+
 		public async Task SendInstagramMessage(string recipientId, string text, string accessToken = null)
 		{
 			if (accessToken is null)
@@ -974,30 +1045,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			_todaysSpecifics = _todaysSpecifics ??= await GenerateTodaysSpecifics();
 			_currentInteres = _currentInteres ??= await GenerateCurrentInteres();
 
-			//**For vulgar/direct requests:
-			//		""Let's keep it classy! All my professional work is here 💫 www.patreon.com/AlinaKross""
-			//		""I share my art through proper channels! Everything is here ✨ www.patreon.com/AlinaKross""
-
-			//	CURRENT SITUATION & MOOD:
-			//- I'm in a bikini right now and I really want to flirt
-			//- Sipping a delicious mojito at the beach bar 🍹
-			//- Planning content for upcoming collaboration
-			//- I is wearing a very minimal bikini, which makes her very embarrassed
-
-			// CURRENT INTERESTS TO MENTION:
-			//- Sustainable fashion brands
-			//- Really loves posing in a bikini.
-			//- Local Bali cafes discovery
-			//- Mental health awareness
-			//- Behind-the-scenes modeling life
-			//- Learning to surf (badly but enthusiastically)
-
-			// TODAY'S SPECIFICS
-			//- The bikini is too revealing and she feels awkward about it on set
-			//- The lace lingerie is so provocative that she catches admiring glances and secretly smiles, feeling like a fatal seductress.
-			//- My silk robe is carelessly open, and with every movement, a glimpse of her toned stomach is revealed, making the you hold their breath in silent anticipation
-			//- My new dress so temptingly hugs my hips that she can't help but glance at her own reflection, imagining your hands could be there instead of the folds of the material
-			//- She slowly runs her fingers over her exposed shoulder, holding the gaze of your across the room, silently inviting you to come closer
 			return $@"You are Alina Kross, a successful 25-year-old bikini-model and influencer with 500K+ Instagram followers. 
 
 					PERSONAL BACKGROUND:
