@@ -30,6 +30,8 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 		public async Task HandleUpdateAsync(Update update, CancellationToken ct)
 		{
+			if (!await _telegramService.CanUseBot(update, ct)) return;
+
 			if (update.Message != null && update.Message?.Text is not { } text)
 			{
 				_telegramService.HandleMediaGroup(update.Message);
@@ -45,8 +47,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			{
 				case UpdateType.Message when msgText.IsCommand("generate_image") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
-
 						Message msgStart = null;
 						try
 						{
@@ -66,8 +66,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_threads") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
-
 						// Ваши данные (должны быть уже настроены в Instagram Graph API)
 						var httpClient = new HttpClient();
 						try
@@ -89,7 +87,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_insta") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -103,7 +100,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("story_to_insta") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -117,7 +113,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_facebook") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -131,7 +126,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("story_to_facebook") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -145,7 +139,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_bluesky") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -163,7 +156,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_tg_free") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -181,7 +173,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_tg_private") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -199,7 +190,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_x") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
@@ -217,7 +207,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("top_hash_posts") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var replayText = rmsg.GetMsgText() ?? "";
@@ -228,8 +217,6 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_all") && update.Message.ReplyToMessage is Message rmsg:
 					{
-						if (!await _telegramService.CanUseBot(update, ct)) return;
-
 						using (var scope = _scopeFactory.CreateScope())
 						{
 							var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
