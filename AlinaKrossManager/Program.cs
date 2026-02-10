@@ -49,7 +49,9 @@ builder.Services.AddSingleton<ITelegramBotClient>(provider =>
 builder.Services.AddSingleton<IGenerativeLanguageModel>(provider =>
 {
 	var client = provider.GetService<GeminiService.GeminiServiceClient>();
-	return new GoogleGenerativeLanguageModel(client);
+	var key = GetConfigOrThrow(GEMINI_API_KEY);
+
+	return new GoogleGenerativeLanguageModel(client, key);
 });
 
 builder.Services.AddSingleton(provider =>

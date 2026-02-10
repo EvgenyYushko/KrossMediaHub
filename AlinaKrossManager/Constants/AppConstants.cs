@@ -16,5 +16,6 @@ namespace AlinaKrossManager.Constants
 		public static string X_ACCESS_TOKEN_SECRET = "X_ACCESS_TOKEN_SECRET";
 		public static string ELEVEN_LABS_KEY = "ELEVEN_LABS_KEY";
 		public static string WHATS_APP_TOKEN = "WHATS_APP_TOKEN";
+		public static string GEMINI_API_KEY = "GEMINI_API_KEY";
 	}
 }

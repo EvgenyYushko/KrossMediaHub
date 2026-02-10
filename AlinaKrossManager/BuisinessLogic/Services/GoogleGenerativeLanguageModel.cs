@@ -1,5 +1,5 @@
 using AlinaKrossManager.Services;
-//using Grpc.Core;
+using Grpc.Core;
 using Protos.GoogleGeminiService;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
@@ -7,7 +7,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 	public class GoogleGenerativeLanguageModel : IGenerativeLanguageModel
 	{
 		private readonly GeminiService.GeminiServiceClient _geminiServiceClient;
-
+		private readonly string _token;
 		private string[] modelsToTry =
 		{
 			"imagen-4.0-ultra-generate-001",
@@ -17,9 +17,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			"gemini-2.5-flash-image" // nano banana
 		};
 
-		public GoogleGenerativeLanguageModel(GeminiService.GeminiServiceClient geminiServiceClient)
+		public GoogleGenerativeLanguageModel(GeminiService.GeminiServiceClient geminiServiceClient, string token)
 		{
 			_geminiServiceClient = geminiServiceClient;
+			_token = token;
 		}
 
 		public async Task<string> RequestWithChatAsync(List<ChatMessage> messages, string systemInstruction = null)
@@ -35,10 +36,10 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						Text = m.Text
 					})
 				}
-			});
+			}, AddTokenToHeaders());
 
 			return rsponce.GeneratedText;
-		}
+		}		
 
 		public async Task<string> GeminiAudioToText(string base64Iaudio)
 		{
@@ -47,7 +48,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				Prompt = { new Prompt { Text = prompt } },
 				Base64Idata = base64Iaudio
-			});
+			}, AddTokenToHeaders());
 			return response.GeneratedText;
 		}
 
@@ -59,7 +60,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				LanguageName = "en-US-Studio-O",
 				LanguageCode = "en-US",
 				AudioEncoding = "MP3"
-			});
+			}, AddTokenToHeaders());
 
 			return response.AudioContent;
 		}
@@ -72,17 +73,14 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				LanguageName = "ru-RU-Standard-A",
 				LanguageCode = "ru-RU",
 				AudioEncoding = "MP3"
-			});
+			}, AddTokenToHeaders());
 
 			return response.AudioContent;
 		}
 
 		public async Task<string> GeminiRequest(string prompt)
 		{
-			//var headers = new Metadata();
-			//headers.Add("x-goog-api-key", userApiKey); 
-
-			var response = await _geminiServiceClient.RequestAsync(new Prompt { Text = prompt });
+			var response = await _geminiServiceClient.RequestAsync(new Prompt { Text = prompt }, AddTokenToHeaders());
 			return response.GeneratedText;
 		}
 
@@ -92,7 +90,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				Prompt = { new Prompt { Text = prompt } },
 				Base64Idata = base64Image
-			});
+			}, AddTokenToHeaders());
 			return response.GeneratedText;
 		}
 
@@ -102,7 +100,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			{
 				Prompt = { new Prompt { Text = prompt } },
 				Base64Idata = base64video
-			});
+			}, AddTokenToHeaders());
 			return response.GeneratedText;
 		}
 
@@ -126,7 +124,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 							AspectRatio = "3:4",
 							SampleCount = countImage,
 							SelectedModel = model
-						});
+						}, AddTokenToHeaders());
 
 						var images = response.GeneratedImagesBase64.ToList();
 
@@ -160,6 +158,13 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			Console.WriteLine($"💥 Все модели исчерпаны. Не удалось сгенерировать изображения.");
 			return new List<string>();
+		}
+
+		private Metadata AddTokenToHeaders()
+		{
+			var headers = new Metadata();
+			headers.Add("x-goog-api-key", _token);
+			return headers;
 		}
 	}
 
