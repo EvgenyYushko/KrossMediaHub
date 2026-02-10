@@ -1,4 +1,5 @@
 using AlinaKrossManager.Services;
+//using Grpc.Core;
 using Protos.GoogleGeminiService;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
@@ -78,6 +79,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task<string> GeminiRequest(string prompt)
 		{
+			//var headers = new Metadata();
+			//headers.Add("x-goog-api-key", userApiKey); 
+
 			var response = await _geminiServiceClient.RequestAsync(new Prompt { Text = prompt });
 			return response.GeneratedText;
 		}

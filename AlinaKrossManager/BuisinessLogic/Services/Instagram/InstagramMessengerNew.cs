@@ -52,7 +52,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 					foreach (var convo in freshConversations)
 					{
 						// Сразу отсекаем старые диалоги, чтобы не засорять очередь
-						if (IsRecent(convo.UpdatedTime, hours: 24))
+						//if (IsRecent(convo.UpdatedTime, hours: 24))
 						{
 							_conversationQueue.Enqueue(convo);
 							addedCount++;
