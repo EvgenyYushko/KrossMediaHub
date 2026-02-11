@@ -3,6 +3,7 @@ using System.Web;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
+using static AlinaKrossManager.Controllers.InstagramController;
 
 namespace AlinaKrossManager.Controllers
 {
@@ -135,131 +136,6 @@ namespace AlinaKrossManager.Controllers
 			}
 		}
 
-		public class InstagramOAuthService
-		{
-			private readonly IConfiguration _configuration;
-			private readonly ILogger<InstagramOAuthService> _logger;
-
-			public InstagramOAuthService(
-				IConfiguration configuration,
-				ILogger<InstagramOAuthService> logger)
-			{
-				_configuration = configuration;
-				_logger = logger;
-			}
-
-			private const string INSTAGRAM_OAUTH_URL = "https://www.instagram.com/consent/?flow=ig_biz_login_oauth";
-			private const string INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
-			private const string INSTAGRAM_GRAPH_URL = "https://graph.instagram.com";
-
-			// Конфигурация из appsettings.json
-			private string AppId => "1130517405203905";//_configuration["Instagram:AppId"];
-			private string AppSecret => "190d6d42309964b51d0203d0520b36b3";//_configuration["Instagram:AppSecret"];
-			private string BaseUrl => "https://krossmediahub.onrender.com";//_configuration["Instagram:BaseUrl"];
-
-			// Генерация CSRF токена
-			public string GenerateCsrfToken()
-			{
-				using var rng = RandomNumberGenerator.Create();
-				byte[] tokenData = new byte[32];
-				rng.GetBytes(tokenData);
-				return Convert.ToBase64String(tokenData).Replace("+", "-").Replace("/", "_").Replace("=", "");
-			}
-
-			// Альтернативная упрощенная версия
-			public string GenerateSimpleOAuthUrl(string userId)
-			{
-				var csrfToken = GenerateCsrfToken();
-				var state = new InstagramAuthState
-				{
-					UserId = userId,
-					Provider = "instagram",
-					Token = csrfToken,
-					CallbackUrl = $"{BaseUrl}/instagram/auth/callback",
-					MessagesCallback = $"{BaseUrl}/instagram/webhook"
-				};
-
-				var stateJson = JsonConvert.SerializeObject(state);
-				var encodedState = HttpUtility.UrlEncode(stateJson);
-
-				return $"https://api.instagram.com/oauth/authorize?" +
-					   $"client_id={AppId}&" +
-					   $"redirect_uri={HttpUtility.UrlEncode($"{BaseUrl}/instagram/auth/callback")}&" +
-					   $"scope=instagram_business_basic,instagram_business_manage_messages&" +
-					   $"response_type=code&" +
-					   $"state={encodedState}";
-			}
-
-			// Обмен кода на токен
-			public async Task<InstagramTokenResponse> ExchangeCodeForTokenAsync(string code, string redirectUri)
-			{
-				try
-				{
-					_logger.LogInformation($"=== Starting token exchange ===");
-					_logger.LogInformation($"AppId: {AppId}");
-					_logger.LogInformation($"AppSecret length: {AppSecret?.Length}");
-					_logger.LogInformation($"RedirectUri: {redirectUri}");
-					_logger.LogInformation($"Code length: {code?.Length}");
-					_logger.LogInformation($"Code preview: {code?.Substring(0, Math.Min(20, code?.Length ?? 0))}...");
-
-					using var client = new HttpClient();
-
-					// ШАГ 1: Обмен кода на КРАТКОВРЕМЕННЫЙ токен (1 час)
-					var shortLivedRequest = new HttpRequestMessage(HttpMethod.Post,
-						"https://api.instagram.com/oauth/access_token");
-
-					var formData = new Dictionary<string, string>
-					{
-						["client_id"] = AppId,
-						["client_secret"] = AppSecret,
-						["grant_type"] = "authorization_code",
-						["redirect_uri"] = redirectUri,
-						["code"] = code
-					};
-
-					shortLivedRequest.Content = new FormUrlEncodedContent(formData);
-
-					var shortLivedResponse = await client.SendAsync(shortLivedRequest);
-					var shortLivedJson = await shortLivedResponse.Content.ReadAsStringAsync();
-					var shortLivedToken = JsonConvert.DeserializeObject<InstagramShortLivedToken>(shortLivedJson);
-
-					// Логируем получение кратковременного токена
-					_logger.LogInformation("Short-lived token obtained. User ID: {UserId}",
-						shortLivedToken.UserId);
-
-					// ШАГ 2: Обмен КРАТКОВРЕМЕННОГО на ДОЛГОВРЕМЕННЫЙ токен (60 дней)
-					// ВАЖНО: Используем graph.instagram.com, НЕ graph.facebook.com!
-					var longLivedUrl = $"https://graph.instagram.com/access_token" +
-						$"?grant_type=ig_exchange_token" +
-						$"&client_secret={Uri.EscapeDataString(AppSecret)}" +
-						$"&access_token={Uri.EscapeDataString(shortLivedToken.AccessToken)}";
-
-					var longLivedResponse = await client.GetAsync(longLivedUrl);
-					var longLivedJson = await longLivedResponse.Content.ReadAsStringAsync();
-					var longLivedToken = JsonConvert.DeserializeObject<InstagramLongLivedToken>(longLivedJson);
-
-					// ШАГ 3: Сохраняем токен с датой истечения
-					var expiresAt = DateTime.UtcNow.AddSeconds(longLivedToken.ExpiresIn);
-
-					_logger.LogInformation("Long-lived token obtained. Expires at: {ExpiresAt}", expiresAt);
-					_logger.LogInformation($"Long-lived token ={longLivedToken.AccessToken}");
-
-					return new InstagramTokenResponse
-					{
-						AccessToken = longLivedToken.AccessToken,
-						UserId = shortLivedToken.UserId
-						//ExpiresAt = expiresAt,
-						//Permissions = shortLivedToken.Permissions?.Split(',').ToList()
-					};
-				}
-				catch (Exception ex)
-				{
-					_logger.LogError(ex, "Error exchanging code for token");
-					throw;
-				}
-			}
-		}
-
 		#region Models
 		public class InstagramShortLivedToken
 		{
@@ -322,7 +198,131 @@ namespace AlinaKrossManager.Controllers
 			public int ExpiresIn { get; set; }
 		}
 
-
 		#endregion
+	}
+
+	public class InstagramOAuthService
+	{
+		private readonly IConfiguration _configuration;
+		private readonly ILogger<InstagramOAuthService> _logger;
+
+		public InstagramOAuthService(
+			IConfiguration configuration,
+			ILogger<InstagramOAuthService> logger)
+		{
+			_configuration = configuration;
+			_logger = logger;
+		}
+
+		private const string INSTAGRAM_OAUTH_URL = "https://www.instagram.com/consent/?flow=ig_biz_login_oauth";
+		private const string INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
+		private const string INSTAGRAM_GRAPH_URL = "https://graph.instagram.com";
+
+		// Конфигурация из appsettings.json
+		private string AppId => "1130517405203905";//_configuration["Instagram:AppId"];
+		private string AppSecret => "190d6d42309964b51d0203d0520b36b3";//_configuration["Instagram:AppSecret"];
+		private string BaseUrl => "https://krossmediahub.onrender.com";//_configuration["Instagram:BaseUrl"];
+
+		// Генерация CSRF токена
+		public string GenerateCsrfToken()
+		{
+			using var rng = RandomNumberGenerator.Create();
+			byte[] tokenData = new byte[32];
+			rng.GetBytes(tokenData);
+			return Convert.ToBase64String(tokenData).Replace("+", "-").Replace("/", "_").Replace("=", "");
+		}
+
+		// Альтернативная упрощенная версия
+		public string GenerateSimpleOAuthUrl(string userId)
+		{
+			var csrfToken = GenerateCsrfToken();
+			var state = new InstagramAuthState
+			{
+				UserId = userId,
+				Provider = "instagram",
+				Token = csrfToken,
+				CallbackUrl = $"{BaseUrl}/instagram/auth/callback",
+				MessagesCallback = $"{BaseUrl}/instagram/webhook"
+			};
+
+			var stateJson = JsonConvert.SerializeObject(state);
+			var encodedState = HttpUtility.UrlEncode(stateJson);
+
+			return $"https://api.instagram.com/oauth/authorize?" +
+				   $"client_id={AppId}&" +
+				   $"redirect_uri={HttpUtility.UrlEncode($"{BaseUrl}/instagram/auth/callback")}&" +
+				   $"scope=instagram_business_basic,instagram_business_manage_messages&" +
+				   $"response_type=code&" +
+				   $"state={encodedState}";
+		}
+
+		// Обмен кода на токен
+		public async Task<InstagramTokenResponse> ExchangeCodeForTokenAsync(string code, string redirectUri)
+		{
+			try
+			{
+				_logger.LogInformation($"=== Starting token exchange ===");
+				_logger.LogInformation($"AppId: {AppId}");
+				_logger.LogInformation($"AppSecret length: {AppSecret?.Length}");
+				_logger.LogInformation($"RedirectUri: {redirectUri}");
+				_logger.LogInformation($"Code length: {code?.Length}");
+				_logger.LogInformation($"Code preview: {code?.Substring(0, Math.Min(20, code?.Length ?? 0))}...");
+
+				using var client = new HttpClient();
+
+				// ШАГ 1: Обмен кода на КРАТКОВРЕМЕННЫЙ токен (1 час)
+				var shortLivedRequest = new HttpRequestMessage(HttpMethod.Post,
+					"https://api.instagram.com/oauth/access_token");
+
+				var formData = new Dictionary<string, string>
+				{
+					["client_id"] = AppId,
+					["client_secret"] = AppSecret,
+					["grant_type"] = "authorization_code",
+					["redirect_uri"] = redirectUri,
+					["code"] = code
+				};
+
+				shortLivedRequest.Content = new FormUrlEncodedContent(formData);
+
+				var shortLivedResponse = await client.SendAsync(shortLivedRequest);
+				var shortLivedJson = await shortLivedResponse.Content.ReadAsStringAsync();
+				var shortLivedToken = JsonConvert.DeserializeObject<InstagramShortLivedToken>(shortLivedJson);
+
+				// Логируем получение кратковременного токена
+				_logger.LogInformation("Short-lived token obtained. User ID: {UserId}",
+					shortLivedToken.UserId);
+
+				// ШАГ 2: Обмен КРАТКОВРЕМЕННОГО на ДОЛГОВРЕМЕННЫЙ токен (60 дней)
+				// ВАЖНО: Используем graph.instagram.com, НЕ graph.facebook.com!
+				var longLivedUrl = $"https://graph.instagram.com/access_token" +
+					$"?grant_type=ig_exchange_token" +
+					$"&client_secret={Uri.EscapeDataString(AppSecret)}" +
+					$"&access_token={Uri.EscapeDataString(shortLivedToken.AccessToken)}";
+
+				var longLivedResponse = await client.GetAsync(longLivedUrl);
+				var longLivedJson = await longLivedResponse.Content.ReadAsStringAsync();
+				var longLivedToken = JsonConvert.DeserializeObject<InstagramLongLivedToken>(longLivedJson);
+
+				// ШАГ 3: Сохраняем токен с датой истечения
+				var expiresAt = DateTime.UtcNow.AddSeconds(longLivedToken.ExpiresIn);
+
+				_logger.LogInformation("Long-lived token obtained. Expires at: {ExpiresAt}", expiresAt);
+				_logger.LogInformation($"Long-lived token ={longLivedToken.AccessToken}");
+
+				return new InstagramTokenResponse
+				{
+					AccessToken = longLivedToken.AccessToken,
+					UserId = shortLivedToken.UserId
+					//ExpiresAt = expiresAt,
+					//Permissions = shortLivedToken.Permissions?.Split(',').ToList()
+				};
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "Error exchanging code for token");
+				throw;
+			}
+		}
 	}
 }
