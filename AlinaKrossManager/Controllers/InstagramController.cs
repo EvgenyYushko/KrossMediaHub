@@ -537,7 +537,7 @@ namespace AlinaKrossManager.Controllers
 
 		// Конфигурация из appsettings.json
 		private string AppId => "1130517405203905";//_configuration["Instagram:AppId"];
-		private string AppSecret => _configuration["Instagram:AppSecret"];
+		private string AppSecret => "190d6d42309964b51d0203d0520b36b3";//_configuration["Instagram:AppSecret"];
 		private string BaseUrl => "https://krossmediahub.onrender.com/";//_configuration["Instagram:BaseUrl"];
 
 		// Генерация CSRF токена
