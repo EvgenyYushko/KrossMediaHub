@@ -84,55 +84,56 @@ namespace AlinaKrossManager.Controllers
 		{
 			try
 			{
-				_logger.LogInformation($"Instagram callback received. Code: {code}, State: {state}");
+				_logger.LogInformation($"=== Callback received ===");
+				_logger.LogInformation($"Raw code: {code?.Substring(0, Math.Min(20, code?.Length ?? 0))}...");
+				_logger.LogInformation($"Raw state: {state}");
 
-				if (string.IsNullOrEmpty(code))
-				{
-					return BadRequest(new { error = "Code parameter is required" });
-				}
+				string userId = "unknown";
 
-				// Если state есть - декодируем, если нет - создаем новый userId
-				string userId;
 				if (!string.IsNullOrEmpty(state))
 				{
-					// Декодируем state если он был передан
-					var decodedState = Uri.UnescapeDataString(state);
-					var stateData = JsonConvert.DeserializeObject<dynamic>(decodedState);
-					userId = stateData?.user_id?.ToString() ?? "unknown";
-				}
-				else
-				{
-					// Если state не пришел, генерируем новый userId из кода
-					userId = $"instagram_{Guid.NewGuid():N}";
+					try
+					{
+						// Декодируем URL-кодирование
+						var decodedState = HttpUtility.UrlDecode(state);
+						_logger.LogInformation($"Decoded state: {decodedState}");
+
+						// Убираем экранирование кавычек
+						var unescapedState = decodedState.Replace("\\\"", "\"");
+						_logger.LogInformation($"Unescaped state: {unescapedState}");
+
+						var stateData = JsonConvert.DeserializeObject<InstagramAuthState>(unescapedState);
+						if (stateData != null)
+						{
+							userId = stateData.UserId ?? "unknown";
+							_logger.LogInformation($"Extracted user_id: {userId}");
+						}
+					}
+					catch (Exception ex)
+					{
+						_logger.LogError(ex, "Failed to parse state");
+					}
 				}
 
-				// Обмениваем код на токен
+				// Исправляем redirectUri - убираем двойной слеш
 				var redirectUri = "https://krossmediahub.onrender.com/instagram/auth/callback";
+
 				var tokenResponse = await _oauthService.ExchangeCodeForTokenAsync(code, redirectUri);
-
-				_logger.LogInformation($"Token exchange successful for user {userId}");
-
-				// Сохраняем токен (здесь ваша логика сохранения в БД)
-				// await SaveInstagramToken(userId, tokenResponse);
 
 				return Ok(new
 				{
 					success = true,
 					message = "Instagram успешно подключен!",
 					user_id = userId,
-					access_token = tokenResponse.AccessToken,
-					instagram_user_id = tokenResponse.UserId,
-					expires_in = tokenResponse.ExpiresIn
+					access_token = tokenResponse?.AccessToken?.Substring(0, Math.Min(20, tokenResponse?.AccessToken?.Length ?? 0)) + "...",
+					instagram_user_id = tokenResponse?.UserId,
+					expires_in = tokenResponse?.ExpiresIn
 				});
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "Error in Instagram OAuth callback");
-				return StatusCode(500, new
-				{
-					error = "Failed to process Instagram authorization",
-					details = ex.Message
-				});
+				_logger.LogError(ex, "Error in OAuth callback");
+				return StatusCode(500, new { error = ex.Message });
 			}
 		}
 
@@ -629,31 +630,41 @@ namespace AlinaKrossManager.Controllers
 		{
 			try
 			{
+				_logger.LogInformation($"=== Starting token exchange ===");
+				_logger.LogInformation($"AppId: {AppId}");
+				_logger.LogInformation($"AppSecret length: {AppSecret?.Length}");
+				_logger.LogInformation($"RedirectUri: {redirectUri}");
+				_logger.LogInformation($"Code length: {code?.Length}");
+				_logger.LogInformation($"Code preview: {code?.Substring(0, Math.Min(20, code?.Length ?? 0))}...");
+
 				using var httpClient = new HttpClient();
 
 				var content = new FormUrlEncodedContent(new[]
 				{
-				new KeyValuePair<string, string>("client_id", AppId),
-				new KeyValuePair<string, string>("client_secret", AppSecret),
-				new KeyValuePair<string, string>("grant_type", "authorization_code"),
-				new KeyValuePair<string, string>("redirect_uri", redirectUri),
-				new KeyValuePair<string, string>("code", code)
-			});
+			new KeyValuePair<string, string>("client_id", AppId),
+			new KeyValuePair<string, string>("client_secret", AppSecret),
+			new KeyValuePair<string, string>("grant_type", "authorization_code"),
+			new KeyValuePair<string, string>("redirect_uri", redirectUri),
+			new KeyValuePair<string, string>("code", code)
+		});
 
+				_logger.LogInformation("Sending request to Instagram...");
 				var response = await httpClient.PostAsync(INSTAGRAM_TOKEN_URL, content);
+
+				var responseContent = await response.Content.ReadAsStringAsync();
+				_logger.LogInformation($"Response Status: {response.StatusCode}");
+				_logger.LogInformation($"Response Body: {responseContent}");
 
 				if (!response.IsSuccessStatusCode)
 				{
-					var errorContent = await response.Content.ReadAsStringAsync();
-					_logger.LogError($"Token exchange failed: {errorContent}");
-					throw new Exception($"Token exchange failed: {response.StatusCode}");
+					_logger.LogError($"Token exchange failed: {responseContent}");
+					throw new Exception($"Token exchange failed: {response.StatusCode} - {responseContent}");
 				}
 
-				var responseContent = await response.Content.ReadAsStringAsync();
 				var tokenResponse = JsonConvert.DeserializeObject<InstagramTokenResponse>(responseContent);
-
-				// Получаем дополнительную информацию о пользователе
-				await EnrichTokenWithUserInfo(tokenResponse);
+				_logger.LogInformation($"Token received successfully. User ID: {tokenResponse?.UserId}");
+				_logger.LogInformation($"Access token preview: {tokenResponse?.AccessToken?.Substring(0, Math.Min(20, tokenResponse?.AccessToken?.Length ?? 0))}...");
+				_logger.LogInformation($"=== Token exchange completed ===");
 
 				return tokenResponse;
 			}
