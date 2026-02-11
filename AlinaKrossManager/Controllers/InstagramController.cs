@@ -5,7 +5,6 @@ using System.Web;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
-using static System.Net.WebRequestMethods;
 
 namespace AlinaKrossManager.Controllers
 {
@@ -78,63 +77,62 @@ namespace AlinaKrossManager.Controllers
 		[HttpGet("auth/callback")]
 		public async Task<IActionResult> OAuthCallback(
 			[FromQuery] string code,
-			[FromQuery] string state,
+			[FromQuery] string state = null,
 			[FromQuery] string error = null,
 			[FromQuery] string error_reason = null,
 			[FromQuery] string error_description = null)
 		{
 			try
 			{
-				// Проверяем ошибки от Instagram
-				if (!string.IsNullOrEmpty(error))
+				_logger.LogInformation($"Instagram callback received. Code: {code}, State: {state}");
+
+				if (string.IsNullOrEmpty(code))
 				{
-					_logger.LogWarning($"Instagram OAuth error: {error} - {error_description}");
-					return Redirect($"https://krossmediahub.onrender.com/error?error={error}&reason={error_reason}");
+					return BadRequest(new { error = "Code parameter is required" });
 				}
 
-				if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
+				// Если state есть - декодируем, если нет - создаем новый userId
+				string userId;
+				if (!string.IsNullOrEmpty(state))
 				{
-					return BadRequest(new { error = "Missing code or state parameters" });
+					// Декодируем state если он был передан
+					var decodedState = Uri.UnescapeDataString(state);
+					var stateData = JsonConvert.DeserializeObject<dynamic>(decodedState);
+					userId = stateData?.user_id?.ToString() ?? "unknown";
 				}
-
-				// Декодируем state
-				InstagramAuthState stateData;
-				try
+				else
 				{
-					var decodedState = HttpUtility.UrlDecode(state);
-					stateData = JsonConvert.DeserializeObject<InstagramAuthState>(decodedState);
-
-					if (stateData == null)
-						throw new Exception("Invalid state format");
-				}
-				catch
-				{
-					return BadRequest(new { error = "Invalid state parameter" });
+					// Если state не пришел, генерируем новый userId из кода
+					userId = $"instagram_{Guid.NewGuid():N}";
 				}
 
 				// Обмениваем код на токен
-				var tokenResponse = await _oauthService.ExchangeCodeForTokenAsync(
-					code,
-					stateData.CallbackUrl);
+				var redirectUri = "https://krossmediahub.onrender.com/instagram/auth/callback";
+				var tokenResponse = await _oauthService.ExchangeCodeForTokenAsync(code, redirectUri);
 
-				// Сохраняем токен в базе данных
-				//await SaveUserToken(stateData.UserId, tokenResponse);
+				_logger.LogInformation($"Token exchange successful for user {userId}");
 
-				//// Генерируем вебхук для этого пользователя
-				//await SetupInstagramWebhooks(stateData.UserId, tokenResponse.AccessToken);
+				// Сохраняем токен (здесь ваша логика сохранения в БД)
+				// await SaveInstagramToken(userId, tokenResponse);
 
-				// Перенаправляем на страницу успеха
-				//var successUrl = $"{_configuration["Client:BaseUrl"]}/success?" +
-				//			   $"user_id={stateData.UserId}&" +
-				//			   $"platform=instagram&" +
-				//			   $"timestamp={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
-				Console.WriteLine("Token=" + tokenResponse.AccessToken);
-				return Ok();
+				return Ok(new
+				{
+					success = true,
+					message = "Instagram успешно подключен!",
+					user_id = userId,
+					access_token = tokenResponse.AccessToken,
+					instagram_user_id = tokenResponse.UserId,
+					expires_in = tokenResponse.ExpiresIn
+				});
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "Error in OAuth callback");
-				return Redirect($"{_configuration["Client:BaseUrl"]}/error?message=auth_failed");
+				_logger.LogError(ex, "Error in Instagram OAuth callback");
+				return StatusCode(500, new
+				{
+					error = "Failed to process Instagram authorization",
+					details = ex.Message
+				});
 			}
 		}
 
@@ -670,6 +668,8 @@ namespace AlinaKrossManager.Controllers
 		{
 			try
 			{
+				_logger.LogInformation($"Token: {tokenResponse.AccessToken}");
+
 				using var httpClient = new HttpClient();
 
 				var url = $"{INSTAGRAM_GRAPH_URL}/me?" +
