@@ -60,7 +60,7 @@ namespace AlinaKrossManager.Controllers
 				_cache.Set(cacheKey, attempts + 1);
 
 				// Генерируем ссылку
-				var authUrl = _oauthService.GenerateInstagramOAuthUrl(userId);
+				var authUrl = _oauthService.GenerateSimpleOAuthUrl(userId);
 
 				_logger.LogInformation($"Auth URL generated for user {userId}");
 
