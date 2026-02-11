@@ -125,8 +125,8 @@ namespace AlinaKrossManager.Controllers
 					success = true,
 					message = "Instagram успешно подключен!",
 					user_id = userId,
+					instagram_user_id = tokenResponse.UserId.ToString(),
 					access_token = tokenResponse?.AccessToken?.Substring(0, Math.Min(20, tokenResponse?.AccessToken?.Length ?? 0)) + "...",
-					instagram_user_id = tokenResponse?.UserId,
 					expires_in = tokenResponse?.ExpiresIn
 				});
 			}
@@ -637,36 +637,55 @@ namespace AlinaKrossManager.Controllers
 				_logger.LogInformation($"Code length: {code?.Length}");
 				_logger.LogInformation($"Code preview: {code?.Substring(0, Math.Min(20, code?.Length ?? 0))}...");
 
-				using var httpClient = new HttpClient();
+				using var client = new HttpClient();
 
-				var content = new FormUrlEncodedContent(new[]
+				// ШАГ 1: Обмен кода на КРАТКОВРЕМЕННЫЙ токен (1 час)
+				var shortLivedRequest = new HttpRequestMessage(HttpMethod.Post,
+					"https://api.instagram.com/oauth/access_token");
+
+				var formData = new Dictionary<string, string>
 				{
-			new KeyValuePair<string, string>("client_id", AppId),
-			new KeyValuePair<string, string>("client_secret", AppSecret),
-			new KeyValuePair<string, string>("grant_type", "authorization_code"),
-			new KeyValuePair<string, string>("redirect_uri", redirectUri),
-			new KeyValuePair<string, string>("code", code)
-		});
+					["client_id"] = AppId,
+					["client_secret"] = AppSecret, 
+					["grant_type"] = "authorization_code",
+					["redirect_uri"] = redirectUri,
+					["code"] = code
+				};
 
-				_logger.LogInformation("Sending request to Instagram...");
-				var response = await httpClient.PostAsync(INSTAGRAM_TOKEN_URL, content);
+				shortLivedRequest.Content = new FormUrlEncodedContent(formData);
 
-				var responseContent = await response.Content.ReadAsStringAsync();
-				_logger.LogInformation($"Response Status: {response.StatusCode}");
-				_logger.LogInformation($"Response Body: {responseContent}");
+				var shortLivedResponse = await client.SendAsync(shortLivedRequest);
+				var shortLivedJson = await shortLivedResponse.Content.ReadAsStringAsync();
+				var shortLivedToken = JsonConvert.DeserializeObject<InstagramShortLivedToken>(shortLivedJson);
 
-				if (!response.IsSuccessStatusCode)
+				// Логируем получение кратковременного токена
+				_logger.LogInformation("Short-lived token obtained. User ID: {UserId}",
+					shortLivedToken.UserId);
+
+				// ШАГ 2: Обмен КРАТКОВРЕМЕННОГО на ДОЛГОВРЕМЕННЫЙ токен (60 дней)
+				// ВАЖНО: Используем graph.instagram.com, НЕ graph.facebook.com!
+				var longLivedUrl = $"https://graph.instagram.com/access_token" +
+					$"?grant_type=ig_exchange_token" +
+					$"&client_secret={Uri.EscapeDataString(AppSecret)}" +
+					$"&access_token={Uri.EscapeDataString(shortLivedToken.AccessToken)}";
+
+				var longLivedResponse = await client.GetAsync(longLivedUrl);
+				var longLivedJson = await longLivedResponse.Content.ReadAsStringAsync();
+				var longLivedToken = JsonConvert.DeserializeObject<InstagramLongLivedToken>(longLivedJson);
+	
+				// ШАГ 3: Сохраняем токен с датой истечения
+				var expiresAt = DateTime.UtcNow.AddSeconds(longLivedToken.ExpiresIn);
+
+				_logger.LogInformation("Long-lived token obtained. Expires at: {ExpiresAt}", expiresAt);
+				_logger.LogInformation($"Long-lived token ={longLivedToken.AccessToken}");
+
+				return new InstagramTokenResponse
 				{
-					_logger.LogError($"Token exchange failed: {responseContent}");
-					throw new Exception($"Token exchange failed: {response.StatusCode} - {responseContent}");
-				}
-
-				var tokenResponse = JsonConvert.DeserializeObject<InstagramTokenResponse>(responseContent);
-				_logger.LogInformation($"Token received successfully. User ID: {tokenResponse?.UserId}");
-				_logger.LogInformation($"Access token preview: {tokenResponse?.AccessToken?.Substring(0, Math.Min(20, tokenResponse?.AccessToken?.Length ?? 0))}...");
-				_logger.LogInformation($"=== Token exchange completed ===");
-
-				return tokenResponse;
+					AccessToken = longLivedToken.AccessToken,
+					UserId = shortLivedToken.UserId
+					//ExpiresAt = expiresAt,
+					//Permissions = shortLivedToken.Permissions?.Split(',').ToList()
+				};
 			}
 			catch (Exception ex)
 			{
@@ -683,7 +702,7 @@ namespace AlinaKrossManager.Controllers
 
 				using var httpClient = new HttpClient();
 
-				var url = $"{INSTAGRAM_GRAPH_URL}/me?" +
+				var url = $"{INSTAGRAM_GRAPH_URL}/{tokenResponse.UserId}?" +
 						 $"fields=id,username,account_type&" +
 						 $"access_token={tokenResponse.AccessToken}";
 
@@ -716,7 +735,29 @@ namespace AlinaKrossManager.Controllers
 	}
 
 	#region Models
+	public class InstagramShortLivedToken
+	{
+		[JsonPropertyName("access_token")]
+		public string AccessToken { get; set; }
 
+		[JsonPropertyName("user_id")]
+		public long UserId { get; set; }
+
+		[JsonPropertyName("permissions")]
+		public string Permissions { get; set; }
+	}
+
+	public class InstagramLongLivedToken
+	{
+		[JsonPropertyName("access_token")]
+		public string AccessToken { get; set; }
+
+		[JsonPropertyName("token_type")]
+		public string TokenType { get; set; }
+
+		[JsonPropertyName("expires_in")]
+		public int ExpiresIn { get; set; }
+	}
 	// Models/InstagramAuthModels.cs
 	public class InstagramAuthState
 	{
@@ -742,7 +783,7 @@ namespace AlinaKrossManager.Controllers
 		public string AccessToken { get; set; }
 
 		[JsonPropertyName("user_id")]
-		public string UserId { get; set; }
+		public long UserId { get; set; }
 
 		[JsonPropertyName("expires_in")]
 		public int ExpiresIn { get; set; }
