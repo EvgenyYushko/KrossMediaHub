@@ -28,6 +28,9 @@ builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddMemoryCache();
+
 string GetConfigOrThrow(string key)
 {
 	var value = builder.Configuration.GetValue<string>(key) ?? Environment.GetEnvironmentVariable(key);
@@ -39,6 +42,8 @@ string GetConfigOrThrow(string key)
 	}
 	return value;
 }
+
+builder.Services.AddScoped<InstagramOAuthService>();
 
 builder.Services.AddSingleton<ITelegramBotClient>(provider =>
 {
@@ -237,6 +242,7 @@ using (var scope = app.Services.CreateScope())
 	}
 }
 app.UseStaticFiles();
+app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/", () => "Service is running! 🚀");
