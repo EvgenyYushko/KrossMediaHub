@@ -646,7 +646,7 @@ namespace AlinaKrossManager.Controllers
 				var formData = new Dictionary<string, string>
 				{
 					["client_id"] = AppId,
-					["client_secret"] = AppSecret, 
+					["client_secret"] = AppSecret,
 					["grant_type"] = "authorization_code",
 					["redirect_uri"] = redirectUri,
 					["code"] = code
@@ -672,7 +672,7 @@ namespace AlinaKrossManager.Controllers
 				var longLivedResponse = await client.GetAsync(longLivedUrl);
 				var longLivedJson = await longLivedResponse.Content.ReadAsStringAsync();
 				var longLivedToken = JsonConvert.DeserializeObject<InstagramLongLivedToken>(longLivedJson);
-	
+
 				// ШАГ 3: Сохраняем токен с датой истечения
 				var expiresAt = DateTime.UtcNow.AddSeconds(longLivedToken.ExpiresIn);
 
@@ -743,8 +743,13 @@ namespace AlinaKrossManager.Controllers
 		[JsonPropertyName("user_id")]
 		public long UserId { get; set; }
 
+		// Исправляем: permissions - это МАССИВ, а не строка!
 		[JsonPropertyName("permissions")]
-		public string Permissions { get; set; }
+		public List<string> Permissions { get; set; }
+
+		// Добавляем для отладки
+		[System.Text.Json.Serialization.JsonIgnore]
+		public string RawResponse { get; set; }
 	}
 
 	public class InstagramLongLivedToken
@@ -789,56 +794,6 @@ namespace AlinaKrossManager.Controllers
 		public int ExpiresIn { get; set; }
 	}
 
-	//public class InstagramWebhookPayload
-	//{
-	//	[JsonPropertyName("object")]
-	//	public string Object { get; set; }
-
-	//	[JsonPropertyName("entry")]
-	//	public List<InstagramWebhookEntry> Entry { get; set; }
-	//}
-
-	public class InstagramWebhookEntry
-	{
-		[JsonPropertyName("id")]
-		public string Id { get; set; }
-
-		[JsonPropertyName("time")]
-		public long Time { get; set; }
-
-		[JsonPropertyName("messaging")]
-		public List<InstagramMessagingEvent> Messaging { get; set; }
-	}
-
-	public class InstagramMessagingEvent
-	{
-		[JsonPropertyName("sender")]
-		public InstagramUser Sender { get; set; }
-
-		[JsonPropertyName("recipient")]
-		public InstagramUser Recipient { get; set; }
-
-		[JsonPropertyName("timestamp")]
-		public long Timestamp { get; set; }
-
-		[JsonPropertyName("message")]
-		public InstagramMessage Message { get; set; }
-	}
-
-	public class InstagramUser
-	{
-		[JsonPropertyName("id")]
-		public string Id { get; set; }
-	}
-
-	public class InstagramMessage
-	{
-		[JsonPropertyName("mid")]
-		public string Mid { get; set; }
-
-		[JsonPropertyName("text")]
-		public string Text { get; set; }
-	}
 
 	#endregion
 }
