@@ -3,6 +3,7 @@ using System.Web;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using static AlinaKrossManager.Controllers.InstagramController;
 
 namespace AlinaKrossManager.Controllers
@@ -302,13 +303,56 @@ namespace AlinaKrossManager.Controllers
 
 				var longLivedResponse = await client.GetAsync(longLivedUrl);
 				var longLivedJson = await longLivedResponse.Content.ReadAsStringAsync();
-				var longLivedToken = JsonConvert.DeserializeObject<InstagramLongLivedToken>(longLivedJson);
 
-				// ШАГ 3: Сохраняем токен с датой истечения
+				_logger.LogInformation($"Long-lived RAW JSON: {longLivedJson}");
+
+				if (!longLivedResponse.IsSuccessStatusCode)
+				{
+					_logger.LogError($"Long-lived token error: {longLivedResponse.StatusCode}, Body: {longLivedJson}");
+					throw new Exception($"Long-lived token error: {longLivedJson}");
+				}
+
+				var longObj = JObject.Parse(longLivedJson);
+				var longLivedToken = new InstagramLongLivedToken
+				{
+					AccessToken = longObj["access_token"]?.ToString(),
+					TokenType = longObj["token_type"]?.ToString() ?? "bearer",
+					ExpiresIn = longObj["expires_in"]?.Value<int>() ?? 0
+				};
+
+				// ПРОВЕРКА: если токен null - показываем всю структуру JSON
+				if (string.IsNullOrEmpty(longLivedToken.AccessToken))
+				{
+					_logger.LogError($"LONG-LIVED TOKEN IS NULL! Full JSON: {longLivedJson}");
+					_logger.LogError($"Available fields: {string.Join(", ", longObj.Properties().Select(p => p.Name))}");
+
+					// Может быть под другим именем?
+					var possibleTokens = new[] { "access_token", "access-token", "token", "data.access_token" };
+					foreach (var field in possibleTokens)
+					{
+						var token = longObj.SelectToken(field)?.ToString();
+						if (!string.IsNullOrEmpty(token))
+						{
+							_logger.LogInformation($"Found token at field '{field}': {token.Substring(0, 15)}...");
+							longLivedToken.AccessToken = token;
+							break;
+						}
+					}
+				}
+
 				var expiresAt = DateTime.UtcNow.AddSeconds(longLivedToken.ExpiresIn);
 
-				_logger.LogInformation("Long-lived token obtained. Expires at: {ExpiresAt}", expiresAt);
-				_logger.LogInformation($"Long-lived token ={longLivedToken.AccessToken}");
+				// ТЕПЕРЬ ЛОГИРУЕМ ТОКЕН (обрезанный для безопасности)
+				_logger.LogInformation($"Long-lived token obtained. Expires at: {expiresAt}");
+				if (!string.IsNullOrEmpty(longLivedToken.AccessToken))
+				{
+					_logger.LogInformation($"Long-lived token preview: {longLivedToken.AccessToken.Substring(0, 15)}...{longLivedToken.AccessToken.Substring(longLivedToken.AccessToken.Length - 10)}");
+					_logger.LogInformation($"Long-lived token length: {longLivedToken.AccessToken.Length}");
+				}
+				else
+				{
+					_logger.LogError($"LONG-LIVED TOKEN IS STILL NULL AFTER PARSING!");
+				}
 
 				return new InstagramTokenResponse
 				{
