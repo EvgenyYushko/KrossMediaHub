@@ -215,9 +215,6 @@ namespace AlinaKrossManager.Controllers
 			_logger = logger;
 		}
 
-		private const string INSTAGRAM_OAUTH_URL = "https://www.instagram.com/consent/?flow=ig_biz_login_oauth";
-		private const string INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
-		private const string INSTAGRAM_GRAPH_URL = "https://graph.instagram.com";
 
 		// Конфигурация из appsettings.json
 		private string AppId => "1130517405203905";//_configuration["Instagram:AppId"];
@@ -242,8 +239,7 @@ namespace AlinaKrossManager.Controllers
 				UserId = userId,
 				Provider = "instagram",
 				Token = csrfToken,
-				CallbackUrl = $"{BaseUrl}/instagram/auth/callback",
-				MessagesCallback = $"{BaseUrl}/instagram/webhook"
+				CallbackUrl = $"{BaseUrl}/instagram/auth/callback"
 			};
 
 			var stateJson = JsonConvert.SerializeObject(state);
@@ -252,7 +248,7 @@ namespace AlinaKrossManager.Controllers
 			return $"https://api.instagram.com/oauth/authorize?" +
 				   $"client_id={AppId}&" +
 				   $"redirect_uri={HttpUtility.UrlEncode($"{BaseUrl}/instagram/auth/callback")}&" +
-				   $"scope=instagram_business_basic,instagram_business_manage_messages&" +
+				   $"scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments, instagram_business_content_publish&" +
 				   $"response_type=code&" +
 				   $"state={encodedState}";
 		}
