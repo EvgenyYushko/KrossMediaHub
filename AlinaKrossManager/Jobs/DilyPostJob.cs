@@ -12,7 +12,7 @@ namespace AlinaKrossManager.Jobs
 	[DisallowConcurrentExecution]
 	public class DilyPostJob : SchedulerJob
 	{
-		public static string Time => "0 0 10,14,18 * * ?";
+		public static string Time => "0 20 10,14,18 * * ?";
 
 		private readonly InstagramService _instagramService;
 		private readonly TelegramService _telegramService;
@@ -113,8 +113,6 @@ namespace AlinaKrossManager.Jobs
 			//	images.Reverse();
 			//}
 
-			return;
-
 			Message[] loadedPictureMessages = null;
 			try
 			{
@@ -132,6 +130,8 @@ namespace AlinaKrossManager.Jobs
 			{
 				Console.WriteLine(e.ToString());
 			}
+
+			return;
 
 			string description = "";
 			try
