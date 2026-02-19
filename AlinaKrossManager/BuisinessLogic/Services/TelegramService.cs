@@ -127,6 +127,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 		public async Task<bool> CanUseBot(Update update, CancellationToken ct)
 		{
+			if (update.CallbackQuery != null)
+			{
+				return update.CallbackQuery.From.Id == EVGENY_YUSHKO_TG_ID;
+			}
+
 			if (update.Message.Chat.Id != EVGENY_YUSHKO_TG_ID || update.Message.Chat.Type is not ChatType.Private)
 			{
 				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "Данная комманда доступна только в ЛС чата, и только для его администратора!");

@@ -7,9 +7,9 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 {
 	public partial class InstagramService
 	{
-		private const string _alinaKrossId = "17841477563266256";
+		private const string _alinaKrossId = "17841477563266256"; // 2617983501879205 
 		private const string _alinaKrossName = "alina.kross.ai";
-		private const string _evgenyYushkoId = "1307933750574022";
+		private const string _evgenyYushkoId = "1307933750574022"; // 26256314783964729
 
 		public async Task ProcessChange(InstagramChange change)
 		{
