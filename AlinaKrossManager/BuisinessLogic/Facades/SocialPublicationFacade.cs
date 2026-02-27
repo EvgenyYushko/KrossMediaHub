@@ -228,6 +228,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					break;
 				case NetworkType.BlueSky:
 					{
+						break;
 						await BlueSkyPost(caption, files, null);
 						//try { await _telegramService.SendMessage("✅ Post bluesky success!"); } catch { }
 					}
