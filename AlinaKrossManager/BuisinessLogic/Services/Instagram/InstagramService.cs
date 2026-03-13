@@ -5,8 +5,8 @@ using System.Text.Json.Serialization;
 using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.Services;
-using static AlinaKrossManager.Helpers.Logger;
 using static AlinaKrossManager.Constants.AppConstants;
+using static AlinaKrossManager.Helpers.Logger;
 
 namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 {
@@ -521,34 +521,49 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		public async Task<string> PublishStoryFromBase64(string base64Img)
 		{
+			if (string.IsNullOrEmpty(base64Img))
+			{
+				Log("❌ No media provided for story");
+				return null;
+			}
+
+			// Запускаем фоновую чистку старого мусора (на случай прошлых падений сервера)
+			CleanupOldTempFiles();
+
+			string localFilePath = null; // Переменная для отслеживания пути к файлу для удаления
+
 			try
 			{
-				if (base64Img == null)
+				// 1. Сохраняем файл на свой сервер (вместо ImgBB)
+				var (mediaUrl, localPath) = await SaveMediaLocallyAsync(base64Img);
+				localFilePath = localPath; // Запоминаем путь, чтобы удалить в finally
+
+				if (string.IsNullOrEmpty(mediaUrl))
 				{
-					Log("❌ No media provided for story");
+					Log($"❌ Не удалось получить ссылку на локальное медиа");
 					return null;
 				}
 
-				var imageUrl = await UploadToImgBBAsync(base64Img);
-				if (imageUrl is null)
-				{
-					Log($"Не получили ссылку на изображение");
-					return null;
-				}
+				Log($"✅ Файл для сторис сохранен локально. Ссылка: {mediaUrl}");
+
+				// 2. Определяем тип медиа (Instagram требует VIDEO для mp4 и IMAGE для фото)
+				string mediaType = mediaUrl.EndsWith(".mp4") ? "VIDEO" : "IMAGE";
 
 				var media = new InstagramMedia
 				{
-					Media_Type = "IMAGE",
-					Media_Url = imageUrl,
+					Media_Type = mediaType,
+					Media_Url = mediaUrl,
 				};
 
+				// 3. Создаем контейнер для сторис
 				var containerId = await CreateStoryContainer(media);
 				if (string.IsNullOrEmpty(containerId))
 				{
+					Log("❌ Не удалось создать контейнер для сторис");
 					return null;
 				}
 
-				// Ждем и публикуем БЕЗ ССЫЛКИ
+				// 4. Ждем готовности медиа и публикуем
 				var storyId = await WaitAndPublishContainer(containerId);
 
 				if (!string.IsNullOrEmpty(storyId))
@@ -563,6 +578,23 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			{
 				Log(ex, "❌ Error publishing regular story");
 				return null;
+			}
+			finally
+			{
+				// 5. ГАРАНТИРОВАННАЯ ОЧИСТКА
+				// Этот блок выполнится всегда: и при успехе, и при ошибке (например, если Instagram отклонил файл)
+				if (!string.IsNullOrEmpty(localFilePath) && File.Exists(localFilePath))
+				{
+					try
+					{
+						File.Delete(localFilePath);
+						Log($"🗑️ Временный файл сторис удален: {localFilePath}");
+					}
+					catch (Exception ex)
+					{
+						Log(ex, $"⚠️ Не удалось удалить временный файл сторис {localFilePath}");
+					}
+				}
 			}
 		}
 
