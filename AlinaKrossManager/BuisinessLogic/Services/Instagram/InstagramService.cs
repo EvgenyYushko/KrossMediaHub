@@ -6,6 +6,7 @@ using AlinaKrossManager.BuisinessLogic.Instagram;
 using AlinaKrossManager.BuisinessLogic.Services.Base;
 using AlinaKrossManager.Services;
 using static AlinaKrossManager.Helpers.Logger;
+using static AlinaKrossManager.Constants.AppConstants;
 
 namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 {
@@ -46,72 +47,101 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 			Console.WriteLine("CreateMediaAsync - Start");
 
-			ContainerResult containerResult;
+			// Запускаем фоновую чистку старого мусора (на случай прошлых падений)
+			CleanupOldTempFiles();
 
-			if (base64Strings.Count == 1)
+			// Список для отслеживания созданных локальных файлов
+			var tempFilesTracker = new List<string>();
+
+			try
 			{
-				// Одиночное изображение
-				containerResult = await CreateSingleMediaContainerAsync(base64Strings[0], caption);
+				ContainerResult containerResult;
+
+				if (base64Strings.Count == 1)
+				{
+					// Одиночное изображение
+					containerResult = await CreateSingleMediaContainerAsync(base64Strings[0], caption, tempFilesTracker);
+				}
+				else if (base64Strings.Count <= 10)
+				{
+					// Карусель
+					containerResult = await CreateCarouselContainerAsync(base64Strings, caption, tempFilesTracker);
+				}
+				else
+				{
+					throw new ArgumentException("Instagram позволяет не более 10 изображений в одном посте");
+				}
+
+				if (containerResult == null || string.IsNullOrEmpty(containerResult.Id))
+					throw new Exception("Не удалось создать контейнер");
+
+				Console.WriteLine($"Контейнер создан: {containerResult.Id}");
+
+				// ЖДЕМ пока медиа станет готовым к публикации
+				var isReady = await WaitForMediaReadyAsync(containerResult.Id);
+				if (!isReady)
+				{
+					throw new Exception($"Медиа {containerResult.Id} не готово к публикации после ожидания");
+				}
+
+				Console.WriteLine($"Медиа {containerResult.Id} готово к публикации");
+
+				// Публикуем
+				var container = await PublishContainerAsync(containerResult.Id);
+				container.ExternalContentUrl = containerResult.ExternalContentUrl;
+				return container;
 			}
-			else if (base64Strings.Count <= 10) // Instagram позволяет до 10 фото в карусели
+			finally
 			{
-				// Карусель из нескольких изображений
-				containerResult = await CreateCarouselContainerAsync(base64Strings, caption);
+				// === ГАРАНТИРОВАННОЕ УДАЛЕНИЕ ФАЙЛОВ ===
+				// Выполняется всегда, даже если произошла ошибка публикации
+				foreach (var localPath in tempFilesTracker)
+				{
+					try
+					{
+						if (File.Exists(localPath))
+						{
+							File.Delete(localPath);
+							Console.WriteLine($"Удален временный файл: {localPath}");
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"Не удалось удалить файл {localPath}: {ex.Message}");
+					}
+				}
 			}
-			else
-			{
-				throw new ArgumentException("Instagram позволяет не более 10 изображений в одном посте");
-			}
-
-			if (string.IsNullOrEmpty(containerResult.Id))
-				throw new Exception("Не удалось создать контейнер");
-
-			Console.WriteLine($"Контейнер создан: {containerResult}");
-
-			// ЖДЕМ пока медиа станет готовым к публикации
-			var isReady = await WaitForMediaReadyAsync(containerResult.Id);
-			if (!isReady)
-			{
-				throw new Exception($"Медиа {containerResult} не готово к публикации после ожидания");
-			}
-
-			Console.WriteLine($"Медиа {containerResult} готово к публикации");
-
-			// Публикуем
-			var container = await PublishContainerAsync(containerResult.Id);
-			container.ExternalContentUrl = containerResult.ExternalContentUrl;
-			return container;
 		}
 
-		private async Task<ContainerResult> CreateSingleMediaContainerAsync(string base64String, string caption = null)
+		private async Task<ContainerResult> CreateSingleMediaContainerAsync(string base64String, string caption, List<string> tempFilesTracker)
 		{
 			try
 			{
 				Console.WriteLine("CreateSingleMediaContainerAsync - Start");
 
-				var imageUrl = await UploadToImgBBAsync(base64String);
+				// Сохраняем на свой сервер
+				var (mediaUrl, localPath) = await SaveMediaLocallyAsync(base64String);
+				tempFilesTracker.Add(localPath); // Добавляем в трекер для последующего удаления
 
-				if (string.IsNullOrEmpty(imageUrl))
-				{
-					throw new Exception("Не удалось получить URL изображения от ImgBB");
-				}
+				Console.WriteLine($"Медиа доступно по ссылке: {mediaUrl}");
 
-				Console.WriteLine($"Изображение загружено на ImgBB: {imageUrl}");
-
-				// Проверьте доступность URL
-				using (var client = new HttpClient())
-				{
-					var headResponse = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, imageUrl));
-					if (!headResponse.IsSuccessStatusCode)
-					{
-						throw new Exception($"URL изображения недоступен: {imageUrl}");
-					}
-				}
+				// Учитываем тип: для видео нужен параметр media_type=VIDEO, для фото по умолчанию IMAGE
+				string mediaTypeParam = mediaUrl.EndsWith(".mp4") ? "&media_type=VIDEO" : "";
 
 				// Создаем контейнер для медиа
-				var containerUrl = $"me/media?image_url={Uri.EscapeDataString(imageUrl)}" +
-								  $"&caption={Uri.EscapeDataString(caption ?? "")}" +
-								  $"&access_token={_accessToken}";
+				var containerUrl = $"me/media?image_url={Uri.EscapeDataString(mediaUrl)}" +
+								   $"&caption={Uri.EscapeDataString(caption ?? "")}" +
+								   mediaTypeParam +
+								   $"&access_token={_accessToken}";
+
+				// Для видео Instagram ожидает video_url вместо image_url
+				if (mediaUrl.EndsWith(".mp4"))
+				{
+					containerUrl = $"me/media?video_url={Uri.EscapeDataString(mediaUrl)}" +
+								   $"&caption={Uri.EscapeDataString(caption ?? "")}" +
+								   "&media_type=VIDEO" +
+								   $"&access_token={_accessToken}";
+				}
 
 				var response = await _https.PostAsync(containerUrl, null);
 				var json = await response.Content.ReadAsStringAsync();
@@ -127,17 +157,17 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				return new ContainerResult
 				{
 					Id = doc.RootElement.GetProperty("id").GetString(),
-					ExternalContentUrl = imageUrl
+					ExternalContentUrl = mediaUrl
 				};
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Ошибка в CreateSingleMediaContainerAsync: {ex.Message}");
-				throw; // Пробрасываем исключение дальше, а не возвращаем null
+				throw;
 			}
 		}
 
-		private async Task<ContainerResult> CreateCarouselContainerAsync(List<string> base64Strings, string caption = null)
+		private async Task<ContainerResult> CreateCarouselContainerAsync(List<string> base64Strings, string caption, List<string> tempFilesTracker)
 		{
 			try
 			{
@@ -146,10 +176,18 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 				// Сначала создаем все дочерние контейнеры
 				foreach (var base64String in base64Strings)
 				{
-					var imageUrl = await UploadToImgBBAsync(base64String);
+					// Сохраняем на свой сервер
+					var (mediaUrl, localPath) = await SaveMediaLocallyAsync(base64String);
+					tempFilesTracker.Add(localPath); // Добавляем в трекер
 
-					// Создаем контейнер для этого изображения
-					var childUrl = $"me/media?image_url={Uri.EscapeDataString(imageUrl)}&access_token={_accessToken}";
+					string mediaTypeParam = mediaUrl.EndsWith(".mp4") ? "&media_type=VIDEO" : "";
+					var childUrl = $"me/media?image_url={Uri.EscapeDataString(mediaUrl)}{mediaTypeParam}&access_token={_accessToken}";
+
+					if (mediaUrl.EndsWith(".mp4"))
+					{
+						childUrl = $"me/media?video_url={Uri.EscapeDataString(mediaUrl)}&media_type=VIDEO&access_token={_accessToken}";
+					}
+
 					var childResponse = await _https.PostAsync(childUrl, null);
 					var childJson = await childResponse.Content.ReadAsStringAsync();
 
@@ -159,26 +197,24 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 						var childId = childDoc.RootElement.GetProperty("id").GetString();
 						childrenIds.Add(childId);
 
-						// Ждем немного между запросами
-						await Task.Delay(500);
+						await Task.Delay(500); // Ждем немного между запросами
 					}
 					else
 					{
 						Console.WriteLine($"Ошибка создания child: {childJson}");
+						throw new Exception($"Не удалось создать дочерний контейнер: {childJson}");
 					}
 				}
 
 				if (childrenIds.Count == 0)
 					throw new Exception("Не удалось создать ни одного дочернего контейнера");
 
-				// ВАЖНО: Используем form-data вместо JSON
 				var carouselUrl = $"me/media?access_token={_accessToken}";
 
 				var formData = new MultipartFormDataContent();
 				formData.Add(new StringContent("CAROUSEL"), "media_type");
 				formData.Add(new StringContent(caption ?? ""), "caption");
 
-				// Добавляем children как отдельные поля
 				for (int i = 0; i < childrenIds.Count; i++)
 				{
 					formData.Add(new StringContent(childrenIds[i]), $"children[{i}]");
@@ -201,7 +237,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Ошибка в CreateCarouselContainerAsync: {ex.Message}");
-				return null;
+				throw;
 			}
 		}
 
@@ -303,6 +339,76 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 					return url;
 				}
+			}
+		}
+
+		private async Task<(string PublicUrl, string LocalPath)> SaveMediaLocallyAsync(string base64String)
+		{
+			// Получаем пути
+			string webRootPath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+			string tempFolder = Path.Combine(webRootPath, "temp_media");
+
+			if (!Directory.Exists(tempFolder))
+			{
+				Directory.CreateDirectory(tempFolder);
+			}
+
+			// Определяем расширение файла из Base64 (по умолчанию .jpg)
+			string extension = ".jpg";
+			string cleanBase64 = base64String;
+
+			if (base64String.Contains(","))
+			{
+				var parts = base64String.Split(',');
+				var metaInfo = parts[0].ToLower();
+				cleanBase64 = parts[1];
+
+				if (metaInfo.Contains("video/mp4") || metaInfo.Contains("video/")) extension = ".mp4";
+				else if (metaInfo.Contains("image/png")) extension = ".png";
+			}
+
+			// Генерируем уникальное имя
+			string fileName = $"{Guid.NewGuid()}{extension}";
+			string localPath = Path.Combine(tempFolder, fileName);
+
+			// Декодируем и сохраняем файл
+			byte[] fileBytes = Convert.FromBase64String(cleanBase64);
+			await File.WriteAllBytesAsync(localPath, fileBytes);
+
+			// Формируем публичную ссылку (убедитесь, что APP_URL доступен в классе)
+			// APP_URL должен быть вашим доменом на Render, например https://my-app.onrender.com
+			string publicUrl = $"{APP_URL.TrimEnd('/')}/temp_media/{fileName}";
+
+			return (publicUrl, localPath);
+		}
+
+		/// <summary>
+		/// Очистка старых файлов, которые могли остаться при экстренном падении сервера
+		/// </summary>
+		private void CleanupOldTempFiles()
+		{
+			try
+			{
+				string webRootPath = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+				string tempFolder = Path.Combine(webRootPath, "temp_media");
+
+				if (Directory.Exists(tempFolder))
+				{
+					var oldFiles = Directory.GetFiles(tempFolder)
+						.Select(f => new FileInfo(f))
+						.Where(f => f.CreationTime < DateTime.Now.AddMinutes(-15)) // Удаляем все, что старше 15 минут
+						.ToList();
+
+					foreach (var file in oldFiles)
+					{
+						file.Delete();
+						Console.WriteLine($"[Очистка] Удален старый временный файл: {file.Name}");
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Ошибка при очистке старых файлов: {ex.Message}");
 			}
 		}
 

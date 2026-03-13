@@ -15,8 +15,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 		{
 			try
 			{
-				//Log($"Processing change field: {change.Field}");
-
 				switch (change.Field)
 				{
 					case "comments":
