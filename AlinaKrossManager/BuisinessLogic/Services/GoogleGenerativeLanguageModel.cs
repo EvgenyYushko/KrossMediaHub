@@ -10,11 +10,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly string _token;
 		private string[] modelsToTry =
 		{
+			"gemini-3.1-flash-image-preview",
+			"gemini-2.5-flash-image", // nano banana
 			"imagen-4.0-ultra-generate-001",
 			"imagen-4.0-generate-001",
 			"imagen-4.0-fast-generate-001",
 			"imagen-3.0-generate-002",
-			"gemini-2.5-flash-image" // nano banana
 		};
 
 		public GoogleGenerativeLanguageModel(GeminiService.GeminiServiceClient geminiServiceClient, string token)
@@ -121,7 +122,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 						{
 							Prompt = { new Prompt { Text = prompt } },
 							MimeType = "image/jpeg",
-							AspectRatio = "3:4",
+							AspectRatio = "9:16",
 							SampleCount = countImage,
 							SelectedModel = model
 						}, AddTokenToHeaders());
