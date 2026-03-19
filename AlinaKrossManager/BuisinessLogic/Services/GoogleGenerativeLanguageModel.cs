@@ -10,12 +10,12 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		private readonly string _token;
 		private string[] modelsToTry =
 		{
-			"gemini-3.1-flash-image-preview",
-			"gemini-2.5-flash-image", // nano banana
 			"imagen-4.0-ultra-generate-001",
 			"imagen-4.0-generate-001",
 			"imagen-4.0-fast-generate-001",
 			"imagen-3.0-generate-002",
+			"gemini-3.1-flash-image-preview",
+			"gemini-2.5-flash-image", // nano banana
 		};
 
 		public GoogleGenerativeLanguageModel(GeminiService.GeminiServiceClient geminiServiceClient, string token)
