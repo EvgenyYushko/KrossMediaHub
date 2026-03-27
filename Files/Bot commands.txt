@@ -1,4 +1,6 @@
 start - очередь
+generate_lana_image - create image Lana 🍌
+generate_nano_banana - create with 🍌
 generate_image - создать изображение
 top_hash_posts - поиск по тегу в инсте
 post_to_insta - пост в инсту

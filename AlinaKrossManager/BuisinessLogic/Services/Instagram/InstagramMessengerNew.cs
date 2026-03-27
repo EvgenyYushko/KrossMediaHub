@@ -197,7 +197,6 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 
 		private async Task<string> ResolveMessageContentAsync(MessageItem msg)
 		{
-			string userContent = null;
 			string messageId = msg.Id;
 
 			// 1. Проверка КЭША (Webhooks)
@@ -216,46 +215,43 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			}
 
 			// 2. Если в кэше пусто, смотрим поля API
-			if (string.IsNullOrEmpty(userContent))
+			// А. Текст
+			if (!string.IsNullOrEmpty(msg.Text))
 			{
-				// А. Текст
-				if (!string.IsNullOrEmpty(msg.Text))
+				return msg.Text;
+			}
+			// Б. Вложения API (Фото/Видео)
+			else if (msg.Attachments?.Data != null && msg.Attachments.Data.Count > 0)
+			{
+				var attachment = msg.Attachments.Data[0];
+				MediaDataEntry newEntry = null;
+
+				if (attachment.VideoData != null && !string.IsNullOrEmpty(attachment.VideoData.Url))
 				{
-					return msg.Text;
+					newEntry = new MediaDataEntry { Url = attachment.VideoData.Url, MediaType = "video", IsProcessed = false };
 				}
-				// Б. Вложения API (Фото/Видео)
-				else if (msg.Attachments?.Data != null && msg.Attachments.Data.Count > 0)
+				else if (attachment.ImageData != null && !string.IsNullOrEmpty(attachment.ImageData.Url))
 				{
-					var attachment = msg.Attachments.Data[0];
-					MediaDataEntry newEntry = null;
-
-					if (attachment.VideoData != null && !string.IsNullOrEmpty(attachment.VideoData.Url))
-					{
-						newEntry = new MediaDataEntry { Url = attachment.VideoData.Url, MediaType = "video", IsProcessed = false };
-					}
-					else if (attachment.ImageData != null && !string.IsNullOrEmpty(attachment.ImageData.Url))
-					{
-						newEntry = new MediaDataEntry { Url = attachment.ImageData.Url, MediaType = "image", IsProcessed = false };
-					}
-
-					if (newEntry != null)
-					{
-						// Анализируем и сохраняем в кэш
-						string aiResult = await ProcessAndCacheMediaAsync(newEntry, messageId);
-
-						// Сохраняем в static storage, чтобы в следующий раз брать готовое
-						newEntry.AiResult = aiResult;
-						newEntry.IsProcessed = true;
-						MediaMessageStorage.Storage.TryAdd(messageId, new List<MediaDataEntry> { newEntry });
-
-						return aiResult;
-					}
+					newEntry = new MediaDataEntry { Url = attachment.ImageData.Url, MediaType = "image", IsProcessed = false };
 				}
-				// В. Unsupported (Аудио/Стикеры без кэша)
-				else if (msg.IsUnsupported)
+
+				if (newEntry != null)
 				{
-					return "[The user sent a sticker, reaction, or audio]";
+					// Анализируем и сохраняем в кэш
+					string aiResult = await ProcessAndCacheMediaAsync(newEntry, messageId);
+
+					// Сохраняем в static storage, чтобы в следующий раз брать готовое
+					newEntry.AiResult = aiResult;
+					newEntry.IsProcessed = true;
+					MediaMessageStorage.Storage.TryAdd(messageId, new List<MediaDataEntry> { newEntry });
+
+					return aiResult;
 				}
+			}
+			// В. Unsupported (Аудио/Стикеры без кэша)
+			else if (msg.IsUnsupported)
+			{
+				return "[The user sent a sticker, reaction, or audio]";
 			}
 
 			return "[Empty message]";
@@ -479,7 +475,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services.Instagram
 			try
 			{
 				string userContextInfo = await GetUserContextForAiAsync(senderId);
-				systemInstruction += "\n\nKeep this information in mind when responding. For example, whether you are mutual subscribers. If not, ask him to subscribe.\n" 
+				systemInstruction += "\n\nKeep this information in mind when responding. For example, whether you are mutual subscribers. If not, ask him to subscribe.\n"
 					+ userContextInfo;
 			}
 			catch (Exception ex)

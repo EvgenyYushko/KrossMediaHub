@@ -39,5 +39,10 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 		{
 			return _generativeLanguageModel.GeminiRequestGenerateImage(promptImg, countImage);
 		}
+
+		public Task<string> GenerateNanoBanana(string prompt, string aspectRatio, string imageSize, List<string> base64Images)
+		{
+			return _generativeLanguageModel.GenetareNanoBanana(prompt,aspectRatio,imageSize, base64Images);
+		}
 	}
 }

@@ -12,5 +12,8 @@ namespace AlinaKrossManager.Services
 		Task<string> GeminiTextToSpeechEn(string text);
 		Task<string> GeminiTextToSpeechRu(string text);
 		Task<string> RequestWithChatAsync(List<ChatMessage> messages, string systemInstruction = null);
+
+		Task<string> GenetareNanoBanana(string prompt, string aspectRatio, string imageSize
+			, List<string> base64Images, string selectedModel = "gemini-3.1-flash-image-preview");
 	}
 }

@@ -95,6 +95,31 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return response.GeneratedText;
 		}
 
+		public async Task<string> GenetareNanoBanana(string prompt, string aspectRatio, string imageSize
+			, List<string> base64Images, string selectedModel = "gemini-3.1-flash-image-preview")
+		{
+			var response = await _geminiServiceClient.RequestGenerateImageNanoBanaTwoAsync(new ()
+			{
+				Prompt = new Prompt { Text = prompt },
+				AspectRatio = aspectRatio,
+				ImageSize = imageSize,
+				SelectedModel = selectedModel,
+				ImagesData = { base64Images.Select(i => new ImageData() { Data = i, MimeType = "image/jpeg" }) }
+			}, AddTokenToHeaders());
+
+			var images = response.GeneratedImagesBase64.ToList();
+
+			if (images.Count > 0)
+			{
+				Console.WriteLine($"✅ Успех! Модель {selectedModel} сгенерировала {images.Count} изображений");
+				return images.First();
+			}
+
+			Console.WriteLine($"⚠️ Модель {selectedModel} вернула 0 изображений");
+
+			return "";
+		}
+
 		public async Task<string> GeminiRequestWithVideo(string prompt, string base64video)
 		{
 			var response = await _geminiServiceClient.RequestWithVideoAsync(new()
