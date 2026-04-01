@@ -61,7 +61,7 @@ namespace AlinaKrossManager.Controllers
 						{
 							foreach (var messaging in entry.Messaging)
 							{
-								await _instagramService.ProcessMessage(messaging);
+								//await _instagramService.ProcessMessage(messaging);
 								return Ok();
 							}
 						}
@@ -71,7 +71,7 @@ namespace AlinaKrossManager.Controllers
 						{
 							foreach (var change in entry.Changes)
 							{
-								await _instagramService.ProcessChange(change);
+								//await _instagramService.ProcessChange(change);
 							}
 						}
 					}

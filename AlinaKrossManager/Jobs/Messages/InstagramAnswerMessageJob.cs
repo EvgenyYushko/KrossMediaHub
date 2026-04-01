@@ -35,7 +35,7 @@ namespace AlinaKrossManager.Jobs.Messages
 		{
 			try
 			{
-				await _instagramService.ProcessNextUnreadMessageAsync();
+				//await _instagramService.ProcessNextUnreadMessageAsync();
 				//// 1. Генерируем base64 (здесь симуляция)
 				//string base64Audio = await _generativeLanguageModel.GeminiTextToSpeechEn("Hello, how are you");
 				//var audioBytes = Convert.FromBase64String(base64Audio);
