@@ -22,6 +22,8 @@ namespace AlinaKrossManager.Jobs
 
 		public async override Task Execute(IJobExecutionContext context)
 		{
+			return;
+
 			try
 			{
 				// 1. Получаем "снэпшот" всех данных из кэша

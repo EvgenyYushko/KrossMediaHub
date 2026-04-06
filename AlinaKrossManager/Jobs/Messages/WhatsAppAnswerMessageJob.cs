@@ -27,6 +27,8 @@ namespace AlinaKrossManager.Jobs.Messages
 
 		public async override Task Execute(IJobExecutionContext context)
 		{
+			return;
+
 			var allUsers = _conversationService.GetAllUserConversations();
 
 			foreach (var phoneNumber in allUsers)

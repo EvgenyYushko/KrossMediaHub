@@ -22,6 +22,7 @@ namespace AlinaKrossManager.Jobs.Messages
 
 		public async Task Execute(IJobExecutionContext context)
 		{
+			return;
 			try
 			{
 				// 1. Получаем сообщения, на которые нужно ответить

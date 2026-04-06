@@ -24,6 +24,8 @@ namespace AlinaKrossManager.Jobs.Messages
 
 		public async Task Execute(IJobExecutionContext context)
 		{
+			return;
+
 			try
 			{
 				// 1. Убедимся, что мы залогинены

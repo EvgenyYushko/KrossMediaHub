@@ -33,7 +33,7 @@ namespace AlinaKrossManager.Jobs
 
 		public override async Task Execute(IJobExecutionContext context)
 		{
-			//return;
+			return;
 			try
 			{
 				await _instagramService.SendInstagramAdminMessage("Привет, я сейчас буду выкладывать новый пост)");
