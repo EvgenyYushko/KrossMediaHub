@@ -11,6 +11,7 @@ namespace AlinaKrossManager.Services
 		Task<string> GeminiAudioToText(string base64Iaudio);
 		Task<string> GeminiTextToSpeechEn(string text);
 		Task<string> GeminiTextToSpeechRu(string text);
+		Task<MemoryStream?> TextToSpeech(string text, string voiceName, string model);
 		Task<string> RequestWithChatAsync(List<ChatMessage> messages, string systemInstruction = null);
 
 		Task<string> GenetareNanoBanana(string prompt, string aspectRatio, string imageSize

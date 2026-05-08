@@ -102,6 +102,25 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						}
 					}
 					break;
+				case UpdateType.Message when msgText.IsCommand("text_to_voice") && update.Message.ReplyToMessage is Message rmsg:
+					{
+						Message msgStart = null;
+						try
+						{
+							msgStart = await _telegramService.SendMessage("Генерируем голосовое...");
+							await SendTextToVoice(update, rmsg, ct);
+						}
+						finally
+						{
+							try
+							{
+								await _telegramService.DeleteMessage(update.Message.MessageId, ct);
+								await _telegramService.DeleteMessage(msgStart.MessageId, ct);
+							}
+							catch { }
+						}
+					}
+					break;
 				case UpdateType.Message when msgText.IsCommand("post_to_threads") && update.Message.ReplyToMessage is Message rmsg:
 					{
 						// Ваши данные (должны быть уже настроены в Instagram Graph API)
@@ -506,7 +525,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				}
 				else if (resVideos is not null)
 				{
-					success = await publisher.XPost(description, null, resVideos.Base64Video);					
+					success = await publisher.XPost(description, null, resVideos.Base64Video);
 				}
 				else
 				{
@@ -693,7 +712,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			var msgId = update.Message.ReplyToMessage.MessageId;
 			string caption = prompt;
 
-			if(string.IsNullOrEmpty(image))
+			if (string.IsNullOrEmpty(image))
 			{
 				await _telegramService.SendMessage("📭 Изображения не сгенерированы.\nВозможно запрос не прошёл цензуру.", msgId);
 				return;
@@ -718,13 +737,42 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			var msgId = update.Message.ReplyToMessage.MessageId;
 			string caption = prompt;
 
-			if(string.IsNullOrEmpty(image))
+			if (string.IsNullOrEmpty(image))
 			{
 				await _telegramService.SendMessage("📭 Изображения не сгенерированы.\nВозможно запрос не прошёл цензуру.", msgId);
 				return;
 			}
 
 			await _telegramService.SendSinglePhotoAsync(image, msgId, caption);
+		}
+
+		public async Task SendTextToVoice(Update update, Message rmsg, CancellationToken ct)
+		{
+			try
+			{
+				var replayText = rmsg.GetMsgText() ?? "";
+
+				//var text = "Read the following transcript based on the audio profile and director's note.\n\n# Audio Profile\nA helpful and professional personal assistant.\n\n# Director's note\nStyle: Empathetic. Pace: Natural. Accent: American (Gen).\n\n## Scene:\nНежная девушка , шепчет тихо и сексуально\n\n## Sample Context:\nИмитация секса по телефону\n\n## Transcript:\n[in a gentle, low, aroused voice, breathy]\nMmm... Hello, my sweet... [moan softly and sweetly]\n[take a deep breath, voice trembling with excitement]";
+				var voiceName = "Aoede";
+				var model = "gemini-3.1-flash-tts-preview";
+				
+				var inText = "Read the following transcript based on the audio profile and director's note.\n\n# Audio Profile\nA helpful and professional personal assistant.\n\n# Director's note\nStyle: Empathetic. Pace: Natural. Accent: American (Gen).\n\n## Scene:\nНежная девушка , шепчет тихо и сексуально\n\n## Sample Context:\nИмитация секса по телефону\n\n## Transcript:\n[in a gentle, low, aroused voice, breathy]\n";
+				inText += replayText;
+				using var mp3Stream = await _aiFacade.TextToSpeech(inText, voiceName, model);
+
+				if (mp3Stream != null)
+				{
+					await _telegramService.SendVoice(update.Message.Chat.Id, mp3Stream);
+					Console.WriteLine("Голосовое сообщение с волной отправлено!");
+					return;
+				}
+
+				Console.WriteLine("Не удалось получить голосовое");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"❌ Ошибка генерации голосового: {ex.Message}");
+			}			
 		}
 	}
 }

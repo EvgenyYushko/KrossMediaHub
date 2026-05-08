@@ -41,6 +41,11 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return images;
 		}
 
+		public async Task SendVoice(long senderId, MemoryStream wavStream)
+		{
+			await _telegramBotClient.SendVoice(chatId: senderId, voice: InputFile.FromStream(wavStream, "voice.mp3"));
+		}
+
 		public Task<Message> SendMessage(long senderId, string text, ReplyMarkup replyMarkup)
 		{
 			return _telegramBotClient.SendMessage(senderId, text, replyMarkup: replyMarkup);
@@ -134,7 +139,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 
 			if (update.Message.Chat.Id != EVGENY_YUSHKO_TG_ID || update.Message.Chat.Type is not ChatType.Private)
 			{
-				await _telegramBotClient.SendMessage(EVGENY_YUSHKO_TG_ID, "Данная комманда доступна только в ЛС чата, и только для его администратора!");
+				await _telegramBotClient.SendMessage(update.Message.Chat.Id, "Данная комманда доступна только в ЛС чата, и только для его администратора!");
 				return false;
 			}
 			return true;
@@ -552,5 +557,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 				HandleMediaGroup(rmsg);
 			}
 		}
+
+
 	}
 }

@@ -1,6 +1,8 @@
 using AlinaKrossManager.Services;
 using Grpc.Core;
 using Protos.GoogleGeminiService;
+using Google.GenAI.Types;
+using Google.GenAI;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
@@ -40,7 +42,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			}, AddTokenToHeaders());
 
 			return rsponce.GeneratedText;
-		}		
+		}
 
 		public async Task<string> GeminiAudioToText(string base64Iaudio)
 		{
@@ -79,6 +81,67 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return response.AudioContent;
 		}
 
+		public async Task<MemoryStream?> TextToSpeech(string text, string voiceName, string model)
+		{
+			var client = new Client(apiKey: _token);
+
+			var contents = new List<Content>
+			{
+				new Content
+				{
+					Role = "user",
+					Parts = new List<Part>
+					{
+						new Part { Text = text },
+					}
+				},
+			};
+
+			var config = new GenerateContentConfig
+			{
+				Temperature = 1,
+				ResponseModalities = new List<string>
+				{
+					"audio"
+				},
+				SpeechConfig = new SpeechConfig
+				{
+					VoiceConfig = new VoiceConfig
+					{
+						PrebuiltVoiceConfig = new PrebuiltVoiceConfig
+						{
+							VoiceName = voiceName
+						}
+					}
+				},
+			};
+
+			var audioDataList = new List<byte>();
+
+			await foreach (var chunk in client.Models.GenerateContentStreamAsync(model, contents, config))
+			{
+				if (chunk.Candidates[0].Content.Parts != null)
+				{
+					var part = chunk.Candidates[0].Content.Parts[0];
+					if (part.InlineData?.Data != null)
+					{
+						audioDataList.AddRange(part.InlineData.Data);
+					}
+				}
+			}
+
+			if (audioDataList.Count > 0)
+			{
+				// ВАЖНО: Конвертируем в MP3 прямо в памяти
+				var mp3Stream = AudioService.GetMp3Stream(audioDataList.ToArray(), 24000, 1);
+
+				// Отправляем именно MP3 поток
+				return mp3Stream;
+			}
+
+			return null;
+		}
+
 		public async Task<string> GeminiRequest(string prompt)
 		{
 			var response = await _geminiServiceClient.RequestAsync(new Prompt { Text = prompt }, AddTokenToHeaders());
@@ -98,7 +161,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 		public async Task<string> GenetareNanoBanana(string prompt, string aspectRatio, string imageSize
 			, List<string> base64Images, string selectedModel = "gemini-3.1-flash-image-preview")
 		{
-			var response = await _geminiServiceClient.RequestGenerateImageNanoBanaTwoAsync(new ()
+			var response = await _geminiServiceClient.RequestGenerateImageNanoBanaTwoAsync(new()
 			{
 				Prompt = new Prompt { Text = prompt },
 				AspectRatio = aspectRatio,
@@ -193,5 +256,4 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return headers;
 		}
 	}
-
 }

@@ -42,7 +42,12 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 
 		public Task<string> GenerateNanoBanana(string prompt, string aspectRatio, string imageSize, List<string> base64Images)
 		{
-			return _generativeLanguageModel.GenetareNanoBanana(prompt,aspectRatio,imageSize, base64Images);
+			return _generativeLanguageModel.GenetareNanoBanana(prompt, aspectRatio, imageSize, base64Images);
+		}
+
+		public Task<MemoryStream?> TextToSpeech(string text, string voiceName, string model)
+		{
+			return _generativeLanguageModel.TextToSpeech(text, voiceName, model);
 		}
 	}
 }
