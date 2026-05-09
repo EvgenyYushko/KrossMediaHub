@@ -133,7 +133,7 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			if (audioDataList.Count > 0)
 			{
 				// ВАЖНО: Конвертируем в MP3 прямо в памяти
-				var mp3Stream = AudioService.GetMp3Stream(audioDataList.ToArray(), 24000, 1);
+				var mp3Stream = await AudioService.GetMp3Stream(audioDataList.ToArray(), 24000, 1);
 
 				// Отправляем именно MP3 поток
 				return mp3Stream;

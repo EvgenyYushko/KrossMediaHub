@@ -755,7 +755,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 				//var text = "Read the following transcript based on the audio profile and director's note.\n\n# Audio Profile\nA helpful and professional personal assistant.\n\n# Director's note\nStyle: Empathetic. Pace: Natural. Accent: American (Gen).\n\n## Scene:\nНежная девушка , шепчет тихо и сексуально\n\n## Sample Context:\nИмитация секса по телефону\n\n## Transcript:\n[in a gentle, low, aroused voice, breathy]\nMmm... Hello, my sweet... [moan softly and sweetly]\n[take a deep breath, voice trembling with excitement]";
 				var voiceName = "Aoede";
 				var model = "gemini-3.1-flash-tts-preview";
-				
+
 				var inText = "Read the following transcript based on the audio profile and director's note.\n\n# Audio Profile\nA helpful and professional personal assistant.\n\n# Director's note\nStyle: Empathetic. Pace: Natural. Accent: American (Gen).\n\n## Scene:\nНежная девушка , шепчет тихо и сексуально\n\n## Sample Context:\nИмитация секса по телефону\n\n## Transcript:\n[in a gentle, low, aroused voice, breathy]\n";
 				inText += replayText;
 				using var mp3Stream = await _aiFacade.TextToSpeech(inText, voiceName, model);
@@ -772,7 +772,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			catch (Exception ex)
 			{
 				Console.WriteLine($"❌ Ошибка генерации голосового: {ex.Message}");
-			}			
+			}
 		}
 	}
 }

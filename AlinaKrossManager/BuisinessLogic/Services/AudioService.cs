@@ -1,33 +1,53 @@
-using NAudio.Lame;
-using NAudio.Wave;
+using System.Diagnostics;
 
 namespace AlinaKrossManager.BuisinessLogic.Services
 {
 	public static class AudioService
 	{
-		public static MemoryStream GetMp3Stream(byte[] rawPcmData, int sampleRate, int channels)
+		public static async Task<MemoryStream> GetMp3Stream(byte[] rawPcmData, int sampleRate, int channels)
 		{
-			var waveFormat = new WaveFormat(sampleRate, 16, channels);
-			byte[] mp3Bytes;
+			var outputStream = new MemoryStream();
 
-			// Используем временный MemoryStream для записи
-			using (var tempMs = new MemoryStream())
+			// Настраиваем запуск FFmpeg
+			// -f s16le: формат входных данных (16-bit PCM Little Endian)
+			// -ar 24000: частота дискретизации (как у Gemini)
+			// -ac 1: количество каналов (моно)
+			// -i pipe:0: читать данные из стандартного ввода (stdin)
+			// -f mp3 pipe:1: записывать результат в формате mp3 в стандартный вывод (stdout)
+			var startInfo = new ProcessStartInfo
 			{
-				using (var pcmStream = new MemoryStream(rawPcmData))
-				using (var reader = new RawSourceWaveStream(pcmStream, waveFormat))
-				using (var writer = new LameMP3FileWriter(tempMs, waveFormat, 64))
-				{
-					reader.CopyTo(writer);
-					writer.Flush();
-					// Здесь, при выходе из using, writer финализирует MP3 и закрывает tempMs
-				}
+				FileName = "ffmpeg",
+				Arguments = $"-f s16le -ar {sampleRate} -ac {channels} -i pipe:0 -f mp3 pipe:1",
+				RedirectStandardInput = true,
+				RedirectStandardOutput = true,
+				RedirectStandardError = true,
+				UseShellExecute = false,
+				CreateNoWindow = true
+			};
 
-				// MemoryStream.ToArray() работает даже после того, как поток закрыт!
-				mp3Bytes = tempMs.ToArray();
+			using (var process = new Process { StartInfo = startInfo })
+			{
+				process.Start();
+
+				// Записываем PCM данные в stdin FFmpeg
+				var inputTask = Task.Run(async () =>
+				{
+					using (var stdin = process.StandardInput.BaseStream)
+					{
+						await stdin.WriteAsync(rawPcmData, 0, rawPcmData.Length);
+						await stdin.FlushAsync();
+					}
+				});
+
+				// Читаем готовый MP3 из stdout FFmpeg
+				var outputTask = process.StandardOutput.BaseStream.CopyToAsync(outputStream);
+
+				await Task.WhenAll(inputTask, outputTask);
+				await process.WaitForExitAsync();
 			}
 
-			// Возвращаем НОВЫЙ открытый поток из байтов
-			return new MemoryStream(mp3Bytes);
+			outputStream.Position = 0;
+			return outputStream;
 		}
 	}
 }
