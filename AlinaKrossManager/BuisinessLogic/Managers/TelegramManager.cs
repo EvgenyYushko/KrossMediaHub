@@ -783,7 +783,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 					Style = "Whisper",
 					Pace = "The Drift",
 					Accent = "American (Gen)",
-					Scene = "Нежная девушка, шепчет тихо и сексуально",
+					Scene = "Нежная девушка, говорит тихо",
 					SampleContext = "Имитация секса по телефону"
 				};
 

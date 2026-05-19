@@ -71,9 +71,9 @@ namespace AlinaKrossManager.Jobs
 					{
 						AudioProfile = "Alina Kross",
 						VoiceName = "Aoede",
-						Style = "Whisper",
-						Pace = "The Drift",
-						Accent = "American (Gen)",
+						Style = "The \"Vocal Smile\": The soft palate is raised to keep the tone bright, sunny, and explicitly inviting",
+						Pace = "Natural",
+						Accent = "American (General)",
 						Scene = sceneAi,
 						SampleContext = sampleContextAi
 					};
