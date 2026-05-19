@@ -16,6 +16,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 		public static string DB_MAINTANANCE_QUEUE = "DbMaintananceQueue";
 		public static string WHATS_APP_ANSWER_MESSAGE_QUEUE = "WhatsAppAnswerMessageQueue";
 		public static string CACH_PROCESS_QUEUE= "CachProcessJobQueue";
+		public static string WISHPERS_QUEUE= "WishpersJobQueue";
 
 		public static List<JobsSetting> JobSettings { get; set; } = new();
 
@@ -39,6 +40,7 @@ namespace AlinaKrossManager.Jobs.Helpers
 			JobSettings.Add(new() { Type = typeof(DbMaintananceJob), Key = DB_MAINTANANCE_QUEUE, Time = DbMaintananceJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(WhatsAppAnswerMessageJob), Key = WHATS_APP_ANSWER_MESSAGE_QUEUE, Time = WhatsAppAnswerMessageJob.Time, Castum = false });
 			JobSettings.Add(new() { Type = typeof(CachProcessJob), Key = CACH_PROCESS_QUEUE, Time = CachProcessJob.Time, Castum = false });
+			JobSettings.Add(new() { Type = typeof(WishpersJob), Key = WISHPERS_QUEUE, Time = WishpersJob.Time, Castum = false });
 		}
 	}
 

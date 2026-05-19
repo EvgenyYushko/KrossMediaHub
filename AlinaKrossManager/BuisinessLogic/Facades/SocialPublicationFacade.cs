@@ -172,6 +172,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			string caption = post.GetCaption(network);
 			List<string> files = post.Images; // Это Base64 строки из БД!
 			Video? video = null;
+			MemoryStream audio= null;
 
 			switch (network)
 			{
@@ -235,7 +236,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					break;
 				case NetworkType.TelegramPublic:
 					{
-						await TelegrammPublicPost(caption, files, video);
+						await TelegrammPublicPost(caption, files, video, audio);
 						//try { await _telegramService.SendMessage("✅ Post TelegrammPublic success"); } catch { }
 					}
 					break;
@@ -247,7 +248,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					break;
 				case NetworkType.TelegramPrivate:
 					{
-						await TelegramPrivatePost(caption, files, video);
+						await TelegramPrivatePost(caption, files, video, audio);
 						await _telegramService.SendPaidPhotosAsync(files, 30, caption, senderId: PublicTelegramChanel.CHANEL_ID);
 						//await _telegramService.SendPaidVideosAsync(files, 30, caption, senderId : PublicTelegramChanel.CHANEL_ID);
 						//try { await _telegramService.SendMessage("✅ Post TelegramPrivate success"); } catch { }
@@ -259,14 +260,14 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			}
 		}
 
-		public async Task TelegramPrivatePost(string caption, List<string> files, Video? video)
+		public async Task TelegramPrivatePost(string caption, List<string> files, Video? video, MemoryStream? audio)
 		{
-			await TgHandler(new CancellationToken(), PrivateTelegramChanel.CHANEL_ID, _privateTelegramChanel.ServiceName, files, caption, video);
+			await TgHandler(new CancellationToken(), PrivateTelegramChanel.CHANEL_ID, _privateTelegramChanel.ServiceName, files, caption, video, audio);
 		}
 
-		public async Task TelegrammPublicPost(string caption, List<string> files, Video? video)
+		public async Task TelegrammPublicPost(string caption, List<string> files, Video? video, MemoryStream? audio)
 		{
-			await TgHandler(new CancellationToken(), PublicTelegramChanel.CHANEL_ID, _publicTelegramChanel.ServiceName, files, caption, video);
+			await TgHandler(new CancellationToken(), PublicTelegramChanel.CHANEL_ID, _publicTelegramChanel.ServiceName, files, caption, video, audio);
 		}
 
 		public async Task BlueSkyPost(string caption, List<string> files, VideoModel videoModel)
@@ -366,7 +367,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 		}
 
 		public async Task TgHandler(CancellationToken ct, long chanelId, string serviceName
-			, List<string> files, string caption, Video? video)
+			, List<string> files, string caption, Video? video, MemoryStream? audio)
 		{
 			try
 			{
@@ -391,6 +392,10 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 					{
 						await _telegramService.SendPhotoAlbumAsync(files, null, caption, chanelId);
 					}
+				}
+				else if (audio is not null)
+				{
+					await _telegramService.SendVoice(chanelId, audio);
 				}
 				else
 				{

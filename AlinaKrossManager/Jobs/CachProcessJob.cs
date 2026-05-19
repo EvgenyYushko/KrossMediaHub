@@ -5,6 +5,7 @@ using Quartz;
 
 namespace AlinaKrossManager.Jobs
 {
+	[DisallowConcurrentExecution]
 	public class CachProcessJob : SchedulerJob
 	{
 		private readonly InstagramService _instagramService;

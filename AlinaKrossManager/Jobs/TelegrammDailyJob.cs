@@ -37,7 +37,7 @@ namespace AlinaKrossManager.Jobs
 					var textToTg = await _generativeLanguageModel.GeminiRequest(prompt(topic));
 
 					_logger.LogInformation($"Текстовый пост в TG: {textToTg}");
-					await publisher.TelegrammPublicPost(textToTg, null, null);
+					await publisher.TelegrammPublicPost(textToTg, null, null, null);
 				}
 			}
 			catch (Exception ex)

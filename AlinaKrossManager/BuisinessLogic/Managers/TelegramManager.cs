@@ -108,7 +108,11 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 						try
 						{
 							msgStart = await _telegramService.SendMessage("Генерируем голосовое...");
-							await SendTextToVoice(update, rmsg, ct);
+							using (var scope = _scopeFactory.CreateScope())
+							{
+								var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
+								await SendTextToVoice(update, rmsg, ct, publisher);
+							}
 						}
 						finally
 						{
@@ -629,7 +633,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 				var description = await GetDescription(rmsg, images, replayText, false, basePrompt);
 
-				await publisher.TgHandler(ct, chanelId, serviceName, images.Images, description, resVideos);
+				await publisher.TgHandler(ct, chanelId, serviceName, images.Images, description, resVideos, null);
 
 				try
 				{
@@ -746,23 +750,40 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			await _telegramService.SendSinglePhotoAsync(image, msgId, caption);
 		}
 
-		public async Task SendTextToVoice(Update update, Message rmsg, CancellationToken ct)
+		public async Task SendTextToVoice(Update update, Message rmsg, CancellationToken ct, SocialPublicationFacade publisher)
 		{
 			try
 			{
 				var replayText = rmsg.GetMsgText() ?? "";
 
-				//var text = "Read the following transcript based on the audio profile and director's note.\n\n# Audio Profile\nA helpful and professional personal assistant.\n\n# Director's note\nStyle: Empathetic. Pace: Natural. Accent: American (Gen).\n\n## Scene:\nНежная девушка , шепчет тихо и сексуально\n\n## Sample Context:\nИмитация секса по телефону\n\n## Transcript:\n[in a gentle, low, aroused voice, breathy]\nMmm... Hello, my sweet... [moan softly and sweetly]\n[take a deep breath, voice trembling with excitement]";
-				var voiceName = "Aoede";
-				var model = "gemini-3.1-flash-tts-preview";
-
-				var inText = "Read the following transcript based on the audio profile and director's note.\n\n# Audio Profile\nA helpful and professional personal assistant.\n\n# Director's note\nStyle: Empathetic. Pace: Natural. Accent: American (Gen).\n\n## Scene:\nНежная девушка , шепчет тихо и сексуально\n\n## Sample Context:\nИмитация секса по телефону\n\n## Transcript:\n[in a gentle, low, aroused voice, breathy]\n";
-				inText += replayText;
-				using var mp3Stream = await _aiFacade.TextToSpeech(inText, voiceName, model);
-
-				if (mp3Stream != null)
+				var sexySettings = new VoiceSettings
 				{
-					await _telegramService.SendVoice(update.Message.Chat.Id, mp3Stream);
+					AudioProfile = "Alina Kross",
+					VoiceName = "Aoede",
+					Style = "Whisper",
+					Pace = "The Drift",
+					Accent = "American (Gen)",
+					Scene = "Нежная девушка, шепчет тихо и сексуально",
+					SampleContext = "Имитация секса по телефону"
+				};
+
+				// Пример 2: "Британский официант"
+				//var waiterSettings = new VoiceSettings
+				//{
+				//	AudioProfile = "Professional Male",
+				//	VoiceName = "Guy",
+				//	Style = "Cheerful",
+				//	Pace = "Natural",
+				//	Accent = "British (RP)",
+				//	Scene = "Официант в дорогом ресторане",
+				//	SampleContext = "Приветствие гостя"
+				//};
+
+				using var stream = await _aiFacade.GenerateVoiceAsync(replayText, sexySettings);
+
+				if (stream != null)
+				{
+					await publisher.TelegrammPublicPost(null, null, null, stream);
 					Console.WriteLine("Голосовое сообщение с волной отправлено!");
 					return;
 				}
