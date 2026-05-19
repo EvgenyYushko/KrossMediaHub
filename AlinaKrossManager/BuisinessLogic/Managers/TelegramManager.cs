@@ -783,7 +783,7 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 
 				if (stream != null)
 				{
-					await publisher.TelegrammPublicPost(null, null, null, stream);
+					await _telegramService.SendVoice(update.Message.Chat.Id, stream);
 					Console.WriteLine("Голосовое сообщение с волной отправлено!");
 					return;
 				}
