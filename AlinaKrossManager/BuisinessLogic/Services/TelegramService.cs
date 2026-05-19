@@ -442,6 +442,28 @@ namespace AlinaKrossManager.BuisinessLogic.Services
 			return base64Video;
 		}
 
+		public async Task<string> GetFileData(string fileId)
+		{
+			var file = await _telegramBotClient.GetFile(fileId);
+
+			if (file.FileSize.HasValue && file.FileSize.Value > 25 * 1024 * 1024)
+			{
+				Console.WriteLine($"Файл слишком большой для скачивания через Bot API. Отправьте короче или как файл.");
+				return null;
+			}
+
+			var ct = new CancellationToken();
+			string base64Iaudio = null;
+			using (var ms = new MemoryStream())
+			{
+				await _telegramBotClient.DownloadFile(file.FilePath, ms, ct);
+				byte[] audioBytes = ms.ToArray();
+				base64Iaudio = Convert.ToBase64String(audioBytes);
+			}
+
+			return base64Iaudio;
+		}
+
 		public Task EditMessageText(int messageId, string text, ParseMode parseMode, InlineKeyboardMarkup replyMarkup = null, CancellationToken cancellationToken = default)
 		{
 			return _telegramBotClient.EditMessageText(new ChatId(EVGENY_YUSHKO_TG_ID), messageId, text, parseMode, replyMarkup: replyMarkup, cancellationToken: cancellationToken);

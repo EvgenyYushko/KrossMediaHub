@@ -756,6 +756,26 @@ namespace AlinaKrossManager.BuisinessLogic.Managers
 			{
 				var replayText = rmsg.GetMsgText() ?? "";
 
+				if (replayText == "")
+				{
+					var voice = update.Message.GetVoice();
+					if (voice != null)
+					{
+						var base64Iaudio = await _telegramService.GetFileData(voice.FileId);
+						var transcript = await _aiFacade.SpeechToText(base64Iaudio);
+						if (!string.IsNullOrEmpty(transcript))
+						{
+							replayText = transcript;
+							Console.WriteLine($"Распознанное голосовое: {replayText}");
+						}
+					}
+				}
+
+				if (string.IsNullOrEmpty(replayText))
+				{
+					return;
+				}
+
 				var sexySettings = new VoiceSettings
 				{
 					AudioProfile = "Alina Kross",
