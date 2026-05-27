@@ -55,7 +55,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			return _generativeLanguageModel.GeminiAudioToText(base64Audio);
 		}
 
-		public async Task<MemoryStream> GenerateVoiceAsync(string text, VoiceSettings settings)
+		public Task<MemoryStream> GenerateVoiceAsync(string text, VoiceSettings settings)
 		{
 			var model = "gemini-3.1-flash-tts-preview";
 
@@ -85,7 +85,7 @@ namespace AlinaKrossManager.BuisinessLogic.Facades
 			{text}";
 
 			// 3. Отправляем в AI
-			return await TextToSpeech(prompt, settings.VoiceName, model);
+			return TextToSpeech(prompt, settings.VoiceName, model);
 		}
 	}
 	public static class VoiceConstants
