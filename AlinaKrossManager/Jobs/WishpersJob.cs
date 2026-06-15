@@ -27,6 +27,9 @@ namespace AlinaKrossManager.Jobs
 		{
 			try
 			{
+				_logger.LogError("WishpersJob skiped...");
+				return;
+
 				using (var scope = _serviceScopeFactory.CreateScope())
 				{
 					var publisher = scope.ServiceProvider.GetRequiredService<SocialPublicationFacade>();
